@@ -43,6 +43,6 @@ sim_data <- sim_data %>%
     Value = pmax(Value, 0.5)
   )
 
-write_csv(sim_data, here::here("data", "simulated", "simulated_data.csv"))
+write_csv(sim_data, here::here("Simulations", "data", "simulated_data.csv"))
 
 glimpse(sim_data)
