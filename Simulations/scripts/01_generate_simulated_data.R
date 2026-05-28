@@ -1,6 +1,12 @@
+#' Purpose: Generate simulated data to be tested in three regressions
+
+# Load libraries
+# Need to add 'here' for reproducibility
 library(tidyverse)
 
+# Set seed for reproducibility
 set.seed(42)
+
 
 n <- 300
 
