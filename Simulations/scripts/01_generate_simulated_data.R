@@ -54,13 +54,15 @@ f_true <- function(t) {
 }
 
 sim_data <- sim_data %>%
+  rowwise() %>%
   mutate(
-    Midpoint   = (Start_date + End_date) / 2,
-    True_value = f_true(Midpoint),
-    Value      = round(True_value + rnorm(n, 0, 2.5), 1),
+    True_date  = runif(1, min = Start_date, max = End_date),
+    True_value = f_true(True_date),
+    Value      = round(True_value + rnorm(1, 0, 2.5), 1),
     Value      = pmax(Value, 0.5)
   ) %>%
-  select(-Midpoint, -True_value)
+  ungroup() %>%
+  select(-True_date, -True_value)
 
 write_csv(sim_data, here::here("Simulations", "data", "simulated_data.csv"))
 
@@ -71,3 +73,4 @@ ground_truth <- tibble(
 write_csv(ground_truth, here::here("Simulations", "data", "ground_truth.csv"))
 
 glimpse(sim_data)
+summary(sim_data$Value)
