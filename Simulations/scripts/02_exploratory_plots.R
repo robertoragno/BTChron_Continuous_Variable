@@ -49,38 +49,29 @@ p_dur <- ggplot(sim_data, aes(y = rank)) +
     axis.ticks.y = element_blank()
   )
 
-# ── Panel C: Value vs time ──────────────────────────────────────────────────
+# ── Panel C: Value on Y axis, date ranges on X ─────────────────────────────
 
-p_val <- ggplot(sim_data, aes(y = reorder(factor(ID), Midpoint))) +
-  geom_segment(aes(x = Start_date, xend = End_date, yend = reorder(factor(ID), Midpoint)),
-               linewidth = 0.15, colour = "grey60") +
-  geom_point(aes(x = Midpoint, size = Value), shape = 16, colour = "black",
-             alpha = 0.5) +
+p_val <- ggplot(sim_data) +
+  geom_segment(aes(x = Start_date, xend = End_date, y = Value, yend = Value),
+               linewidth = 0.15, colour = "grey50", alpha = 0.4) +
+  geom_point(aes(x = Midpoint, y = Value), shape = 16, colour = "black",
+             size = 0.6, alpha = 0.5) +
   scale_x_continuous(breaks = seq(100, 900, 100), expand = c(0.01, 0)) +
-  scale_size_continuous(range = c(0.3, 2.5)) +
   labs(
-    title = expression(bold("C.") ~ "Value mapped onto date ranges"),
+    title = expression(bold("C.") ~ "Value vs. date range"),
     x = "Year CE",
-    y = "Sample (ordered)"
+    y = "Value"
   ) +
   theme_panel +
-  theme(
-    axis.title.x = element_text(),
-    axis.text.y  = element_blank(),
-    axis.ticks.y = element_blank(),
-    legend.position = "bottom",
-    legend.key.width = unit(1.2, "cm"),
-    legend.title = element_text(size = 9),
-    legend.text  = element_text(size = 8)
-  )
+  theme(axis.title.x = element_text())
 
 # ── Combine ──────────────────────────────────────────────────────────────────
 
 p <- (p_hist / p_dur / p_val) +
-  plot_layout(heights = c(1, 1.6, 1.6))
+  plot_layout(heights = c(1, 1.4, 1))
 
 out_dir <- here("Simulations", "figures")
 ggsave(file.path(out_dir, "exploratory_panel.png"), p,
-       width = 7, height = 10, dpi = 300, bg = "white")
+       width = 6, height = 8, dpi = 300, bg = "white")
 
 cat("Saved to", file.path(out_dir, "exploratory_panel.png"), "\n")
