@@ -1,5 +1,8 @@
 # BTChron Continuous Variable
 
+> [!NOTE]  
+> Work in progress for the [first BTChron paper](https://www.overleaf.com/read/jjbchksqjpdr#694367). This readme will be updated soon with more details.
+
 ## Repository structure
 
 ```
