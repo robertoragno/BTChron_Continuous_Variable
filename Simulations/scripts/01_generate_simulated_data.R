@@ -2,7 +2,7 @@ library(tidyverse)
 
 set.seed(42)
 
-n <- 500
+n <- 300
 
 date_grid <- seq(100, 900, by = 25)
 
@@ -36,13 +36,32 @@ flip <- sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.35, 0.65))
 sim_data <- sim_data %>%
   mutate(End_date = if_else(flip, End_date - 1L, End_date))
 
-# Simulated continuous archaeological variable (e.g. vessel capacity in litres)
+# Ground truth: smooth rise-and-fall peaking around 450 CE
+# f(t) = baseline + amplitude * exp(-((t - peak) / width)^2)
+gt_baseline  <- 8
+gt_amplitude <- 12
+gt_peak      <- 450
+gt_width     <- 200
+
+f_true <- function(t) {
+  gt_baseline + gt_amplitude * exp(-((t - gt_peak) / gt_width)^2)
+}
+
 sim_data <- sim_data %>%
   mutate(
-    Value = round(rnorm(n, mean = 15, sd = 5), 1),
-    Value = pmax(Value, 0.5)
-  )
+    Midpoint   = (Start_date + End_date) / 2,
+    True_value = f_true(Midpoint),
+    Value      = round(True_value + rnorm(n, 0, 2.5), 1),
+    Value      = pmax(Value, 0.5)
+  ) %>%
+  select(-Midpoint, -True_value)
 
 write_csv(sim_data, here::here("Simulations", "data", "simulated_data.csv"))
+
+ground_truth <- tibble(
+  Year       = seq(100, 900, by = 1),
+  True_value = f_true(Year)
+)
+write_csv(ground_truth, here::here("Simulations", "data", "ground_truth.csv"))
 
 glimpse(sim_data)
