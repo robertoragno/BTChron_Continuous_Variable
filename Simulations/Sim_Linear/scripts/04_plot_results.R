@@ -54,9 +54,8 @@ p_trend <- ggplot(trend_summary) +
   geom_line(aes(x = Year, y = Median), linewidth = 0.6, colour = "black") +
   geom_line(data = ground_truth, aes(x = Year, y = True_value),
             linewidth = 0.7, colour = "black", linetype = "dashed") +
-  geom_point(data = sim_data,
-             aes(x = (Start_date + End_date) / 2, y = Value),
-             shape = 16, size = 0.4, colour = "grey40", alpha = 0.4) +
+  geom_rug(data = sim_data, aes(y = Value),
+           sides = "r", colour = "grey50", alpha = 0.3, length = unit(3, "pt")) +
   scale_fill_manual(
     name   = NULL,
     values = c("90% CI" = "grey80", "50% CI" = "grey60"),
@@ -101,12 +100,16 @@ p_dates <- ggplot(date_recovery, aes(x = True_date, y = Inferred_med)) +
   scale_y_continuous(breaks = seq(100, 900, 100), expand = c(0.01, 0)) +
   coord_equal() +
   labs(
-    title = expression(bold("B.") ~ "Latent date recovery"),
-    x = "True date (CE)",
-    y = "Inferred date (CE)"
+    title    = expression(bold("B.") ~ "Latent date recovery"),
+    subtitle = "Each point = one sample. Dashed line = perfect 1:1 recovery.",
+    x = "True generating date (CE)",
+    y = "Posterior median date (CE)"
   ) +
   theme_panel +
-  theme(axis.title.x = element_text())
+  theme(
+    axis.title.x  = element_text(),
+    plot.subtitle = element_text(size = 9, colour = "grey40", hjust = 0)
+  )
 
 # ── Panel C: Posterior distributions of generating parameters ────────────────
 
