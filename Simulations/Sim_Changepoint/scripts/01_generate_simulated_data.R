@@ -10,17 +10,17 @@ set.seed(42)
 
 # ── Known parameters (to be recovered) ──────────────────────────────────────
 
-gt_baseline <- 8
-gt_slope_1  <- 0.02
-gt_slope_2  <- -0.01
-gt_cp       <- 500          # changepoint year
+true_baseline <- 8
+true_slope_1  <- 0.02
+true_slope_2  <- -0.01
+true_cp       <- 500          # "known" changepoint year
 
 f_true <- function(t) {
   t_min <- 100
   ifelse(
-    t <= gt_cp,
-    gt_baseline + gt_slope_1 * (t - t_min),
-    gt_baseline + gt_slope_1 * (gt_cp - t_min) + gt_slope_2 * (t - gt_cp)
+    t <= true_cp,
+    true_baseline + true_slope_1 * (t - t_min),
+    true_baseline + true_slope_1 * (true_cp - t_min) + true_slope_2 * (t - true_cp)
   )
 }
 
@@ -53,9 +53,9 @@ sim_data <- tibble(
   ungroup()
 
 set.seed(123)
-flip <- sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.35, 0.65))
+censor_flag <- sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.35, 0.65))
 sim_data <- sim_data %>%
-  mutate(End_date = if_else(flip, End_date - 1L, End_date))
+  mutate(End_date = if_else(censor_flag, End_date - 1L, End_date))
 
 # ── Generate observed values from the true function ─────────────────────────
 
@@ -87,7 +87,7 @@ write_csv(ground_truth,
 
 params <- tibble(
   parameter = c("baseline", "slope_1", "slope_2", "changepoint", "sigma_noise"),
-  value     = c(gt_baseline, gt_slope_1, gt_slope_2, gt_cp, 1.5)
+  value     = c(true_baseline, true_slope_1, true_slope_2, true_cp, 1.5)
 )
 write_csv(params,
           here("Simulations", "Sim_Changepoint", "data", "generating_parameters.csv"))

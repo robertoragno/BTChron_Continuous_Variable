@@ -7,18 +7,18 @@ library(tidyverse)
 
 set.seed(42)
 
-# ── Known parameters (to be recovered) ──────────────────────────────────────
+# Known parameters (to be recovered from the model later)
 
-gt_baseline <- 5
-gt_slope    <- 0.015
+true_baseline <- 5
+true_slope    <- 0.015
 
 f_true <- function(t) {
-  gt_baseline + gt_slope * t
+  true_baseline + true_slope * t
 }
 
-# ── Generate date ranges ────────────────────────────────────────────────────
+# Generate date ranges
 
-n         <- 300
+n         <- 300 # number of observations
 date_grid <- seq(100, 900, by = 25)
 
 sim_data <- tibble(
@@ -45,19 +45,23 @@ sim_data <- tibble(
   ungroup()
 
 set.seed(123)
-flip <- sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.35, 0.65))
-sim_data <- sim_data %>%
-  mutate(End_date = if_else(flip, End_date - 1L, End_date))
 
-# ── Generate observed values from the true function ─────────────────────────
+#' Introduce some "censoring" by randomly shortening some end dates by 1 year
+#' as the flip of a coin. This simulates the real-world scenario where some observations
+#' might end a century (for instance the second century) as 199 CE instead of 200 CE.
+censor_flag <- sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.35, 0.65))
+sim_data <- sim_data %>%
+  mutate(End_date = if_else(censor_flag, End_date - 1L, End_date))
+
+# Generate observed values from the true function 
 
 sim_data <- sim_data %>%
   rowwise() %>%
   mutate(
-    True_date  = runif(1, min = Start_date, max = End_date),
-    True_value = f_true(True_date),
-    Value      = round(True_value + rnorm(1, 0, 1.5), 1),
-    Value      = pmax(Value, 0.5)
+    True_date  = runif(1, min = Start_date, max = End_date), # a random date within the range
+    True_value = f_true(True_date), # the true value from the linear function at that date
+    Value      = round(True_value + rnorm(1, 0, 1.5), 1), # add some noise to the true value
+    Value      = pmax(Value, 0.5) # ensure values are not negative
   ) %>%
   ungroup()
 
@@ -79,7 +83,7 @@ write_csv(ground_truth,
 
 params <- tibble(
   parameter = c("baseline", "slope", "sigma_noise"),
-  value     = c(gt_baseline, gt_slope, 1.5)
+  value     = c(true_baseline, true_slope, 1.5)
 )
 write_csv(params,
           here("Simulations", "Sim_Linear", "data", "generating_parameters.csv"))

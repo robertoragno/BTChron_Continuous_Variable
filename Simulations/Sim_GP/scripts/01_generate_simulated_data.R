@@ -9,13 +9,13 @@ set.seed(42)
 
 # ── Known parameters (to be recovered) ──────────────────────────────────────
 
-gt_baseline  <- 8
-gt_amplitude <- 12
-gt_peak      <- 450
-gt_width     <- 200
+true_baseline  <- 8
+true_amplitude <- 12
+true_peak      <- 450
+true_width     <- 200
 
 f_true <- function(t) {
-  gt_baseline + gt_amplitude * exp(-((t - gt_peak) / gt_width)^2)
+  true_baseline + true_amplitude * exp(-((t - true_peak) / true_width)^2)
 }
 
 # ── Generate date ranges ────────────────────────────────────────────────────
@@ -47,9 +47,9 @@ sim_data <- tibble(
   ungroup()
 
 set.seed(123)
-flip <- sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.35, 0.65))
+censor_flag <- sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.35, 0.65))
 sim_data <- sim_data %>%
-  mutate(End_date = if_else(flip, End_date - 1L, End_date))
+  mutate(End_date = if_else(censor_flag, End_date - 1L, End_date))
 
 # ── Generate observed values from the true function ─────────────────────────
 
@@ -81,7 +81,7 @@ write_csv(ground_truth,
 
 params <- tibble(
   parameter = c("baseline", "amplitude", "peak", "width", "sigma_noise"),
-  value     = c(gt_baseline, gt_amplitude, gt_peak, gt_width, 2.5)
+  value     = c(true_baseline, true_amplitude, true_peak, true_width, 2.5)
 )
 write_csv(params,
           here("Simulations", "Sim_GP", "data", "generating_parameters.csv"))
