@@ -53,9 +53,9 @@ transformed parameters {
 }
 
 model {
-  alpha ~ normal(5, 5);
-  beta  ~ normal(0, 20);
-  sigma ~ exponential(0.5);
+  alpha ~ normal(0, 10);
+  beta  ~ normal(0, 10);
+  sigma ~ exponential(1);
 
   for (n in 1:N) {
     real trend_n = alpha + beta * true_date_norm[n];
