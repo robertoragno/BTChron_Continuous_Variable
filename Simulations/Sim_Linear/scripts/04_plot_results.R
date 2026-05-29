@@ -49,16 +49,19 @@ trend_summary <- tibble(
 # ── Panel A: Recovered trend vs true trend ───────────────────────────────────
 
 p_trend <- ggplot(trend_summary) +
-  geom_ribbon(aes(x = Year, ymin = Lower_90, ymax = Upper_90),
-              fill = "grey80", alpha = 0.6) +
-  geom_ribbon(aes(x = Year, ymin = Lower_50, ymax = Upper_50),
-              fill = "grey60", alpha = 0.6) +
+  geom_ribbon(aes(x = Year, ymin = Lower_90, ymax = Upper_90, fill = "90% CI")) +
+  geom_ribbon(aes(x = Year, ymin = Lower_50, ymax = Upper_50, fill = "50% CI")) +
   geom_line(aes(x = Year, y = Median), linewidth = 0.6, colour = "black") +
   geom_line(data = ground_truth, aes(x = Year, y = True_value),
             linewidth = 0.7, colour = "black", linetype = "dashed") +
   geom_point(data = sim_data,
              aes(x = (Start_date + End_date) / 2, y = Value),
              shape = 16, size = 0.4, colour = "grey40", alpha = 0.4) +
+  scale_fill_manual(
+    name   = NULL,
+    values = c("90% CI" = "grey80", "50% CI" = "grey60"),
+    guide  = guide_legend(override.aes = list(alpha = 1))
+  ) +
   scale_x_continuous(breaks = seq(100, 900, 100), expand = c(0.01, 0)) +
   labs(
     title = expression(bold("A.") ~ "Recovered trend vs true trend"),
@@ -66,7 +69,14 @@ p_trend <- ggplot(trend_summary) +
     y = "Value"
   ) +
   theme_panel +
-  theme(axis.title.x = element_text())
+  theme(
+    axis.title.x  = element_text(),
+    legend.position = c(0.05, 0.95),
+    legend.justification = c(0, 1),
+    legend.background = element_rect(fill = alpha("white", 0.8), colour = NA),
+    legend.key.size = unit(10, "pt"),
+    legend.text = element_text(size = 8)
+  )
 
 # ── Panel B: Latent date recovery ────────────────────────────────────────────
 
