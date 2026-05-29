@@ -1,5 +1,7 @@
-#' Purpose: Posterior date densities for a random subset of individual samples,
-#'          greyscale version of MSCA Model_1_Linear figure 04.
+#' Purpose: Per-sample diagnostic panels (greyscale).
+#'   Panel 1 — Linear trend with CI, sample value + date range highlighted
+#'   Panel 2 — Posterior date density with TPQ-TAQ and true date lines
+#' Adapted from MSCA Model_1_GP 05_diagnostics_on_single_sample.R
 
 library(here)
 library(tidyverse)
@@ -14,7 +16,7 @@ sim_data <- read_csv(here("Simulations", "Sim_Linear", "data", "simulated_data.c
 
 fit <- readRDS(here("Simulations", "Sim_Linear", "output", "fit_linear.rds"))
 
-# ── Shared theme (matches exploratory panel) ─────────────────────────────────
+# ── Shared theme ─────────────────────────────────────────────────────────────
 
 theme_panel <- theme_classic(base_size = 11) +
   theme(
@@ -23,50 +25,93 @@ theme_panel <- theme_classic(base_size = 11) +
     plot.margin   = margin(5, 10, 2, 10)
   )
 
-# ── Extract latent date posteriors ───────────────────────────────────────────
+# ── Extract draws ────────────────────────────────────────────────────────────
 
-draws   <- fit$draws(format = "df")
-N_obs   <- nrow(sim_data)
+draws <- fit$draws(format = "df")
+
+pred_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
+N_pred    <- length(pred_grid)
+
+trend_cols <- paste0("trend_pred[", 1:N_pred, "]")
+trend_mat  <- as.matrix(draws[, trend_cols])
+
+trend_summary <- tibble(
+  Year     = pred_grid,
+  Median   = apply(trend_mat, 2, median),
+  Lower_90 = apply(trend_mat, 2, quantile, 0.05),
+  Upper_90 = apply(trend_mat, 2, quantile, 0.95)
+)
+
+N_obs <- nrow(sim_data)
+
+# ── Diagnostic function ─────────────────────────────────────────────────────
+
+diagnose_sample <- function(sample_id) {
+
+  info <- sim_data[sample_id, ]
+
+  # Panel 1: trend + sample highlight
+  p_trend <- ggplot(trend_summary) +
+    geom_ribbon(aes(x = Year, ymin = Lower_90, ymax = Upper_90),
+                fill = "grey80") +
+    geom_line(aes(x = Year, y = Median), linewidth = 0.6, colour = "black") +
+    annotate("rect",
+             xmin = info$Start_date, xmax = info$End_date,
+             ymin = -Inf, ymax = Inf,
+             fill = "grey50", alpha = 0.15) +
+    geom_hline(yintercept = info$Value,
+               linetype = "dashed", colour = "black", linewidth = 0.5) +
+    scale_x_continuous(expand = c(0.01, 0)) +
+    labs(title = "Linear trend vs observed value",
+         x = "Date (CE)", y = "Value") +
+    theme_panel
+
+  # Panel 2: posterior date density
+  date_col   <- paste0("true_date_actual[", sample_id, "]")
+  date_draws <- draws[[date_col]]
+
+  date_df <- tibble(estimated_date = date_draws)
+
+  p_date <- ggplot(date_df, aes(x = estimated_date)) +
+    geom_density(fill = "grey60", colour = "black", linewidth = 0.4, alpha = 0.5) +
+    geom_vline(xintercept = info$Start_date,
+               linetype = "dashed", colour = "grey40", linewidth = 0.5) +
+    geom_vline(xintercept = info$End_date,
+               linetype = "dashed", colour = "grey40", linewidth = 0.5) +
+    geom_vline(xintercept = info$True_date,
+               linetype = "solid", colour = "black", linewidth = 0.6) +
+    labs(title = "Posterior date estimate",
+         x = "Estimated date (CE)", y = "Density") +
+    theme_panel
+
+  p_trend | p_date
+}
+
+# ── Generate for 6 random samples ───────────────────────────────────────────
 
 set.seed(123)
 sample_ids <- sort(sample(1:N_obs, 6))
 
-date_long <- map_dfr(sample_ids, function(i) {
-  col <- paste0("true_date_actual[", i, "]")
-  tibble(
-    sample_idx     = i,
-    estimated_date = draws[[col]],
-    Start_date     = sim_data$Start_date[i],
-    End_date       = sim_data$End_date[i],
-    True_date      = sim_data$True_date[i],
-    ID             = sim_data$ID[i]
-  )
+plots <- map(sample_ids, function(sid) {
+  info <- sim_data[sid, ]
+  diagnose_sample(sid) +
+    plot_annotation(
+      title    = paste0("Sample ", info$ID),
+      subtitle = paste0("Value = ", round(info$Value, 2),
+                        " | Range: ", info$Start_date,
+                        " to ", info$End_date,
+                        " | True date: ", info$True_date),
+      theme = theme(
+        plot.title    = element_text(size = 12, face = "bold"),
+        plot.subtitle = element_text(size = 9, colour = "grey40")
+      )
+    )
 })
 
-# ── Plot ─────────────────────────────────────────────────────────────────────
-
-p <- ggplot(date_long, aes(x = estimated_date)) +
-  geom_density(fill = "grey60", colour = "black", linewidth = 0.4, alpha = 0.5) +
-  geom_vline(aes(xintercept = Start_date),
-             linetype = "dashed", colour = "grey40", linewidth = 0.5) +
-  geom_vline(aes(xintercept = End_date),
-             linetype = "dashed", colour = "grey40", linewidth = 0.5) +
-  geom_vline(aes(xintercept = True_date),
-             linetype = "solid", colour = "black", linewidth = 0.5) +
-  facet_wrap(~ ID, scales = "free_y", ncol = 2) +
-  labs(
-    title    = "Posterior date estimates for individual samples",
-    subtitle = "Dashed lines: TPQ–TAQ range. Solid line: true generating date.",
-    x = "Estimated date (CE)",
-    y = "Density"
-  ) +
-  theme_panel +
-  theme(
-    strip.background = element_blank(),
-    strip.text = element_text(face = "bold", size = 10)
-  )
+combined <- wrap_plots(plots, ncol = 1)
 
 ggsave(here("Simulations", "Sim_Linear", "figures", "individual_date_posteriors.png"),
-       p, width = 10, height = 8, dpi = 300, bg = "white")
+       combined, width = 12, height = 18, dpi = 300, bg = "white")
 
-cat("Saved to", here("Simulations", "Sim_Linear", "figures", "individual_date_posteriors.png"), "\n")
+cat("Saved to", here("Simulations", "Sim_Linear", "figures",
+                      "individual_date_posteriors.png"), "\n")
