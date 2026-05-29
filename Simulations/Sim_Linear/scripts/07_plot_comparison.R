@@ -88,8 +88,11 @@ extract_params <- function(fit) {
     )
 }
 
-params_latent  <- extract_params(fit_latent)
-params_midpoint <- extract_params(fit_midpoint)
+params_latent   <- extract_params(fit_latent)  %>% mutate(Model = "Latent dates")
+params_midpoint <- extract_params(fit_midpoint) %>% mutate(Model = "Midpoint dates")
+
+params_both <- bind_rows(params_latent, params_midpoint) %>%
+  mutate(Model = factor(Model, levels = c("Latent dates", "Midpoint dates")))
 
 # ── True value reference lines ───────────────────────────────────────────────
 
@@ -123,51 +126,41 @@ p_trend_mid <- make_trend_panel(
   expression(bold("B.") ~ "Trend recovery — midpoint dates")
 )
 
-# ── Row 2 & 3: Parameter posteriors with CI shading ─────────────────────────
+# ── Row 2: Parameter posteriors (facet_grid, shared x per parameter) ─────────
 
-make_post_panel <- function(post_df, title_label) {
-  ggplot(post_df, aes(x = Value, fill = Region)) +
-    geom_histogram(colour = "black", linewidth = 0.2, bins = 40) +
-    geom_vline(data = true_lines, aes(xintercept = True),
-               linetype = "dashed", linewidth = 0.6, colour = "black") +
-    scale_fill_manual(
-      name   = NULL,
-      values = c("50% CI" = "grey40", "90% CI" = "grey65", "Tail" = "grey88")
-    ) +
-    facet_wrap(~ Parameter, scales = "free", nrow = 1) +
-    labs(title = title_label, x = NULL, y = "Count") +
-    theme_panel +
-    theme(
-      strip.background = element_blank(),
-      strip.text       = element_text(face = "bold", size = 10),
-      legend.position  = "bottom",
-      legend.text      = element_text(size = 8),
-      legend.key.size  = unit(10, "pt")
-    )
-}
-
-p_post_latent <- make_post_panel(
-  params_latent,
-  expression(bold("C.") ~ "Posteriors — latent dates")
-)
-
-p_post_mid <- make_post_panel(
-  params_midpoint,
-  expression(bold("D.") ~ "Posteriors — midpoint dates")
-)
+p_post <- ggplot(params_both, aes(x = Value, fill = Region)) +
+  geom_histogram(colour = "black", linewidth = 0.2, bins = 40) +
+  geom_vline(data = true_lines, aes(xintercept = True),
+             linetype = "dashed", linewidth = 0.6, colour = "black") +
+  scale_fill_manual(
+    name   = NULL,
+    values = c("50% CI" = "grey40", "90% CI" = "grey65", "Tail" = "grey88")
+  ) +
+  facet_grid(Model ~ Parameter, scales = "free_x") +
+  labs(
+    title = expression(bold("C.") ~ "Posterior distributions"),
+    x = NULL, y = "Count"
+  ) +
+  theme_panel +
+  theme(
+    strip.background = element_blank(),
+    strip.text       = element_text(face = "bold", size = 10),
+    legend.position  = "bottom",
+    legend.text      = element_text(size = 8),
+    legend.key.size  = unit(10, "pt")
+  )
 
 # ── Combine ──────────────────────────────────────────────────────────────────
 
 p <- (p_trend_latent | p_trend_mid) /
-  p_post_latent /
-  p_post_mid +
-  plot_layout(heights = c(1, 0.7, 0.7)) +
+  p_post +
+  plot_layout(heights = c(1, 1.2)) +
   plot_annotation(
     caption = paste0(
       "Panels A–B: posterior median (solid) and 50%/90% credible intervals ",
       "vs true generating trend (dashed).\n",
-      "Panels C–D: posterior histograms with graduated shading by credible interval; ",
-      "dashed lines = true generating values."
+      "Panel C: posterior histograms with graduated shading by credible interval; ",
+      "dashed lines = true generating values. Rows share the same x-axis per parameter."
     ),
     theme = theme(
       plot.caption = element_text(hjust = 0, size = 8, colour = "grey40",
@@ -176,7 +169,7 @@ p <- (p_trend_latent | p_trend_mid) /
   )
 
 ggsave(here("Simulations", "Sim_Linear", "figures", "model_comparison.png"),
-       p, width = 12, height = 11, dpi = 300, bg = "white")
+       p, width = 12, height = 10, dpi = 300, bg = "white")
 
 cat("Saved to", here("Simulations", "Sim_Linear", "figures",
                       "model_comparison.png"), "\n")
