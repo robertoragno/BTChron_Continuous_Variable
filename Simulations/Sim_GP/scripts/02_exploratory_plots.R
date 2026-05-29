@@ -2,9 +2,9 @@ library(here)
 library(tidyverse)
 library(patchwork)
 
-sim_data     <- read_csv(here("Simulations", "data", "simulated_data.csv"),
+sim_data     <- read_csv(here("Simulations", "Sim_GP", "data", "simulated_data.csv"),
                          show_col_types = FALSE)
-ground_truth <- read_csv(here("Simulations", "data", "ground_truth.csv"),
+ground_truth <- read_csv(here("Simulations", "Sim_GP", "data", "ground_truth.csv"),
                          show_col_types = FALSE)
 
 sim_data <- sim_data %>%
@@ -64,7 +64,7 @@ p_dur <- ggplot(sim_data, aes(y = rank_spaced)) +
     axis.ticks.y = element_blank()
   )
 
-# ── Panel C: Value on Y axis, date ranges on X ─────────────────────────────
+# ── Panel C: Value vs time with true trend ─────────────────────────────────
 
 p_val <- ggplot(sim_data, aes(x = Midpoint, y = Value)) +
   geom_linerange(aes(xmin = Start_date, xmax = End_date),
@@ -86,12 +86,11 @@ p_val <- ggplot(sim_data, aes(x = Midpoint, y = Value)) +
 p <- (p_hist / p_dur / p_val) +
   plot_layout(heights = c(0.8, 1.8, 0.8)) +
   plot_annotation(
-    caption = "The dashed line (C) represents the underlying temporal trend used to generate the simulated values.",
+    caption = "Dashed line (C): true Gaussian bell-curve trend used to generate the simulated values.",
     theme = theme(plot.caption = element_text(hjust = 0, size = 8, colour = "grey40"))
   )
 
-out_dir <- here("Simulations", "figures")
-ggsave(file.path(out_dir, "exploratory_panel.png"), p,
+ggsave(here("Simulations", "Sim_GP", "figures", "exploratory_panel.png"), p,
        width = 6, height = 9, dpi = 300, bg = "white")
 
-cat("Saved to", file.path(out_dir, "exploratory_panel.png"), "\n")
+cat("Saved to", here("Simulations", "Sim_GP", "figures", "exploratory_panel.png"), "\n")
