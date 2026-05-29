@@ -49,6 +49,7 @@ N_obs <- nrow(sim_data)
 diagnose_sample <- function(sample_id) {
 
   info <- sim_data[sample_id, ]
+  label <- paste0(info$ID, " (value = ", round(info$Value, 2), ")")
 
   # Panel 1: trend + sample highlight
   p_trend <- ggplot(trend_summary) +
@@ -62,7 +63,7 @@ diagnose_sample <- function(sample_id) {
     geom_hline(yintercept = info$Value,
                linetype = "dashed", colour = "black", linewidth = 0.5) +
     scale_x_continuous(expand = c(0.01, 0)) +
-    labs(title = "Linear trend vs observed value",
+    labs(title = paste0(label, " — trend vs observed value"),
          x = "Date (CE)", y = "Value") +
     theme_panel
 
@@ -80,7 +81,7 @@ diagnose_sample <- function(sample_id) {
                linetype = "dashed", colour = "grey40", linewidth = 0.5) +
     geom_vline(xintercept = info$True_date,
                linetype = "solid", colour = "black", linewidth = 0.6) +
-    labs(title = "Posterior date estimate",
+    labs(title = paste0(label, " — posterior date estimate"),
          x = "Estimated date (CE)", y = "Density") +
     theme_panel
 
@@ -92,23 +93,21 @@ diagnose_sample <- function(sample_id) {
 set.seed(123)
 sample_ids <- sort(sample(1:N_obs, 6))
 
-plots <- map(sample_ids, function(sid) {
-  info <- sim_data[sid, ]
-  diagnose_sample(sid) +
-    plot_annotation(
-      title    = paste0("Sample ", info$ID),
-      subtitle = paste0("Value = ", round(info$Value, 2),
-                        " | Range: ", info$Start_date,
-                        " to ", info$End_date,
-                        " | True date: ", info$True_date),
-      theme = theme(
-        plot.title    = element_text(size = 12, face = "bold"),
-        plot.subtitle = element_text(size = 9, colour = "grey40")
-      )
-    )
-})
+plots <- map(sample_ids, function(sid) diagnose_sample(sid))
 
-combined <- wrap_plots(plots, ncol = 1)
+combined <- wrap_plots(plots, ncol = 1) +
+  plot_annotation(
+    caption = paste0(
+      "Left panels: posterior median trend (black line) and 90% CI (grey ribbon). ",
+      "Shaded rectangle marks the sample's TPQ–TAQ date range; ",
+      "dashed horizontal line marks the observed value.\n",
+      "Right panels: posterior density for the estimated date. ",
+      "Dashed vertical lines: TPQ–TAQ boundaries. Solid vertical line: true generating date."
+    ),
+    theme = theme(
+      plot.caption = element_text(hjust = 0, size = 8, colour = "grey40")
+    )
+  )
 
 ggsave(here("Simulations", "Sim_Linear", "figures", "individual_date_posteriors.png"),
        combined, width = 12, height = 18, dpi = 300, bg = "white")
