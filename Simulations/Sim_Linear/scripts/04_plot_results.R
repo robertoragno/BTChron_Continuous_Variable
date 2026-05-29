@@ -128,10 +128,35 @@ true_lines <- tibble(
   True      = c(true_baseline, true_slope, true_sigma)
 )
 
-p_post <- ggplot(post_df, aes(x = Value)) +
-  geom_histogram(fill = "grey70", colour = "black", linewidth = 0.3, bins = 40) +
+ci_df <- post_df %>%
+  group_by(Parameter) %>%
+  summarise(
+    q05 = quantile(Value, 0.05),
+    q25 = quantile(Value, 0.25),
+    q75 = quantile(Value, 0.75),
+    q95 = quantile(Value, 0.95),
+    .groups = "drop"
+  )
+
+post_df <- post_df %>%
+  left_join(ci_df, by = "Parameter") %>%
+  mutate(
+    Region = case_when(
+      Value >= q25 & Value <= q75 ~ "50% CI",
+      Value >= q05 & Value <= q95 ~ "90% CI",
+      TRUE                        ~ "Tail"
+    ),
+    Region = factor(Region, levels = c("50% CI", "90% CI", "Tail"))
+  )
+
+p_post <- ggplot(post_df, aes(x = Value, fill = Region)) +
+  geom_histogram(colour = "black", linewidth = 0.2, bins = 40) +
   geom_vline(data = true_lines, aes(xintercept = True),
              linetype = "dashed", linewidth = 0.6, colour = "black") +
+  scale_fill_manual(
+    name   = NULL,
+    values = c("50% CI" = "grey40", "90% CI" = "grey65", "Tail" = "grey88")
+  ) +
   facet_wrap(~ Parameter, scales = "free", nrow = 1) +
   labs(
     title = expression(bold("C.") ~ "Posterior distributions vs true values"),
@@ -141,7 +166,10 @@ p_post <- ggplot(post_df, aes(x = Value)) +
   theme(
     axis.title.x = element_text(),
     strip.background = element_blank(),
-    strip.text = element_text(face = "bold", size = 10)
+    strip.text = element_text(face = "bold", size = 10),
+    legend.position = "bottom",
+    legend.text = element_text(size = 8),
+    legend.key.size = unit(10, "pt")
   )
 
 # ── Combine ──────────────────────────────────────────────────────────────────
