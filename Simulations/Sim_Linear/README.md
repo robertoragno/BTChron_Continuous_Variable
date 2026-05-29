@@ -14,3 +14,18 @@ Given the simulated nature of the dataset, the goal is to verify that the model 
 <p align="center">
 <img src="figures/exploratory_panel.png" height="700" text-align="center"/>
 </p>
+
+## Model 1: Linear regression
+
+A standard Bayesian linear regression with latent date inference. Each observation's true date is modelled as a uniform draw within its `[Start_date, End_date]` window, and the trend is a simple linear function:
+
+```
+trend(x) = alpha + beta * x
+y_n ~ Normal(trend(true_date_n), sigma)
+```
+
+Panel **A** shows the recovered trend (median and 50%/90% credible intervals) against the true generating function. Panel **B** compares the inferred latent dates to the known true dates. Panel **C** shows posterior distributions for each generating parameter, with dashed lines marking the true values.
+
+<p align="center">
+<img src="figures/model_results_panel.png" height="700" text-align="center"/>
+</p>
