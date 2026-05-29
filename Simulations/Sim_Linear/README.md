@@ -42,7 +42,7 @@ Per-sample diagnostic panels for a random subset of observations. The left panel
 
 A second model uses the midpoint of each sample's `[Start_date, End_date]` window as a fixed date, with no latent date inference. This is the conventional approach — treating the midpoint as the "best guess" and ignoring date uncertainty.
 
-Panels **A–B** compare the trend recovery of the latent-date model and the midpoint model. Panel **C** overlays the posterior parameter distributions from both models: the midpoint model produces wider posteriors (especially for sigma) because unmodelled date uncertainty inflates the residual variance. Panel **D** shows the date recovery scatter from the latent model — the midpoint model has no equivalent, since it does not estimate dates.
+Panels **A–B** compare the trend recovery of the latent-date model and the midpoint model. Panels **C–D** show the posterior distributions for each generating parameter, with graduated shading by credible interval (50% CI darker, 90% CI lighter, tails lightest). The midpoint model produces wider posteriors and a sigma estimate biased upward (~1.7 vs the true 1.5), because unmodelled date uncertainty is absorbed into the residual variance.
 
 <p align="center">
 <img src="figures/model_comparison.png" height="800" text-align="center"/>
