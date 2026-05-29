@@ -1,0 +1,4 @@
+parameter,value
+baseline,5
+slope,0.015
+sigma_noise,1.5

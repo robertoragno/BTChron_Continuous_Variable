@@ -8,11 +8,10 @@
 ```
 BTChron_Paper_1/
 ├── Simulations/
-│   ├── data/              # Simulated dataset
-│   ├── models/            # Stan models (simulated)
-│   ├── scripts/           # R scripts (simulated)
-│   ├── output/            # Model output
-│   └── figures/           # Figures
+│   ├── Sim_Linear/        # Linear regression (baseline + slope)
+│   ├── Sim_Changepoint/   # Changepoint regression (two slopes)
+│   └── Sim_GP/            # Gaussian Process (bell-curve trend)
+│       └── (each contains: data/ figures/ scripts/ models/ output/)
 ├── Real_Data/
 │   ├── data/
 │   │   ├── dataset_1/
