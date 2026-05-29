@@ -83,14 +83,14 @@ p_val <- ggplot(sim_data, aes(x = Midpoint, y = Value)) +
 
 # ── Combine ──────────────────────────────────────────────────────────────────
 
-p <- (p_hist / p_dur / p_val) +
-  plot_layout(heights = c(0.8, 1.8, 0.8)) +
+p <- (p_hist | p_dur | p_val) +
+  plot_layout(widths = c(0.8, 1.8, 0.8)) +
   plot_annotation(
     caption = "Dashed line (C): true Gaussian bell-curve trend used to generate the simulated values.",
     theme = theme(plot.caption = element_text(hjust = 0, size = 8, colour = "grey40"))
   )
 
 ggsave(here("Simulations", "Sim_GP", "figures", "exploratory_panel.png"), p,
-       width = 6, height = 9, dpi = 300, bg = "white")
+       width = 14, height = 4.5, dpi = 300, bg = "white")
 
 cat("Saved to", here("Simulations", "Sim_GP", "figures", "exploratory_panel.png"), "\n")
