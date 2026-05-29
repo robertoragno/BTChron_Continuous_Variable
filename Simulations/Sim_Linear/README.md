@@ -29,3 +29,11 @@ Panel **A** shows the recovered trend (median and 50%/90% credible intervals) ag
 <p align="center">
 <img src="figures/model_results_panel.png" height="700" text-align="center"/>
 </p>
+
+## Individual sample diagnostics
+
+Per-sample diagnostic panels for a random subset of observations. The left panel shows the posterior trend (median and 90% CI) with the sample's observed value (dashed horizontal line) and TPQ–TAQ date range (shaded rectangle). The right panel shows the posterior density for the estimated date, with dashed vertical lines for the TPQ–TAQ boundaries and a solid vertical line for the true generating date.
+
+<p align="center">
+<img src="figures/individual_date_posteriors.png" height="900" text-align="center"/>
+</p>
