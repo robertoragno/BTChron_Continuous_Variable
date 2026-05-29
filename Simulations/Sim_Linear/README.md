@@ -24,7 +24,7 @@ trend(x) = alpha + beta * x
 y_n ~ Normal(trend(true_date_n), sigma)
 ```
 
-Panel **A** shows the recovered trend (median and 50%/90% credible intervals) against the true generating function. Panel **B** compares the inferred latent dates to the known true dates. Panel **C** shows posterior distributions for each generating parameter, with dashed lines marking the true values.
+Panel **A** shows the recovered trend (median and 50%/90% credible intervals) against the true generating function; the rug on the right margin shows the distribution of observed values. Panel **B** is a date recovery plot: each dot is one sample, with the true generating date on the x-axis and the posterior median date on the y-axis — if recovery were perfect, all points would sit on the dashed 1:1 line; vertical bars show the 90% CI. Panel **C** shows posterior distributions for each generating parameter, with graduated shading by credible interval and dashed lines marking the true values.
 
 <p align="center">
 <img src="figures/model_results_panel.png" height="700" text-align="center"/>
@@ -36,4 +36,14 @@ Per-sample diagnostic panels for a random subset of observations. The left panel
 
 <p align="center">
 <img src="figures/individual_date_posteriors.png" height="900" text-align="center"/>
+</p>
+
+## Model comparison: latent dates vs midpoint dates
+
+A second model uses the midpoint of each sample's `[Start_date, End_date]` window as a fixed date, with no latent date inference. This is the conventional approach — treating the midpoint as the "best guess" and ignoring date uncertainty.
+
+Panels **A–B** compare the trend recovery of the latent-date model and the midpoint model. Panel **C** overlays the posterior parameter distributions from both models: the midpoint model produces wider posteriors (especially for sigma) because unmodelled date uncertainty inflates the residual variance. Panel **D** shows the date recovery scatter from the latent model — the midpoint model has no equivalent, since it does not estimate dates.
+
+<p align="center">
+<img src="figures/model_comparison.png" height="800" text-align="center"/>
 </p>
