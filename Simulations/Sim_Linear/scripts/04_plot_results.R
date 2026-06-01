@@ -1,5 +1,12 @@
 #' Purpose: Plot model results — trend recovery, latent-date recovery,
 #'          and posterior distributions of the generating parameters.
+#'
+#' Figure caption suggestion:
+#'   "A: posterior median (solid) and 50\%/90\% credible intervals vs true
+#'    generating trend (dashed). B: posterior median inferred date vs true
+#'    generating date for each observation. C: posterior histograms with
+#'    graduated shading by credible interval; dashed lines mark the true
+#'    generating values for baseline and slope."
 
 library(here)
 library(tidyverse)
@@ -179,10 +186,7 @@ p_post <- ggplot(post_df, aes(x = Value, fill = Region)) +
 
 p <- (p_trend | p_dates) / p_post +
   plot_layout(heights = c(1, 0.7)) +
-  plot_annotation(
-    caption = "Dashed lines: true generating values. Shaded bands (A): 50% and 90% credible intervals.",
-    theme = theme(plot.caption = element_text(hjust = 0, size = 8, colour = "grey40"))
-  )
+  plot_annotation(theme = theme(plot.margin = margin(5, 5, 5, 5)))
 
 ggsave(here("Simulations", "Sim_Linear", "figures", "model_results_panel.png"), p,
        width = 12, height = 8, dpi = 300, bg = "white")
