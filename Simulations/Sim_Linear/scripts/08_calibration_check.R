@@ -13,7 +13,7 @@ library(tidyverse)
 library(cmdstanr)
 library(patchwork)
 
-# ── Setup ────────────────────────────────────────────────────────────────────
+# Setup
 
 sim_data <- read_csv(here("Simulations", "Sim_Linear", "data", "simulated_data.csv"),
                      show_col_types = FALSE)
@@ -28,7 +28,7 @@ pred_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
 
 K <- 100
 
-# ── Helper: extract quantiles and rank from a fit ────────────────────────────
+# Helper: extract quantiles and rank from a fit
 
 extract_results <- function(fit, seed_id) {
   draws <- fit$draws(format = "df")
@@ -59,7 +59,7 @@ extract_results <- function(fit, seed_id) {
   )
 }
 
-# ── Load existing latent-date results (if available) or rerun ────────────────
+# Load existing latent-date results (if available) or rerun
 
 latent_csv <- here("Simulations", "Sim_Linear", "output", "calibration_results.csv")
 
@@ -96,7 +96,7 @@ if (file.exists(latent_csv)) {
   write_csv(results_latent, latent_csv)
 }
 
-# ── Midpoint SBC loop ───────────────────────────────────────────────────────
+# Midpoint SBC loop
 
 cat("Running midpoint SBC loop...\n")
 model_midpoint <- cmdstan_model(here("Simulations", "Sim_Linear", "models",
@@ -130,7 +130,7 @@ results_midpoint <- bind_rows(results_midpoint)
 write_csv(results_midpoint,
           here("Simulations", "Sim_Linear", "output", "calibration_results_midpoint.csv"))
 
-# ── Coverage summary ─────────────────────────────────────────────────────────
+# Coverage summary
 
 compute_coverage <- function(res) {
   tibble(
@@ -152,7 +152,7 @@ cov_midpoint <- compute_coverage(results_midpoint) %>% mutate(Model = "Midpoint"
 
 coverage <- bind_rows(cov_latent, cov_midpoint)
 
-# ── Plotting ─────────────────────────────────────────────────────────────────
+# Plotting
 
 theme_panel <- theme_classic(base_size = 11) +
   theme(

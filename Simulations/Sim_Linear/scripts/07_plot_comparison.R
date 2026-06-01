@@ -16,7 +16,7 @@ library(cmdstanr)
 library(posterior)
 library(patchwork)
 
-# ── Load data ────────────────────────────────────────────────────────────────
+# Load data
 
 sim_data     <- read_csv(here("Simulations", "Sim_Linear", "data", "simulated_data.csv"),
                          show_col_types = FALSE)
@@ -32,7 +32,7 @@ true_baseline <- true_params$value[true_params$parameter == "baseline"]
 true_slope    <- true_params$value[true_params$parameter == "slope"]
 true_sigma    <- true_params$value[true_params$parameter == "sigma_noise"]
 
-# ── Shared theme ─────────────────────────────────────────────────────────────
+# Shared theme
 
 theme_panel <- theme_classic(base_size = 11) +
   theme(
@@ -40,7 +40,7 @@ theme_panel <- theme_classic(base_size = 11) +
     plot.margin  = margin(5, 10, 2, 10)
   )
 
-# ── Helper: extract trend summary ────────────────────────────────────────────
+# Helper: extract trend summary
 
 pred_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
 N_pred    <- length(pred_grid)
@@ -61,7 +61,7 @@ extract_trend <- function(fit) {
 trend_latent  <- extract_trend(fit_latent)
 trend_midpoint <- extract_trend(fit_midpoint)
 
-# ── Helper: extract parameter posteriors with CI regions ─────────────────────
+# Helper: extract parameter posteriors with CI regions
 
 extract_params <- function(fit) {
   draws <- fit$draws(format = "df")
@@ -101,7 +101,7 @@ params_midpoint <- extract_params(fit_midpoint) %>% mutate(Model = "Midpoint dat
 params_both <- bind_rows(params_latent, params_midpoint) %>%
   mutate(Model = factor(Model, levels = c("Latent dates", "Midpoint dates")))
 
-# ── True value reference lines ───────────────────────────────────────────────
+# True value reference lines
 
 true_lines <- tibble(
   Parameter = factor(c("Baseline", "Slope", "Sigma"),
@@ -109,7 +109,7 @@ true_lines <- tibble(
   True      = c(true_baseline, true_slope, true_sigma)
 )
 
-# ── Row 1: Trend recovery ───────────────────────────────────────────────────
+# Row 1: Trend recovery
 
 make_trend_panel <- function(df, title_label) {
   ggplot(df) +
@@ -133,7 +133,7 @@ p_trend_mid <- make_trend_panel(
   expression(bold("B.") ~ "Trend recovery — midpoint dates")
 )
 
-# ── Row 2: Parameter posteriors (facet_grid, shared x per parameter) ─────────
+# Row 2: Parameter posteriors (facet_grid, shared x per parameter)
 
 p_post <- ggplot(params_both, aes(x = Value, fill = Region)) +
   geom_histogram(colour = "black", linewidth = 0.2, bins = 40) +
@@ -157,7 +157,7 @@ p_post <- ggplot(params_both, aes(x = Value, fill = Region)) +
     legend.key.size  = unit(10, "pt")
   )
 
-# ── Combine ──────────────────────────────────────────────────────────────────
+# Combine
 
 p <- (p_trend_latent | p_trend_mid) /
   p_post +

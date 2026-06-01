@@ -1,12 +1,6 @@
 #' Purpose: Plot model results — trend recovery, latent-date recovery,
 #'          and posterior distributions of the generating parameters.
-#'
-#' Figure caption suggestion:
-#'   "A: posterior median (solid) and 50\%/90\% credible intervals vs true
-#'    generating trend (dashed). B: posterior median inferred date vs true
-#'    generating date for each observation. C: posterior histograms with
-#'    graduated shading by credible interval; dashed lines mark the true
-#'    generating values for baseline and slope."
+
 
 library(here)
 library(tidyverse)
@@ -14,7 +8,7 @@ library(cmdstanr)
 library(posterior)
 library(patchwork)
 
-# ── Load data and fit ────────────────────────────────────────────────────────
+# Load data and fit
 
 sim_data     <- read_csv(here("Simulations", "Sim_Linear", "data", "simulated_data.csv"),
                          show_col_types = FALSE)
@@ -25,7 +19,7 @@ true_params  <- read_csv(here("Simulations", "Sim_Linear", "data", "generating_p
 
 fit <- readRDS(here("Simulations", "Sim_Linear", "output", "fit_linear.rds"))
 
-# ── Shared theme (matches exploratory panel) ─────────────────────────────────
+# Shared theme for panels
 
 theme_panel <- theme_classic(base_size = 11) +
   theme(
@@ -34,7 +28,7 @@ theme_panel <- theme_classic(base_size = 11) +
     axis.title.x = element_blank()
   )
 
-# ── Extract draws ────────────────────────────────────────────────────────────
+# Extract draws
 
 draws <- fit$draws(format = "df")
 
@@ -53,7 +47,7 @@ trend_summary <- tibble(
   Upper_50 = apply(trend_mat, 2, quantile, 0.75)
 )
 
-# ── Panel A: Recovered trend vs true trend ───────────────────────────────────
+# Panel A: Recovered trend vs true trend
 
 p_trend <- ggplot(trend_summary) +
   geom_ribbon(aes(x = Year, ymin = Lower_90, ymax = Upper_90, fill = "90% CI")) +
@@ -84,7 +78,7 @@ p_trend <- ggplot(trend_summary) +
     legend.text = element_text(size = 8)
   )
 
-# ── Panel B: Latent date recovery ────────────────────────────────────────────
+# Panel B: Latent date recovery
 
 N_obs     <- nrow(sim_data)
 date_cols <- paste0("true_date_actual[", 1:N_obs, "]")
@@ -118,7 +112,7 @@ p_dates <- ggplot(date_recovery, aes(x = True_date, y = Inferred_med)) +
     plot.subtitle = element_text(size = 9, colour = "grey40", hjust = 0)
   )
 
-# ── Panel C: Posterior distributions of generating parameters ────────────────
+# Panel C: Posterior distributions of generating parameters
 
 true_baseline <- true_params$value[true_params$parameter == "baseline"]
 true_slope    <- true_params$value[true_params$parameter == "slope"]
@@ -182,7 +176,7 @@ p_post <- ggplot(post_df, aes(x = Value, fill = Region)) +
     legend.key.size = unit(10, "pt")
   )
 
-# ── Combine ──────────────────────────────────────────────────────────────────
+# Combine
 
 p <- (p_trend | p_dates) / p_post +
   plot_layout(heights = c(1, 0.7)) +

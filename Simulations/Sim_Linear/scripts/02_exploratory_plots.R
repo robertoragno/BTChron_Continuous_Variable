@@ -12,7 +12,7 @@ sim_data <- sim_data %>%
   arrange(Midpoint) %>%
   mutate(rank = row_number())
 
-# ── Shared theme ─────────────────────────────────────────────────────────────
+# Shared theme
 
 theme_panel <- theme_classic(base_size = 11) +
   theme(
@@ -21,7 +21,7 @@ theme_panel <- theme_classic(base_size = 11) +
     axis.title.x = element_blank()
   )
 
-# ── Panel A: Histogram of values ────────────────────────────────────────────
+# Panel A: Histogram of values
 
 p_hist <- ggplot(sim_data, aes(x = Value)) +
   geom_histogram(binwidth = 2, fill = "grey70", colour = "black",
@@ -33,7 +33,7 @@ p_hist <- ggplot(sim_data, aes(x = Value)) +
   theme_panel +
   theme(axis.title.x = element_text())
 
-# ── Panel B: Duration bars sorted by midpoint ───────────────────────────────
+# Panel B: Duration bars sorted by midpoint
 
 sim_data <- sim_data %>%
   mutate(rank_spaced = rank * 1.8)
@@ -64,7 +64,7 @@ p_dur <- ggplot(sim_data, aes(y = rank_spaced)) +
     axis.ticks.y = element_blank()
   )
 
-# ── Panel C: Value vs time with true trend ─────────────────────────────────
+# Panel C: Value vs time with true trend
 
 p_val <- ggplot(sim_data, aes(x = Midpoint, y = Value)) +
   geom_linerange(aes(xmin = Start_date, xmax = End_date),
@@ -81,14 +81,11 @@ p_val <- ggplot(sim_data, aes(x = Midpoint, y = Value)) +
   theme_panel +
   theme(axis.title.x = element_text())
 
-# ── Combine ──────────────────────────────────────────────────────────────────
+# Combine
 
 p <- (p_hist | p_dur | p_val) +
   plot_layout(widths = c(0.8, 1.8, 0.8)) +
-  plot_annotation(
-    caption = "Dashed line (C): true linear trend used to generate the simulated values.",
-    theme = theme(plot.caption = element_text(hjust = 0, size = 8, colour = "grey40"))
-  )
+  plot_annotation(theme = theme(plot.margin = margin(5, 5, 5, 5)))
 
 ggsave(here("Simulations", "Sim_Linear", "figures", "exploratory_panel.png"), p,
        width = 14, height = 4.5, dpi = 300, bg = "white")

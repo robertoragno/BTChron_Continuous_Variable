@@ -9,14 +9,14 @@ library(cmdstanr)
 library(posterior)
 library(patchwork)
 
-# ── Load data and fit ────────────────────────────────────────────────────────
+# Load data and fit
 
 sim_data <- read_csv(here("Simulations", "Sim_Linear", "data", "simulated_data.csv"),
                      show_col_types = FALSE)
 
 fit <- readRDS(here("Simulations", "Sim_Linear", "output", "fit_linear.rds"))
 
-# ── Shared theme ─────────────────────────────────────────────────────────────
+# Shared theme
 
 theme_panel <- theme_classic(base_size = 11) +
   theme(
@@ -25,7 +25,7 @@ theme_panel <- theme_classic(base_size = 11) +
     plot.margin   = margin(5, 10, 2, 10)
   )
 
-# ── Extract draws ────────────────────────────────────────────────────────────
+# Extract draws
 
 draws <- fit$draws(format = "df")
 
@@ -44,7 +44,7 @@ trend_summary <- tibble(
 
 N_obs <- nrow(sim_data)
 
-# ── Diagnostic function ─────────────────────────────────────────────────────
+# Diagnostic function
 
 diagnose_sample <- function(sample_id) {
 
@@ -88,7 +88,7 @@ diagnose_sample <- function(sample_id) {
   p_trend | p_date
 }
 
-# ── Generate for 6 random samples ───────────────────────────────────────────
+# Generate for 6 random samples
 
 set.seed(123)
 sample_ids <- sort(sample(1:N_obs, 6))

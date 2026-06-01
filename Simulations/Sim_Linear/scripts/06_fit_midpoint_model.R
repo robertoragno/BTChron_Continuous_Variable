@@ -4,7 +4,7 @@ library(here)
 library(tidyverse)
 library(cmdstanr)
 
-# ── Load data ────────────────────────────────────────────────────────────────
+# Load data
 
 sim_data <- read_csv(here("Simulations", "Sim_Linear", "data", "simulated_data.csv"),
                      show_col_types = FALSE)
@@ -20,7 +20,7 @@ stan_data <- list(
   x_pred     = pred_grid
 )
 
-# ── Compile and fit ──────────────────────────────────────────────────────────
+# Compile and fit
 
 model <- cmdstan_model(here("Simulations", "Sim_Linear", "models",
                             "sim_linear_midpoint.stan"))
