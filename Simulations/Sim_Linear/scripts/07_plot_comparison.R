@@ -2,6 +2,13 @@
 #'   Row 1 — Trend recovery (A: latent dates, B: midpoint dates)
 #'   Row 2 — Posterior parameter distributions, latent model (with CI shading)
 #'   Row 3 — Posterior parameter distributions, midpoint model (with CI shading)
+#'
+#' Figure caption suggestion:
+#'   "Panels A--B: posterior median (solid) and 50\%/90\% credible intervals
+#'    vs true generating trend (dashed). Panel C: posterior histograms with
+#'    graduated shading by credible interval; dashed lines mark the true
+#'    generating values for baseline and slope. Rows share the same x-axis
+#'    per parameter."
 
 library(here)
 library(tidyverse)
@@ -155,18 +162,7 @@ p_post <- ggplot(params_both, aes(x = Value, fill = Region)) +
 p <- (p_trend_latent | p_trend_mid) /
   p_post +
   plot_layout(heights = c(1, 1.2)) +
-  plot_annotation(
-    caption = paste0(
-      "Panels A–B: posterior median (solid) and 50%/90% credible intervals ",
-      "vs true generating trend (dashed).\n",
-      "Panel C: posterior histograms with graduated shading by credible interval; ",
-      "dashed lines = true generating values. Rows share the same x-axis per parameter."
-    ),
-    theme = theme(
-      plot.caption = element_text(hjust = 0, size = 8, colour = "grey40",
-                                  lineheight = 1.2)
-    )
-  )
+  plot_annotation(theme = theme(plot.margin = margin(5, 5, 5, 5)))
 
 ggsave(here("Simulations", "Sim_Linear", "figures", "model_comparison.png"),
        p, width = 12, height = 10, dpi = 300, bg = "white")
