@@ -5,7 +5,7 @@ library(here)
 library(tidyverse)
 library(cmdstanr)
 
-# ── Load data ────────────────────────────────────────────────────────────────
+# Load data
 
 sim_data     <- read_csv(here("Simulations", "Sim_Linear", "data", "simulated_data.csv"),
                          show_col_types = FALSE)
@@ -14,11 +14,11 @@ ground_truth <- read_csv(here("Simulations", "Sim_Linear", "data", "ground_truth
 true_params  <- read_csv(here("Simulations", "Sim_Linear", "data", "generating_parameters.csv"),
                          show_col_types = FALSE)
 
-# ── Prediction grid ──────────────────────────────────────────────────────────
+# Prediction grid
 
 pred_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
 
-# ── Prepare Stan data ────────────────────────────────────────────────────────
+# Prepare Stan data
 
 stan_data <- list(
   N          = nrow(sim_data),
@@ -29,7 +29,7 @@ stan_data <- list(
   x_pred     = pred_grid
 )
 
-# ── Compile and fit ──────────────────────────────────────────────────────────
+# Compile and fit
 
 model <- cmdstan_model(here("Simulations", "Sim_Linear", "models", "sim_linear.stan"))
 
@@ -44,17 +44,17 @@ fit <- model$sample(
   max_treedepth   = 12
 )
 
-# ── Save fit ─────────────────────────────────────────────────────────────────
+# Save fit
 
 fit$save_object(here("Simulations", "Sim_Linear", "output", "fit_linear.rds"))
 
-# ── Diagnostics ──────────────────────────────────────────────────────────────
+# Diagnostics
 
 fit$cmdstan_diagnose()
 fit$summary(variables = c("alpha", "beta", "sigma",
                           "slope_original", "baseline_original"))
 
-# ── Parameter recovery ───────────────────────────────────────────────────────
+# Parameter recovery
 
 cat("\n── Generating parameters ──\n")
 print(true_params)

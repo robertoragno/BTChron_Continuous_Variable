@@ -70,7 +70,7 @@ write_csv(
   here("Simulations", "Sim_Linear", "data", "simulated_data.csv")
 )
 
-# ── Ground truth on a fine grid ─────────────────────────────────────────────
+# Ground truth on a fine grid
 
 ground_truth <- tibble(
   Year       = seq(100, 900, by = 1),
@@ -79,7 +79,7 @@ ground_truth <- tibble(
 write_csv(ground_truth,
           here("Simulations", "Sim_Linear", "data", "ground_truth.csv"))
 
-# ── Save the generating parameters ──────────────────────────────────────────
+# Save the generating parameters
 
 params <- tibble(
   parameter = c("baseline", "slope", "sigma_noise"),

@@ -50,9 +50,11 @@ Panels **A–B** compare the trend recovery of the latent-date model and the mid
 
 ## Simulation-based calibration (SBC)
 
-To verify that the credible intervals are well calibrated, the simulation was repeated 100 times — each time redrawing true dates and observation noise from the same generating process while keeping the timespans fixed. The rank histograms below show the rank of the true parameter value among the posterior draws for each replication. Under a well-calibrated model, ranks should be approximately uniform (dashed line). Coverage rates for the 50% and 90% credible intervals are annotated in each panel.
+To verify that the credible intervals are well calibrated, the simulation was repeated 100 times — each time redrawing true dates and observation noise from the same generating process while keeping the timespans fixed.
 
-The latent-date model is well calibrated across all three parameters. The midpoint model recovers baseline and slope at roughly the expected rates, but its sigma posterior never contains the true value (0% coverage) — confirming that unmodelled date uncertainty is systematically absorbed into the residual variance.
+Each replication produces (for each parameter) 4,000 posterior draws. The **rank** is where the true value falls among those draws — i.e., how many of the 4,000 draws are below the true value. If the model is well calibrated, the true value is equally likely to land anywhere in the posterior, so across 100 replications the ranks should be roughly uniformly distributed. The histograms below have 20 bins, so each bin should contain about 100 / 20 = 5 replications (dashed line). A flat histogram means the model's uncertainty is honest; a histogram piled up on one side means the model is systematically wrong about that parameter.
+
+Coverage rates for the 50% and 90% credible intervals are annotated in each panel. The latent-date model is well calibrated across all three parameters. The midpoint model recovers baseline and slope at roughly the expected rates, but its sigma posterior never contains the true value (0% coverage) — confirming that unmodelled date uncertainty is systematically absorbed into the residual variance.
 
 <p align="center">
 <img src="figures/calibration_coverage.png" height="500" text-align="center"/>
