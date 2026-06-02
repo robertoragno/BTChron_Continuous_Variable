@@ -49,11 +49,13 @@ generated quantities {
   for (n in 1:N)
     log_lik[n] = normal_lpdf(y[n] | alpha + beta * mid_norm[n], sigma);
 
-  array[N_pred] real trend_pred;
-  array[N_pred] real obs_sim;
+  // Expected trend on prediction grid (noise-free)
+  array[N_pred] real mu_pred;
+  // Posterior predictive draws (includes observation noise)
+  array[N_pred] real y_rep;
   for (p in 1:N_pred) {
-    trend_pred[p] = alpha + beta * x_pred_norm[p];
-    obs_sim[p]    = normal_rng(trend_pred[p], sigma);
+    mu_pred[p] = alpha + beta * x_pred_norm[p];
+    y_rep[p]   = normal_rng(mu_pred[p], sigma);
   }
 
   real slope_original    = beta / time_range;

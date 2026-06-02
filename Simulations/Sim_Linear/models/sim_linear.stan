@@ -71,12 +71,13 @@ generated quantities {
     log_lik[n] = normal_lpdf(y[n] | trend_n, sigma);
   }
 
-  // Predictions on grid: mean trend and simulated observations
-  array[N_pred] real trend_pred;
-  array[N_pred] real obs_sim;
+  // Expected trend on prediction grid (noise-free)
+  array[N_pred] real mu_pred;
+  // Posterior predictive draws (includes observation noise)
+  array[N_pred] real y_rep;
   for (p in 1:N_pred) {
-    trend_pred[p] = alpha + beta * x_pred_norm[p];
-    obs_sim[p]    = normal_rng(trend_pred[p], sigma);
+    mu_pred[p] = alpha + beta * x_pred_norm[p];
+    y_rep[p]   = normal_rng(mu_pred[p], sigma);
   }
 
   // Back-transform latent dates to original scale

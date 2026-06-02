@@ -47,7 +47,7 @@ N_pred    <- length(pred_grid)
 
 extract_trend <- function(fit) {
   draws     <- fit$draws(format = "df")
-  trend_mat <- as.matrix(draws[, paste0("trend_pred[", 1:N_pred, "]")])
+  trend_mat <- as.matrix(draws[, paste0("mu_pred[", 1:N_pred, "]")])
   tibble(
     Year     = pred_grid,
     Median   = apply(trend_mat, 2, median),
