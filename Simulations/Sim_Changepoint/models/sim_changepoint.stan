@@ -80,9 +80,12 @@ generated quantities {
     log_lik[n] = normal_lpdf(y[n] | mu, sigma);
   }
 
-  // Expected trend on prediction grid (noise-free)
+  // mu_pred: the model's expected value (the trend line) at each prediction point,
+  // with no observation noise added. We use this to plot the fitted curve.
   array[N_pred] real mu_pred;
-  // Posterior predictive draws (includes observation noise)
+  // y_rep: a simulated observation at each prediction point, drawn from
+  // Normal(mu_pred, sigma). Unlike mu_pred, this includes sigma noise, so it
+  // represents what a new data point would look like. We would use this for predictive intervals.
   array[N_pred] real y_rep;
   for (p in 1:N_pred) {
     real t   = x_pred_norm[p];
