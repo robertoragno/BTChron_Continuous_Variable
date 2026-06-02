@@ -32,7 +32,7 @@ draws <- fit$draws(format = "df")
 pred_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
 N_pred    <- length(pred_grid)
 
-trend_cols <- paste0("trend_pred[", 1:N_pred, "]")
+trend_cols <- paste0("mu_pred[", 1:N_pred, "]")
 trend_mat  <- as.matrix(draws[, trend_cols])
 
 trend_summary <- tibble(

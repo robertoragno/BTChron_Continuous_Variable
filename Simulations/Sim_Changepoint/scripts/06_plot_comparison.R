@@ -1,14 +1,10 @@
-#' Purpose: Side-by-side comparison of the latent-date model vs the midpoint model.
+#' Purpose: Side-by-side comparison of latent-date vs midpoint changepoint model.
 #'   Row 1 — Trend recovery (A: latent dates, B: midpoint dates)
-#'   Row 2 — Posterior parameter distributions, latent model (with CI shading)
-#'   Row 3 — Posterior parameter distributions, midpoint model (with CI shading)
+#'   Row 2 — Posterior parameter distributions for both models
 #'
-#' Figure caption suggestion:
-#'   "Panels A--B: posterior median (solid) and 50\%/90\% credible intervals
-#'    vs true generating trend (dashed). Panel C: posterior histograms with
-#'    graduated shading by credible interval; dashed lines mark the true
-#'    generating values for baseline and slope. Rows share the same x-axis
-#'    per parameter."
+# caption = "A–B: posterior median (solid) and 50%/90% credible intervals vs
+#   true generating trend (dashed). C: posterior histograms with graduated
+#   shading by credible interval; dashed lines mark the true generating values."
 
 library(here)
 library(tidyverse)
@@ -18,19 +14,22 @@ library(patchwork)
 
 # Load data
 
-sim_data     <- read_csv(here("Simulations", "Sim_Linear", "data", "simulated_data.csv"),
+sim_data     <- read_csv(here("Simulations", "Sim_Changepoint", "data",
+                              "simulated_data.csv"),
                          show_col_types = FALSE)
-ground_truth <- read_csv(here("Simulations", "Sim_Linear", "data", "ground_truth.csv"),
+ground_truth <- read_csv(here("Simulations", "Sim_Changepoint", "data",
+                              "ground_truth.csv"),
                          show_col_types = FALSE)
-true_params  <- read_csv(here("Simulations", "Sim_Linear", "data", "generating_parameters.csv"),
+true_params  <- read_csv(here("Simulations", "Sim_Changepoint", "data",
+                              "generating_parameters.csv"),
                          show_col_types = FALSE)
 
-fit_latent   <- readRDS(here("Simulations", "Sim_Linear", "output", "fit_linear.rds"))
-fit_midpoint <- readRDS(here("Simulations", "Sim_Linear", "output", "fit_midpoint.rds"))
+fit_latent   <- readRDS(here("Simulations", "Sim_Changepoint", "output",
+                             "fit_changepoint.rds"))
+fit_midpoint <- readRDS(here("Simulations", "Sim_Changepoint", "output",
+                             "fit_midpoint.rds"))
 
-true_baseline <- true_params$value[true_params$parameter == "baseline"]
-true_slope    <- true_params$value[true_params$parameter == "slope"]
-true_sigma    <- true_params$value[true_params$parameter == "sigma_noise"]
+true_vals <- setNames(true_params$value, true_params$parameter)
 
 # Shared theme
 
@@ -40,25 +39,25 @@ theme_panel <- theme_classic(base_size = 11) +
     plot.margin  = margin(5, 10, 2, 10)
   )
 
-# Helper: extract trend summary
-
 pred_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
 N_pred    <- length(pred_grid)
 
+# Helper: extract trend summary
+
 extract_trend <- function(fit) {
-  draws     <- fit$draws(format = "df")
-  trend_mat <- as.matrix(draws[, paste0("mu_pred[", 1:N_pred, "]")])
+  draws   <- fit$draws(format = "df")
+  mu_mat  <- as.matrix(draws[, paste0("mu_pred[", 1:N_pred, "]")])
   tibble(
     Year     = pred_grid,
-    Median   = apply(trend_mat, 2, median),
-    Lower_90 = apply(trend_mat, 2, quantile, 0.05),
-    Upper_90 = apply(trend_mat, 2, quantile, 0.95),
-    Lower_50 = apply(trend_mat, 2, quantile, 0.25),
-    Upper_50 = apply(trend_mat, 2, quantile, 0.75)
+    Median   = apply(mu_mat, 2, median),
+    Lower_90 = apply(mu_mat, 2, quantile, 0.05),
+    Upper_90 = apply(mu_mat, 2, quantile, 0.95),
+    Lower_50 = apply(mu_mat, 2, quantile, 0.25),
+    Upper_50 = apply(mu_mat, 2, quantile, 0.75)
   )
 }
 
-trend_latent  <- extract_trend(fit_latent)
+trend_latent   <- extract_trend(fit_latent)
 trend_midpoint <- extract_trend(fit_midpoint)
 
 # Helper: extract parameter posteriors with CI regions
@@ -66,12 +65,17 @@ trend_midpoint <- extract_trend(fit_midpoint)
 extract_params <- function(fit) {
   draws <- fit$draws(format = "df")
   post_df <- tibble(
-    Baseline = draws$baseline_original,
-    Slope    = draws$slope_original,
-    Sigma    = draws$sigma
+    Baseline    = draws$baseline_original,
+    `Slope 1`   = draws$slope1_original,
+    `Slope 2`   = draws$slope2_original,
+    Changepoint = draws$cp_actual,
+    Sigma       = draws$sigma
   ) %>%
     pivot_longer(everything(), names_to = "Parameter", values_to = "Value") %>%
-    mutate(Parameter = factor(Parameter, levels = c("Baseline", "Slope", "Sigma")))
+    mutate(Parameter = factor(
+      Parameter,
+      levels = c("Baseline", "Slope 1", "Slope 2", "Changepoint", "Sigma")
+    ))
 
   ci_df <- post_df %>%
     group_by(Parameter) %>%
@@ -95,8 +99,10 @@ extract_params <- function(fit) {
     )
 }
 
-params_latent   <- extract_params(fit_latent)  %>% mutate(Model = "Latent dates")
-params_midpoint <- extract_params(fit_midpoint) %>% mutate(Model = "Midpoint dates")
+params_latent   <- extract_params(fit_latent)   %>%
+  mutate(Model = "Latent dates")
+params_midpoint <- extract_params(fit_midpoint) %>%
+  mutate(Model = "Midpoint dates")
 
 params_both <- bind_rows(params_latent, params_midpoint) %>%
   mutate(Model = factor(Model, levels = c("Latent dates", "Midpoint dates")))
@@ -104,22 +110,32 @@ params_both <- bind_rows(params_latent, params_midpoint) %>%
 # True value reference lines
 
 true_lines <- tibble(
-  Parameter = factor(c("Baseline", "Slope", "Sigma"),
-                     levels = c("Baseline", "Slope", "Sigma")),
-  True      = c(true_baseline, true_slope, true_sigma)
+  Parameter = factor(
+    c("Baseline", "Slope 1", "Slope 2", "Changepoint", "Sigma"),
+    levels = c("Baseline", "Slope 1", "Slope 2", "Changepoint", "Sigma")
+  ),
+  True = c(
+    true_vals["baseline"],
+    true_vals["slope_1"],
+    true_vals["slope_2"],
+    true_vals["changepoint"],
+    true_vals["sigma_noise"]
+  )
 )
 
 # Row 1: Trend recovery
 
 make_trend_panel <- function(df, title_label) {
   ggplot(df) +
-    geom_ribbon(aes(x = Year, ymin = Lower_90, ymax = Upper_90), fill = "grey80") +
-    geom_ribbon(aes(x = Year, ymin = Lower_50, ymax = Upper_50), fill = "grey60") +
+    geom_ribbon(aes(x = Year, ymin = Lower_90, ymax = Upper_90),
+                fill = "grey80") +
+    geom_ribbon(aes(x = Year, ymin = Lower_50, ymax = Upper_50),
+                fill = "grey60") +
     geom_line(aes(x = Year, y = Median), linewidth = 0.6, colour = "black") +
     geom_line(data = ground_truth, aes(x = Year, y = True_value),
               linewidth = 0.7, colour = "black", linetype = "dashed") +
     scale_x_continuous(breaks = seq(100, 900, 200), expand = c(0.01, 0)) +
-    labs(title = title_label, x = "Year (CE)", y = "Value") +
+    labs(title = title_label, x = "Year CE", y = "Value") +
     theme_panel
 }
 
@@ -133,7 +149,7 @@ p_trend_mid <- make_trend_panel(
   expression(bold("B.") ~ "Trend recovery — midpoint dates")
 )
 
-# Row 2: Parameter posteriors (facet_grid, shared x per parameter)
+# Row 2: Parameter posteriors
 
 p_post <- ggplot(params_both, aes(x = Value, fill = Region)) +
   geom_histogram(colour = "black", linewidth = 0.2, bins = 40) +
@@ -164,8 +180,11 @@ p <- (p_trend_latent | p_trend_mid) /
   plot_layout(heights = c(1, 1.2)) +
   plot_annotation(theme = theme(plot.margin = margin(5, 5, 5, 5)))
 
-ggsave(here("Simulations", "Sim_Linear", "figures", "model_comparison.png"),
-       p, width = 12, height = 10, dpi = 300, bg = "white")
+ggsave(
+  here("Simulations", "Sim_Changepoint", "figures", "model_comparison.png"),
+  p, width = 14, height = 10, dpi = 300, bg = "white"
+)
 
-cat("Saved to", here("Simulations", "Sim_Linear", "figures",
-                      "model_comparison.png"), "\n")
+cat("Saved to",
+    here("Simulations", "Sim_Changepoint", "figures",
+         "model_comparison.png"), "\n")

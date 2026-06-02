@@ -1,13 +1,16 @@
 // =============================================================================
-// Simple Linear Regression with Latent Date Inference
+// Changepoint Regression with Latent Date Inference
 // =============================================================================
-// Adapted from lsi_lm_ind.stan, stripped of taxon and individual structure.
+// Broken-stick (segmented) parameterization, continuous changepoint:
 //
-//   trend(x) = alpha + beta * x
-//   y_n ~ Normal(trend(true_date_n), sigma)
+//   mu(t) = alpha + beta1*t + (beta2 - beta1) * max(0, t - cp)
+//
+// Equivalent to the piecewise form used to generate the data:
+//   f(t) = baseline + slope1*(t - t_min)            for t <= cp
+//   f(t) = baseline + slope1*(cp - t_min) + slope2*(t - cp)  for t > cp
 //
 // Latent dates are inferred uniformly within each [start, end] window.
-// All dates are normalised to [0, 1] internally for numerical stability.
+// All dates are normalised to [0, 1] for numerical stability.
 // =============================================================================
 
 data {
@@ -41,7 +44,9 @@ parameters {
   array[N] real<lower=0, upper=1> true_date_raw;
 
   real alpha;
-  real beta;
+  real beta1;
+  real beta2;
+  real<lower=0, upper=1> cp_norm;
   real<lower=0> sigma;
 }
 
@@ -53,13 +58,16 @@ transformed parameters {
 }
 
 model {
-  alpha ~ normal(0, 10);
-  beta  ~ normal(0, 10);
-  sigma ~ exponential(1);
+  alpha   ~ normal(0, 10);
+  beta1   ~ normal(0, 10);
+  beta2   ~ normal(0, 10);
+  cp_norm ~ uniform(0, 1);
+  sigma   ~ exponential(1);
 
   for (n in 1:N) {
-    real trend_n = alpha + beta * true_date_norm[n];
-    y[n] ~ normal(trend_n, sigma);
+    real t  = true_date_norm[n];
+    real mu = alpha + beta1 * t + (beta2 - beta1) * fmax(0.0, t - cp_norm);
+    y[n] ~ normal(mu, sigma);
   }
 }
 
@@ -67,8 +75,9 @@ generated quantities {
   // Pointwise log-likelihood (LOO-CV)
   vector[N] log_lik;
   for (n in 1:N) {
-    real trend_n = alpha + beta * true_date_norm[n];
-    log_lik[n] = normal_lpdf(y[n] | trend_n, sigma);
+    real t  = true_date_norm[n];
+    real mu = alpha + beta1 * t + (beta2 - beta1) * fmax(0.0, t - cp_norm);
+    log_lik[n] = normal_lpdf(y[n] | mu, sigma);
   }
 
   // Expected trend on prediction grid (noise-free)
@@ -76,7 +85,8 @@ generated quantities {
   // Posterior predictive draws (includes observation noise)
   array[N_pred] real y_rep;
   for (p in 1:N_pred) {
-    mu_pred[p] = alpha + beta * x_pred_norm[p];
+    real t   = x_pred_norm[p];
+    mu_pred[p] = alpha + beta1 * t + (beta2 - beta1) * fmax(0.0, t - cp_norm);
     y_rep[p]   = normal_rng(mu_pred[p], sigma);
   }
 
@@ -85,7 +95,9 @@ generated quantities {
   for (n in 1:N)
     true_date_actual[n] = time_min + true_date_norm[n] * time_range;
 
-  // Back-transform trend parameters to original scale
-  real slope_original    = beta / time_range;
-  real baseline_original = alpha - beta * time_min / time_range;
+  // Back-transform parameters to original scale
+  real cp_actual         = time_min + cp_norm * time_range;
+  real baseline_original = alpha;                  // f(t_min): alpha at t_norm = 0
+  real slope1_original   = beta1 / time_range;
+  real slope2_original   = beta2 / time_range;
 }

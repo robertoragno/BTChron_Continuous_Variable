@@ -1,5 +1,5 @@
 // =============================================================================
-// Linear Regression using Midpoint Dates (no latent date inference)
+// Changepoint Regression using Midpoint Dates (no latent date inference)
 // =============================================================================
 // Baseline comparison: dates are fixed at (start + end) / 2.
 // =============================================================================
@@ -31,33 +31,44 @@ transformed data {
 
 parameters {
   real alpha;
-  real beta;
+  real beta1;
+  real beta2;
+  real<lower=0, upper=1> cp_norm;
   real<lower=0> sigma;
 }
 
 model {
-  alpha ~ normal(0, 10);
-  beta  ~ normal(0, 10);
-  sigma ~ exponential(1);
+  alpha   ~ normal(0, 10);
+  beta1   ~ normal(0, 10);
+  beta2   ~ normal(0, 10);
+  cp_norm ~ uniform(0, 1);
+  sigma   ~ exponential(1);
 
-  for (n in 1:N)
-    y[n] ~ normal(alpha + beta * mid_norm[n], sigma);
+  for (n in 1:N) {
+    real t  = mid_norm[n];
+    real mu = alpha + beta1 * t + (beta2 - beta1) * fmax(0.0, t - cp_norm);
+    y[n] ~ normal(mu, sigma);
+  }
 }
 
 generated quantities {
   vector[N] log_lik;
-  for (n in 1:N)
-    log_lik[n] = normal_lpdf(y[n] | alpha + beta * mid_norm[n], sigma);
+  for (n in 1:N) {
+    real t  = mid_norm[n];
+    real mu = alpha + beta1 * t + (beta2 - beta1) * fmax(0.0, t - cp_norm);
+    log_lik[n] = normal_lpdf(y[n] | mu, sigma);
+  }
 
-  // Expected trend on prediction grid (noise-free)
   array[N_pred] real mu_pred;
-  // Posterior predictive draws (includes observation noise)
   array[N_pred] real y_rep;
   for (p in 1:N_pred) {
-    mu_pred[p] = alpha + beta * x_pred_norm[p];
+    real t     = x_pred_norm[p];
+    mu_pred[p] = alpha + beta1 * t + (beta2 - beta1) * fmax(0.0, t - cp_norm);
     y_rep[p]   = normal_rng(mu_pred[p], sigma);
   }
 
-  real slope_original    = beta / time_range;
-  real baseline_original = alpha - beta * time_min / time_range;
+  real cp_actual         = time_min + cp_norm * time_range;
+  real baseline_original = alpha;
+  real slope1_original   = beta1 / time_range;
+  real slope2_original   = beta2 / time_range;
 }

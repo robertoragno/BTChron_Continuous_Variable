@@ -86,8 +86,8 @@ p_val <- ggplot(sim_data, aes(x = Midpoint, y = Value)) +
 p <- (p_hist | p_dur | p_val) +
   plot_layout(widths = c(0.8, 1.8, 0.8)) +
   plot_annotation(
-    caption = "Dashed line (C): true changepoint trend used to generate the simulated values.",
-    theme = theme(plot.caption = element_text(hjust = 0, size = 8, colour = "grey40"))
+    # caption = "Dashed line (C): true changepoint trend used to generate the simulated values.",
+    theme = theme(plot.margin = margin(5, 5, 5, 5))
   )
 
 ggsave(here("Simulations", "Sim_Changepoint", "figures", "exploratory_panel.png"), p,
