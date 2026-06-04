@@ -1,12 +1,10 @@
-#' Purpose: Fit the midpoint linear model (no latent date inference)
+#' Purpose: Fit the HSGP midpoint model (dates fixed at window centres).
 
 library(here)
 library(tidyverse)
 library(cmdstanr)
 
-# Load data
-
-sim_data <- read_csv(here("Simulations", "Sim_Linear", "data", "simulated_data.csv"),
+sim_data <- read_csv(here("Simulations", "Sim_GP", "data", "simulated_data.csv"),
                      show_col_types = FALSE)
 
 pred_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
@@ -17,13 +15,12 @@ stan_data <- list(
   start_date = sim_data$Start_date,
   end_date   = sim_data$End_date,
   N_pred     = length(pred_grid),
-  x_pred     = pred_grid
+  x_pred     = pred_grid,
+  M          = 20,
+  c          = 1.5
 )
 
-# Compile and fit
-
-model <- cmdstan_model(here("Simulations", "Sim_Linear", "models",
-                            "sim_linear_midpoint.stan"))
+model <- cmdstan_model(here("Simulations", "Sim_GP", "models", "sim_hsgp_midpoint.stan"))
 
 fit <- model$sample(
   data            = stan_data,
@@ -36,10 +33,7 @@ fit <- model$sample(
   max_treedepth   = 12
 )
 
-fit$save_object(here("Simulations", "Sim_Linear", "output",
-                     "fit_midpoint.rds"))
+fit$save_object(here("Simulations", "Sim_GP", "output", "fit_hsgp_midpoint.rds"))
 
 fit$cmdstan_diagnose()
-
-cat("\n── Midpoint model parameter recovery ──\n")
-print(fit$summary(variables = c("baseline_original", "slope_original", "sigma")))
+fit$summary(variables = c("mu", "alpha", "rho", "sigma", "rho_actual"))

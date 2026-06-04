@@ -5,3 +5,6 @@
 .DS_Store
 *.Rproj
 **/output/
+
+# Manuscript draft and LaTeX build artefacts — never committed
+Manuscript.*
