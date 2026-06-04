@@ -1,6 +1,6 @@
 parameter,value
 baseline,8
-slope_1,0.02
+slope_1,0.015
 slope_2,-0.01
 changepoint,500
 sigma_noise,1.5

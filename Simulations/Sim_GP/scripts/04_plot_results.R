@@ -1,6 +1,5 @@
-#' Purpose: Plot model results — trend recovery, latent-date recovery,
-#'          and posterior distributions of the generating parameters.
-
+#' Purpose: Plot HSGP model results — trend recovery, latent-date recovery,
+#'          and posterior distributions of the key parameters.
 
 library(here)
 library(tidyverse)
@@ -8,18 +7,16 @@ library(cmdstanr)
 library(posterior)
 library(patchwork)
 
-# Load data and fit
-
-sim_data     <- read_csv(here("Simulations", "Sim_Linear", "data", "simulated_data.csv"),
+sim_data     <- read_csv(here("Simulations", "Sim_GP", "data", "simulated_data.csv"),
                          show_col_types = FALSE)
-ground_truth <- read_csv(here("Simulations", "Sim_Linear", "data", "ground_truth.csv"),
+ground_truth <- read_csv(here("Simulations", "Sim_GP", "data", "ground_truth.csv"),
                          show_col_types = FALSE)
-true_params  <- read_csv(here("Simulations", "Sim_Linear", "data", "generating_parameters.csv"),
+true_params  <- read_csv(here("Simulations", "Sim_GP", "data", "generating_parameters.csv"),
                          show_col_types = FALSE)
 
-fit <- readRDS(here("Simulations", "Sim_Linear", "output", "fit_linear.rds"))
+fit <- readRDS(here("Simulations", "Sim_GP", "output", "fit_hsgp.rds"))
 
-# Shared theme for panels
+true_sigma <- true_params$value[true_params$parameter == "sigma_noise"]
 
 theme_panel <- theme_classic(base_size = 11) +
   theme(
@@ -28,10 +25,7 @@ theme_panel <- theme_classic(base_size = 11) +
     axis.title.x = element_blank()
   )
 
-# Extract draws
-
-draws <- fit$draws(format = "df")
-
+draws     <- fit$draws(format = "df")
 pred_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
 N_pred    <- length(pred_grid)
 
@@ -47,7 +41,7 @@ trend_summary <- tibble(
   Upper_50 = apply(trend_mat, 2, quantile, 0.75)
 )
 
-# Panel A: Recovered trend vs true trend
+# Panel A: Recovered trend vs true Gaussian bell curve
 
 p_trend <- ggplot(trend_summary) +
   geom_ribbon(aes(x = Year, ymin = Lower_90, ymax = Upper_90, fill = "90% CI")) +
@@ -70,12 +64,12 @@ p_trend <- ggplot(trend_summary) +
   ) +
   theme_panel +
   theme(
-    axis.title.x  = element_text(),
-    legend.position = c(0.05, 0.95),
+    axis.title.x     = element_text(),
+    legend.position  = c(0.05, 0.95),
     legend.justification = c(0, 1),
     legend.background = element_rect(fill = alpha("white", 0.8), colour = NA),
-    legend.key.size = unit(10, "pt"),
-    legend.text = element_text(size = 8)
+    legend.key.size  = unit(10, "pt"),
+    legend.text      = element_text(size = 8)
   )
 
 # Panel B: Latent date recovery
@@ -112,25 +106,17 @@ p_dates <- ggplot(date_recovery, aes(x = True_date, y = Inferred_med)) +
     plot.subtitle = element_text(size = 9, colour = "grey40", hjust = 0)
   )
 
-# Panel C: Posterior distributions of generating parameters
-
-true_baseline <- true_params$value[true_params$parameter == "baseline"]
-true_slope    <- true_params$value[true_params$parameter == "slope"]
-true_sigma    <- true_params$value[true_params$parameter == "sigma_noise"]
+# Panel C: Posterior distributions — sigma has a known true value; mu and
+# rho_actual do not map cleanly to generating parameters, so no true-value lines.
 
 post_df <- tibble(
-  Baseline = draws$baseline_original,
-  Slope    = draws$slope_original,
-  Sigma    = draws$sigma
+  Sigma      = draws$sigma,
+  Mu         = draws$mu,
+  Rho_actual = draws$rho_actual
 ) %>%
   pivot_longer(everything(), names_to = "Parameter", values_to = "Value") %>%
-  mutate(Parameter = factor(Parameter, levels = c("Baseline", "Slope", "Sigma")))
-
-true_lines <- tibble(
-  Parameter = factor(c("Baseline", "Slope", "Sigma"),
-                     levels = c("Baseline", "Slope", "Sigma")),
-  True      = c(true_baseline, true_slope, true_sigma)
-)
+  mutate(Parameter = factor(Parameter, levels = c("Sigma", "Mu", "Rho_actual"),
+                            labels = c("sigma", "mu", "rho (CE)")))
 
 ci_df <- post_df %>%
   group_by(Parameter) %>%
@@ -153,9 +139,14 @@ post_df <- post_df %>%
     Region = factor(Region, levels = c("50% CI", "90% CI", "Tail"))
   )
 
+true_sigma_line <- tibble(
+  Parameter = factor("sigma", levels = c("sigma", "mu", "rho (CE)")),
+  True      = true_sigma
+)
+
 p_post <- ggplot(post_df, aes(x = Value, fill = Region)) +
   geom_histogram(colour = "black", linewidth = 0.2, bins = 40) +
-  geom_vline(data = true_lines, aes(xintercept = True),
+  geom_vline(data = true_sigma_line, aes(xintercept = True),
              linetype = "dashed", linewidth = 0.6, colour = "black") +
   scale_fill_manual(
     name   = NULL,
@@ -163,26 +154,26 @@ p_post <- ggplot(post_df, aes(x = Value, fill = Region)) +
   ) +
   facet_wrap(~ Parameter, scales = "free", nrow = 1) +
   labs(
-    title = expression(bold("C.") ~ "Posterior distributions vs true values"),
+    title   = expression(bold("C.") ~ "Posterior distributions"),
+    caption = "Dashed line (sigma only): true generating value.",
     y = "Count"
   ) +
   theme_panel +
   theme(
-    axis.title.x = element_text(),
+    axis.title.x     = element_text(),
     strip.background = element_blank(),
-    strip.text = element_text(face = "bold", size = 10),
-    legend.position = "bottom",
-    legend.text = element_text(size = 8),
-    legend.key.size = unit(10, "pt")
+    strip.text       = element_text(face = "bold", size = 10),
+    legend.position  = "bottom",
+    legend.text      = element_text(size = 8),
+    legend.key.size  = unit(10, "pt"),
+    plot.caption     = element_text(hjust = 0, size = 8, colour = "grey40")
   )
-
-# Combine
 
 p <- (p_trend | p_dates) / p_post +
   plot_layout(heights = c(1, 0.7)) +
   plot_annotation(theme = theme(plot.margin = margin(5, 5, 5, 5)))
 
-ggsave(here("Simulations", "Sim_Linear", "figures", "model_results_panel.png"), p,
+ggsave(here("Simulations", "Sim_GP", "figures", "model_results_panel.png"), p,
        width = 12, height = 8, dpi = 300, bg = "white")
 
-cat("Saved to", here("Simulations", "Sim_Linear", "figures", "model_results_panel.png"), "\n")
+cat("Saved to", here("Simulations", "Sim_GP", "figures", "model_results_panel.png"), "\n")

@@ -1,59 +1,108 @@
 # Simulation 2: Changepoint Regression
 
-This page shows the main findings from the simulated dataset of 300 samples of a continuous variable ranging approximately between ~7 and ~18 (Figure A). Each sample is assigned a time range with a `Start_Date` and an `End_Date`, with a known true date assigned between these boundaries (Figure B). 
-The general structure of the dataset assumes an underlying segmented temporal trend (i.e. with a change in its slope) with a single changepoint (Figure C):
-`f(t) = baseline + slope_1 * (t - t_min)` for `t <= changepoint`
-`f(t) = baseline + slope_1 * (changepoint - t_min) + slope_2 * (t - changepoint)` for `t > changepoint`
+A continuous measurement is assumed to follow a segmented temporal trend — two
+straight segments meeting at a single changepoint, continuous at the join:
 
-The main goal is to verify that the model recovers the known generating parameters that we used in the simulation, listed below:
+```
+f(t) = baseline + slope_1 * (t - t_min)                              for t <= changepoint
+f(t) = baseline + slope_1 * (changepoint - t_min) + slope_2 * (t - changepoint) for t > changepoint
+```
 
-- **Baseline** = 8
-- **Slope 1** = 0.02
-- **Slope 2** = -0.01
-- **Changepoint** = 500 CE
-- **Noise** ~ N(0, 1.5)
+Each observation carries a dating range `[Start_date, End_date]` (of varying
+width) rather than a known year. The question is whether treating each date as a
+latent parameter within its range recovers the trend better than collapsing the
+range to its midpoint.
+
+Generating parameters (worked example): **baseline = 8**, **slope_1 = 0.015**,
+**slope_2 = -0.01**, **changepoint = 500 CE**, **noise ~ N(0, 1.5)**.
+
+## Scripts
+
+`simulate.R` holds the shared generating process (the `simulate_changepoint()`
+function and constants); it is sourced by both the worked example and the study,
+so the two provably use the same process. The pipeline is then three scripts:
+
+| Script | Purpose | Output |
+|---|---|---|
+| `01_example.R` | draw ONE dataset, show it, fit both models, compare | `figures/exploratory_panel.png`, `model_comparison_single_fit.png`, `individual_date_posteriors.png` |
+| `02_recovery_study.R` | draw MANY random plausible datasets (each with its own baseline, two slopes, changepoint, noise, sample size, mixed windows), fit both models, record whether each interval contains the truth | `output/recovery_results.csv` |
+| `03_recovery_plots.R` | the study figures | `figures/recovery.png`, `coverage.png`, `sigma_vs_window.png` |
+
+The worked example (`01`) fits in seconds, so it is self-contained. The study
+(`02`) takes about 11 minutes (800 fits), so its plotting (`03`) is kept separate
+— figures can be restyled without refitting. So that every dataset poses a genuine
+changepoint problem, the two slopes are drawn as `slope_1 ~ U(-0.03, 0.03)` and
+`slope_2 = slope_1 ± U(0.01, 0.05)`: the slope change is random over a range but
+never negligible, which keeps the changepoint identifiable.
 
 ## Exploratory panel
 <p align="center">
 <img src="figures/exploratory_panel.png" height="700" text-align="center"/>
 </p>
 
-## Model 1: Changepoint regression with latent dates
-This is a Bayesian segmented regression with a latent date, as per the linear model. Each observation's 'true' date is modelled as a uniform draw within its `[Start_date, End_date]` window. The trend is a continuous piecewise-linear function (basically a broken-stick parameterisation):
+## Latent-date inference
+
+The latent-date model treats each observation's true date as an unknown
+parameter, uniform within its `[Start_date, End_date]` window:
 
 ```
-mu(t) = alpha + beta1*t + (beta2 - beta1) * max(0, t - changepoint) // mean
+mu(t) = alpha + beta1*t + (beta2 - beta1) * max(0, t - changepoint)
 y_n ~ Normal(mu(true_date_n), sigma)
 ```
 
-where `alpha` is the intercept, `beta1` and `beta2` are the slopes before and after the changepoint, and `sigma` is the observation noise. Before the changepoint, `max(0, t - changepoint) = 0` and the mean reduces to `alpha + beta1*t`. After it, the slope shifts to `beta2`, with the two segments meeting continuously at the changepoint — so `beta2 - beta1` is the change in slope.
+Before the changepoint `max(0, t - changepoint) = 0` and the mean reduces to
+`alpha + beta1*t`; after it the slope shifts to `beta2`, the two segments meeting
+continuously at the changepoint, so `beta2 - beta1` is the change in slope. The
+changepoint itself is a free parameter with a uniform prior over the time range,
+sampled jointly with everything else; the true value (500 CE) is only used
+afterwards to check recovery.
 
-The changepoint is a free parameter with a uniform prior over the normalised time range. Stan treats it as unknown and samples a posterior for it alongside all other parameters. For each candidate value, the piecewise mean changes shape and the likelihood scores how well that shape fits the data — so the posterior concentrates where the slope change is most supported by the observations. The true value (500 CE) is only used afterwards to check whether the posterior recovered it correctly.
-
-Panel **A** shows the recovered trend (median and 50%/90% credible intervals) against the true generating function; the rug on the right margin shows the distribution of observed values. Panel **B** is a date recovery plot: each dot is one sample, with the true generating date on the x-axis and the posterior median date on the y-axis — if recovery were perfect, all points would sit on the dashed 1:1 line; vertical bars show the 90% CI. Panel **C** shows posterior distributions for all five generating parameters, with graduated shading by credible interval and dashed lines marking the true values.
+For a sample of observations, the left panels show the recovered trend with the
+sample's date range (shaded) and observed value (dashed); the right panels show
+the posterior for each estimated date, with the range boundaries (dashed) and the
+true generating date (solid). Wide-window dates stay broadly uncertain — the model
+correctly declines to invent precision it does not have.
 
 <p align="center">
-<img src="figures/model_results_panel.png" height="700" text-align="center"/>
+<img src="figures/individual_date_posteriors.png" height="900" text-align="center"/>
 </p>
 
-## Model comparison: latent dates vs midpoint dates
+## Model comparison on a single dataset
 
-A second model uses the midpoint of each sample's `[Start_date, End_date]` window as a fixed date, with no latent date inference. This is the conventional approach — treating the midpoint as the "best guess" and ignoring date uncertainty.
-
-Panels **A–B** compare the trend recovery of both models. Panel **C** shows the posterior distributions for each generating parameter side by side (latent-date model on top, midpoint model on bottom), with graduated shading by credible interval and dashed lines marking the true values.
+The midpoint model fixes each date at the midpoint of its range. On one dataset
+both approaches recover the trend within the 90% credible interval, but the
+midpoint model returns a larger sigma, because unmodelled date uncertainty is
+absorbed into the residual variance.
 
 <p align="center">
-<img src="figures/model_comparison.png" height="800" text-align="center"/>
+<img src="figures/model_comparison_single_fit.png" height="800" text-align="center"/>
 </p>
 
-## Simulation-based calibration (SBC)
+## Recovery study
 
-To verify that the credible intervals are well calibrated, both models were each run 100 times — each time redrawing true dates and observation noise from the same generating process while keeping the timespans fixed.
+A single dataset tests the method at one point and cannot rule out a favourable
+choice of parameters. Instead the study simulates many random plausible datasets:
+each draws its own baseline, two slopes, changepoint location, noise level, sample
+size, and a realistic mix of dating-window widths. Both models are fit to every
+dataset, and we count how often each 50% / 90% credible interval contains the true
+value. The changepoint posterior is harder to sample than the linear one, so about
+a fifth of fits are dropped for non-convergence (max Rhat > 1.05 or divergences);
+the coverage rates are essentially unchanged whether or not this filter is applied.
 
-Each replication produces (for each parameter) 4,000 posterior draws. The **rank** is where the true value falls among those draws — i.e., how many of the 4,000 draws are below the true value. If the model is well calibrated, the true value is equally likely to land anywhere in the posterior, so across 100 replications the ranks should be roughly uniformly distributed. The histograms below have 20 bins, so each bin should contain about 100 / 20 = 5 replications (dashed line). A flat histogram means the model's uncertainty is honest; a histogram piled up on one side means the model is systematically wrong about that parameter.
-
-The figure has two rows: the **latent-date model** (top) and the **midpoint model** (bottom). Coverage rates for the 50% and 90% credible intervals are annotated in each panel. The latent-date model produces approximately flat rank histograms across all five parameters, with coverage rates close to their nominal levels. The midpoint model is severely miscalibrated: baseline, slope 1, and slope 2 show skewed rank distributions, and sigma collapses entirely to rank 0 in every replication (50% CI: 0%, 90% CI: 0%), indicating that the posterior for sigma is systematically too narrow when date uncertainty is ignored.
+**Findings.** Both models recover the baseline, the first slope, and the
+changepoint location at close to the nominal rates. They diverge in two places.
+First, as in the linear case, the noise level sigma: the midpoint absorbs dating
+uncertainty into the residual and overestimates sigma, and the error grows as a
+dataset's dating becomes vaguer, while the latent-date model recovers sigma
+whatever the dating precision (see `sigma_vs_window.png`). Second, the
+post-changepoint slope `slope_2` is mildly under-covered even by the latent model
+(about 79% at the 90% level) and noticeably worse under the midpoint model (about
+67%) — the segment after the changepoint rests on fewer observations and is
+entangled with the changepoint location, so it is the hardest parameter to pin
+down, and ignoring date uncertainty makes it harder still.
 
 <p align="center">
-<img src="figures/calibration_coverage.png" height="500" text-align="center"/>
+<img src="figures/recovery.png" height="320" text-align="center"/>
+<img src="figures/coverage.png" height="360" text-align="center"/>
+<img src="figures/sigma_vs_window.png" height="400" text-align="center"/>
 </p>
