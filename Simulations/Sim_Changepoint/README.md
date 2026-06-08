@@ -27,6 +27,7 @@ so the two provably use the same process. The pipeline is then three scripts:
 | `01_example.R` | draw ONE dataset, show it, fit both models, compare | `figures/exploratory_panel.png`, `model_comparison_single_fit.png`, `individual_date_posteriors.png` |
 | `02_recovery_study.R` | draw MANY random plausible datasets (each with its own baseline, two slopes, changepoint, noise, sample size, mixed windows), fit both models, record whether each interval contains the truth | `output/recovery_results.csv` |
 | `03_recovery_plots.R` | the study figures | `figures/recovery.png`, `coverage.png`, `sigma_vs_window.png` |
+| `04_convergence_diagnostic.R` | inspect which datasets fail to converge, contrasting dating-window width with changepoint detectability | `figures/convergence_diagnostic.png` |
 
 The worked example (`01`) fits in seconds, so it is self-contained. The study
 (`02`) takes about 11 minutes (800 fits), so its plotting (`03`) is kept separate
@@ -89,6 +90,15 @@ value. The changepoint posterior is harder to sample than the linear one, so abo
 a fifth of fits are dropped for non-convergence (max Rhat > 1.05 or divergences);
 the coverage rates are essentially unchanged whether or not this filter is applied.
 
+Two extra checks are tracked for the difficult changepoint case. First,
+`sigma_vs_window.png` shows that the midpoint model increasingly overestimates the
+generative noise scale as dating windows widen, while the latent-date model stays
+close to unbiased. Second, `convergence_diagnostic.png` asks whether dropped fits
+look like weak-signal cases or simply hard posterior geometries: in these
+simulations, non-convergence is more strongly associated with wide dating windows
+than with low changepoint detectability, so the discarded fits are not just the
+datasets with the faintest kink.
+
 **Findings.** Both models recover the baseline, the first slope, and the
 changepoint location at close to the nominal rates. They diverge in two places.
 First, as in the linear case, the noise level sigma: the midpoint absorbs dating
@@ -105,4 +115,5 @@ down, and ignoring date uncertainty makes it harder still.
 <img src="figures/recovery.png" height="320" text-align="center"/>
 <img src="figures/coverage.png" height="360" text-align="center"/>
 <img src="figures/sigma_vs_window.png" height="400" text-align="center"/>
+<img src="figures/convergence_diagnostic.png" height="400" text-align="center"/>
 </p>

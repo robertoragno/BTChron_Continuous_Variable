@@ -70,7 +70,7 @@ build_panel <- function(sim, results, y_limits) {
     geom_hline(yintercept = 0, linetype = "dotted", colour = "grey45") +
     geom_point(data = results,
                aes(mean_width, sigma_err, colour = model, shape = model),
-               size = 0.5, alpha = 0.6) +
+               size = 0.35, alpha = 0.25) +
     geom_errorbar(data = binned,
                   aes(x = x, ymin = q25, ymax = q75, colour = model),
                   width = 16, linewidth = 0.7) +
@@ -105,7 +105,6 @@ combined <- wrap_plots(panels, nrow = 1, guides = "collect") +
   plot_annotation(
     tag_levels = "A",
     title = "Recovery of the noise scale under latent and midpoint dating",
-    caption = "Markers: bin median with interquartile range (25th-75th percentile).",
     theme = theme(plot.title = element_text(size = 13, face = "bold"),
                   legend.position = "top")
   ) &
