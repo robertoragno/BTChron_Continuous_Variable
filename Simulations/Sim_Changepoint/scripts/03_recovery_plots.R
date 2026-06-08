@@ -159,8 +159,9 @@ sigma_window_plot <- ggplot() +
   scale_x_continuous(breaks = seq(100, 400, 100)) +
   labs(x = "Mean timespan (years)",
        y = expression(sigma[err] == sigma[est] - sigma[true]),
-       title = "Midpoint over-estimates the noise as dating gets vaguer",
-       caption = "Markers: bin median with interquartile range (25th-75th percentile).") +
+       title = "Midpoint over-estimates the noise as dating gets vaguer"
+   #    caption = "Markers: bin median with interquartile range (25th-75th percentile)."
+   ) +
   panel_theme
 
 ggsave(figure_path("sigma_vs_window.png"), sigma_window_plot,
