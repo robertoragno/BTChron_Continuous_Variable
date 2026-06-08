@@ -79,32 +79,43 @@ recovery_plot <- ggplot(estimates_vs_truth,
 ggsave(figure_path("recovery.png"), recovery_plot,
        width = 14, height = 4, dpi = 300, bg = "white")
 
-# coverage.png : how often the interval contained the truth
+# coverage.png : empirical interval coverage with 95% Wilson intervals
+
+z_95 <- qnorm(0.975)
 
 coverage_rates <- recovery_results %>%
-  group_by(model) %>%
-  summarise(across(c(baseline_cov50, slope1_cov50, slope2_cov50, cp_cov50,
-                     sigma_cov50, baseline_cov90, slope1_cov90, slope2_cov90,
-                     cp_cov90, sigma_cov90), mean),
+  pivot_longer(matches("_cov(50|90)$"), names_to = c("parameter", "interval"),
+               names_sep = "_cov", values_to = "contained_truth") %>%
+  group_by(model, parameter, interval) %>%
+  summarise(successes = sum(contained_truth), n = n(), value = mean(contained_truth),
             .groups = "drop") %>%
-  pivot_longer(-model, names_to = c("parameter", "interval"),
-               names_sep = "_cov") %>%
-  mutate(model = label_model(model),
-         parameter = factor(parameter, tolower(param_levels),
-                            labels = param_labels),
-         interval = paste0(interval, "% interval"),
-         target   = ifelse(grepl("50", interval), 0.5, 0.9))
+  mutate(
+    denom  = 1 + z_95^2 / n,
+    centre = (value + z_95^2 / (2 * n)) / denom,
+    half   = z_95 * sqrt((value * (1 - value) + z_95^2 / (4 * n)) / n) / denom,
+    lower  = pmax(0, centre - half),
+    upper  = pmin(1, centre + half),
+    model = label_model(model),
+    parameter = factor(parameter, tolower(param_levels), labels = param_labels),
+    interval = paste0(interval, "% interval"),
+    target = ifelse(grepl("50", interval), 0.5, 0.9)
+  )
 
-coverage_plot <- ggplot(coverage_rates, aes(parameter, value, fill = model)) +
-  geom_col(position = position_dodge(0.7), width = 0.65, colour = "black",
-           linewidth = 0.2) +
+coverage_plot <- ggplot(coverage_rates,
+                        aes(parameter, value, colour = model, shape = model)) +
   geom_hline(aes(yintercept = target), linetype = "dashed", colour = "grey40") +
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                position = position_dodge(width = 0.45),
+                width = 0, linewidth = 0.7) +
+  geom_point(position = position_dodge(width = 0.45), size = 2.4) +
   facet_wrap(~ interval) +
-  scale_fill_manual(values = c("Latent-date" = "grey45", Midpoint = "grey82"),
-                    name = NULL) +
+  scale_colour_manual(values = model_colours, name = NULL) +
+  scale_shape_manual(values = model_shapes, name = NULL) +
+  guides(colour = guide_legend(override.aes = list(size = 2.5, alpha = 1))) +
   scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
   labs(x = NULL, y = "Datasets where the interval contained the truth",
-       title = "Recovery rate (dashed line = target)") +
+       title = "Empirical coverage of credible intervals",
+       subtitle = "Points show observed coverage; error bars show 95% Wilson intervals") +
   panel_theme
 
 ggsave(figure_path("coverage.png"), coverage_plot,
