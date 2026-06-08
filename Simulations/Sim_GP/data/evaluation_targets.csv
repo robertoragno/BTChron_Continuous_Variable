@@ -1,0 +1,4 @@
+target,value,description
+peak_year,450,Year where the true curve reaches its maximum
+peak_value,20,Maximum value of the true curve
+sigma_noise,2.5,Residual noise SD used to generate observations

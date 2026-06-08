@@ -1,16 +1,44 @@
 # Simulation 3: Gaussian Process
 
-This page shows the main findings from the simulated dataset of 300 samples of a continuous variable ranging approximately between ~5 and ~25 (Figure A). Each sample is assigned a time range with a `Start_Date` and an `End_Date`, with a known true date assigned between these boundaries (Figure B). 
-The general structure of the dataset assumes an underlying temporal trend, with a peak around 450 CE and a decline thereafter (Figure C):
-`f(t) = baseline + amplitude * exp(-((t - peak) / width)^2)`
+A continuous measurement is assumed to follow a smooth bell-shaped temporal
+trend,
 
-Given the simulated nature of the dataset, the goal is to verify that the model recovers the known generating parameters:
+```
+f(t) = baseline + amplitude * exp(-((t - peak) / width)^2)
+```
 
-- **Baseline** = 8
-- **Amplitude** = 12
-- **Peak** = 450 CE
-- **Width** = 200
-- **Noise** ~ N(0, 2.5)
+observed with Gaussian noise. Each observation carries a dating range
+`[Start_date, End_date]` rather than a known year. The question is whether
+treating each date as a latent parameter within its range recovers the smooth
+trend better than collapsing the range to its midpoint.
+
+Generating parameters (worked example): **baseline = 8**, **amplitude = 12**,
+**peak = 450 CE**, **width = 200**, **noise ~ N(0, 2.5)**.
+
+Because the fitted model is non-parametric, the GP is not judged by recovering
+those named generator parameters one-for-one. Instead the key checks are whether
+it recovers the true curve, simple curve features such as the peak, and the
+known residual noise scale.
+
+## Scripts
+
+`simulate.R` holds the shared generating process (the true bell-shaped curve,
+date-window generator, and truth tables); it is sourced by both the worked
+example and the repeated study, so they provably use the same process. The
+pipeline is then four scripts:
+
+| Script | Purpose | Output |
+|---|---|---|
+| `01_example.R` | draw ONE dataset, show it, fit both models, compare | `figures/exploratory_panel.png`, `model_results_panel.png`, `model_comparison.png` |
+| `02_recovery_study.R` | redraw true dates and noise many times on the same date windows, fit both models, record sigma calibration summaries | `output/calibration_results.csv`, `output/calibration_results_midpoint.csv` |
+| `03_recovery_plots.R` | the repeated-study figure | `figures/calibration_coverage.png` |
+| `04_prior_predictive_check.R` | draw from the HSGP priors and compare the implied trends and values with the observed range | `figures/prior_predictive_check.png` |
+
+The worked example (`01`) writes the single simulated dataset and all
+single-dataset figures. The repeated study (`02`) is kept separate because it is
+the expensive step; its plotting (`03`) can then be restyled without refitting.
+The prior predictive check (`04`) is separate because it is about the priors,
+not about recovery from one realised dataset.
 
 ## Exploratory panel
 <p align="center">
@@ -50,11 +78,21 @@ Panels **A–B** compare trend recovery between the two models. Panel **C** show
 <img src="figures/model_comparison.png" height="700" text-align="center"/>
 </p>
 
-## Simulation-based calibration (SBC)
+## Repeated study
 
-To check whether the credible intervals are well calibrated, the simulation was repeated 100 times — each time redrawing true dates and observation noise from the same generating process while keeping the date windows fixed.
+For the GP case, the repeated study is a calibration check rather than a
+parameter-recovery table. The simulation is repeated many times, each time
+redrawing true dates and observation noise from the same generating process
+while keeping the date windows fixed. Sigma is the cleanest scalar target
+because it has a known true value (2.5), and it also links directly to the
+linear and changepoint simulations.
 
-Sigma is the primary calibration target because it has a known true value (2.5). Under a well-calibrated model the true value is equally likely to land anywhere in the posterior, so posterior ranks across 100 replications should be roughly uniform (dashed line marks the expected bin count of 5). A histogram piled up on the right means the model systematically underestimates sigma — the pattern expected for the midpoint model.
+Under a well-calibrated model the true sigma should be equally likely to land
+anywhere in the posterior, so posterior ranks across replications should be
+roughly uniform. A histogram piled up on the right means the model
+systematically underestimates sigma; a histogram piled up on the left means it
+systematically overestimates it. The midpoint model is expected to distort sigma
+because unmodelled date uncertainty is absorbed into the residual variance.
 
 <p align="center">
 <img src="figures/calibration_coverage.png" height="500" text-align="center"/>
