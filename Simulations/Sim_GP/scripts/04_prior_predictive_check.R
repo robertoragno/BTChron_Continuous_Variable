@@ -1,31 +1,27 @@
-#' Purpose: Prior predictive check for the HSGP model. Draw hyperparameters
-#'          from the priors, compute GP realisations through the HSGP
-#'          parameterisation, and compare the resulting trends and simulated
-#'          observations against the observed data range. If the priors are
-#'          reasonable the observed values should sit comfortably within the
-#'          bulk of the prior predictive distribution.
+# Prior predictive check for the HSGP model.
+#
+# Kept separate from 01_example.R because it is a distinct check on the priors
+# rather than part of the worked example fit itself.
 
 library(here)
 library(tidyverse)
 library(patchwork)
 
-set.seed(42)
-
 sim_data <- read_csv(here("Simulations", "Sim_GP", "data", "simulated_data.csv"),
                      show_col_types = FALSE)
 
-# ── HSGP setup (must match sim_hsgp.stan) ────────────────────────────────────
+set.seed(42)
 
-M          <- 20
+M <- 20
 c_boundary <- 1.5
-L          <- c_boundary
+L <- c_boundary
 
-time_min   <- min(sim_data$Start_date)
-time_max   <- max(sim_data$End_date)
+time_min <- min(sim_data$Start_date)
+time_max <- max(sim_data$End_date)
 time_range <- time_max - time_min
 
-pred_grid      <- seq(time_min, time_max, by = 5)
-x_pred_norm    <- (pred_grid - time_min) / time_range
+pred_grid <- seq(time_min, time_max, by = 5)
+x_pred_norm <- (pred_grid - time_min) / time_range
 
 PHI_fn <- function(x_norm, M, L) {
   m_seq <- seq_len(M)
@@ -40,48 +36,36 @@ diagSPD_EQ_fn <- function(alpha, rho, L, M) {
 
 PHI_mat <- PHI_fn(x_pred_norm, M, L)
 
-# ── Draw from priors ──────────────────────────────────────────────────────────
-# Priors from sim_hsgp.stan:
-#   mu    ~ normal(0, 15)
-#   alpha ~ normal+(0, 10)   [half-normal, truncated at 0]
-#   rho   ~ inv_gamma(5, 2.5)
-#   sigma ~ exponential(1)
-#   z[m]  ~ std_normal()
-
 N_sim <- 200
 
 rinvgamma <- function(n, shape, scale) scale / rgamma(n, shape = shape, rate = 1)
 
 prior_draws <- tibble(
-  mu    = rnorm(N_sim, 0, 15),
+  mu = rnorm(N_sim, 0, 15),
   alpha = abs(rnorm(N_sim, 0, 10)),
-  rho   = rinvgamma(N_sim, shape = 5, scale = 2.5),
+  rho = rinvgamma(N_sim, shape = 5, scale = 2.5),
   sigma = rexp(N_sim, rate = 1)
 )
 
-# ── Compute prior predictive trends and observations ─────────────────────────
-
 trend_list <- vector("list", N_sim)
-y_sim_all  <- numeric(0)
+y_sim_all <- numeric(0)
 
 for (i in seq_len(N_sim)) {
-  z       <- rnorm(M)
-  spd     <- diagSPD_EQ_fn(prior_draws$alpha[i], prior_draws$rho[i], L, M)
+  z <- rnorm(M)
+  spd <- diagSPD_EQ_fn(prior_draws$alpha[i], prior_draws$rho[i], L, M)
   beta_gp <- spd * z
-  f       <- prior_draws$mu[i] + PHI_mat %*% beta_gp
+  f <- prior_draws$mu[i] + PHI_mat %*% beta_gp
 
   trend_list[[i]] <- tibble(
-    sim  = i,
+    sim = i,
     Year = pred_grid,
-    f    = as.numeric(f)
+    f = as.numeric(f)
   )
 
   y_sim_all <- c(y_sim_all, rnorm(length(f), f, prior_draws$sigma[i]))
 }
 
 trend_df <- bind_rows(trend_list)
-
-# ── Trim extreme draws for legible plot (keep middle 90% by max |f|) ─────────
 
 max_abs_f <- trend_df %>%
   group_by(sim) %>%
@@ -90,15 +74,11 @@ max_abs_f <- trend_df %>%
 
 trend_plot_df <- trend_df %>% filter(sim %in% max_abs_f$sim)
 
-# ── Theme ─────────────────────────────────────────────────────────────────────
-
 theme_panel <- theme_classic(base_size = 11) +
   theme(
-    plot.title  = element_text(size = 11, face = "bold", hjust = 0),
+    plot.title = element_text(size = 11, face = "bold", hjust = 0),
     plot.margin = margin(5, 10, 5, 10)
   )
-
-# ── Panel A: spaghetti of prior predictive trends ────────────────────────────
 
 obs_range <- range(sim_data$Value)
 
@@ -119,29 +99,27 @@ p_trends <- ggplot() +
   coord_cartesian(ylim = c(-50, 80)) +
   labs(
     title = expression(bold("A.") ~ "Prior predictive trends (n = 200, trimmed to 90th percentile)"),
-    x     = "Year CE",
-    y     = "f(t)"
+    x = "Year CE",
+    y = "f(t)"
   ) +
   theme_panel
 
-# ── Panel B: density of prior predictive y vs observed y ─────────────────────
-
 density_df <- bind_rows(
   tibble(Source = "Prior predictive", Value = y_sim_all),
-  tibble(Source = "Observed",         Value = sim_data$Value)
+  tibble(Source = "Observed", Value = sim_data$Value)
 )
 
 p_density <- ggplot(density_df, aes(x = Value, colour = Source, fill = Source)) +
   geom_density(alpha = 0.25, linewidth = 0.6) +
   scale_colour_manual(values = c("Prior predictive" = "grey40", "Observed" = "steelblue4"),
                       name = NULL) +
-  scale_fill_manual(values  = c("Prior predictive" = "grey70", "Observed" = "steelblue"),
+  scale_fill_manual(values = c("Prior predictive" = "grey70", "Observed" = "steelblue"),
                     name = NULL) +
   coord_cartesian(xlim = c(-20, 50)) +
   labs(
     title = expression(bold("B.") ~ "Prior predictive y vs observed values"),
-    x     = "Value",
-    y     = "Density"
+    x = "Value",
+    y = "Density"
   ) +
   theme_panel +
   theme(
@@ -156,5 +134,4 @@ p <- p_trends / p_density
 ggsave(here("Simulations", "Sim_GP", "figures", "prior_predictive_check.png"),
        p, width = 10, height = 8, dpi = 300, bg = "white")
 
-cat("Saved to", here("Simulations", "Sim_GP", "figures",
-                     "prior_predictive_check.png"), "\n")
+cat("Saved to", here("Simulations", "Sim_GP", "figures", "prior_predictive_check.png"), "\n")
