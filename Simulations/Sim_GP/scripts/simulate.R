@@ -105,12 +105,24 @@ generating_parameters <- function() {
 evaluation_targets <- function() {
   # For the GP, these are more useful checks than the generator's named
   # parameters: a known scalar target (sigma) and simple features of the curve.
+  truth <- ground_truth_grid()
+  half_height <- min(truth$True_value) + 0.5 * (max(truth$True_value) - min(truth$True_value))
+  above_half <- which(truth$True_value >= half_height)
+  fwhm_years <- truth$Year[max(above_half)] - truth$Year[min(above_half)]
+# fhwm_years means "full width at half maximum" in years. 
+# It is a measure of the width of the peak of the curve, specifically the distance between 
+# the two points on the curve where the value is half of the maximum value. 
+# In this context, it is calculated by finding the years corresponding to the maximum and 
+#  minimum indices of the values that are above half of the maximum value, and then taking the difference between those two years. 
+# This gives an indication of how wide or narrow the peak of the curve is.
+
   tibble(
-    target = c("peak_year", "peak_value", "sigma_noise"),
-    value = c(TRUE_PEAK, f_true(TRUE_PEAK), TRUE_SIGMA),
+    target = c("peak_year", "peak_value", "fwhm_years", "sigma_noise"),
+    value = c(TRUE_PEAK, f_true(TRUE_PEAK), fwhm_years, TRUE_SIGMA),
     description = c(
       "Year where the true curve reaches its maximum",
       "Maximum value of the true curve",
+      "Full width at half maximum of the true curve",
       "Residual noise SD used to generate observations"
     )
   )

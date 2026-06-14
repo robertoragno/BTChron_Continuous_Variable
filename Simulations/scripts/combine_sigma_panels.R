@@ -3,11 +3,12 @@
 # Each simulation's recovery study writes output/recovery_results.csv with the
 # same sigma columns (model, mean_width, sigma_err). This script rebuilds the
 # sigma-error-vs-window panel from each of those tables and stacks them into one
-# figure with panels A, B, C — one per simulation. Panels are rebuilt from the
+# figure with panels A and B — one per simulation. Panels are rebuilt from the
 # data (not stitched from the per-simulation PNGs) so the styling stays uniform.
 #
-# Linear and Changepoint are present now; GP is included automatically once its
-# recovery_results.csv exists. Missing simulations are skipped.
+# This combined figure is only for the varying-conditions recovery studies.
+# Linear and Changepoint qualify because they redraw mean window width across
+# datasets; the current GP study does not, so it is intentionally excluded.
 
 library(here)
 library(readr)
@@ -18,8 +19,7 @@ library(patchwork)
 # Each simulation in display order. label is the panel subtitle.
 simulations <- list(
   list(key = "Sim_Linear",      label = "Linear trend"),
-  list(key = "Sim_Changepoint", label = "Changepoint trend"),
-  list(key = "Sim_GP",          label = "Gaussian-process trend")
+  list(key = "Sim_Changepoint", label = "Changepoint trend")
 )
 
 label_model   <- function(code) factor(code, c("latent", "midpoint"),
