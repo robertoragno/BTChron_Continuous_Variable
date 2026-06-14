@@ -30,15 +30,19 @@ pipeline is then four scripts:
 | Script | Purpose | Output |
 |---|---|---|
 | `01_example.R` | draw ONE dataset, show it, fit both models, compare | `figures/exploratory_panel.png`, `model_results_panel.png`, `model_comparison.png` |
-| `02_recovery_study.R` | redraw true dates and noise many times on the same date windows, fit both models, record sigma calibration summaries | `output/calibration_results.csv`, `output/calibration_results_midpoint.csv` |
+| `02_recovery_study.R` | redraw true dates and noise many times on the same fixed date windows, fit both models, record sigma calibration summaries, and also write a sigma recovery table for inspection | `output/calibration_results.csv`, `output/calibration_results_midpoint.csv`, `output/recovery_results.csv`, `output/runtime_summary.csv` |
 | `03_recovery_plots.R` | the repeated-study figure | `figures/calibration_coverage.png` |
 | `04_prior_predictive_check.R` | draw from the HSGP priors and compare the implied trends and values with the observed range | `figures/prior_predictive_check.png` |
 
 The worked example (`01`) writes the single simulated dataset and all
 single-dataset figures. The repeated study (`02`) is kept separate because it is
 the expensive step; its plotting (`03`) can then be restyled without refitting.
-The prior predictive check (`04`) is separate because it is about the priors,
-not about recovery from one realised dataset.
+That repeated study also writes `output/recovery_results.csv`, but the current
+paper-level combined sigma-vs-window figure excludes GP because the GP study is
+a fixed-window calibration design, not a varying-window recovery design like the
+linear and changepoint simulations. The prior predictive check (`04`) is
+separate because it is about the priors, not about recovery from one realised
+dataset.
 
 ## Exploratory panel
 <p align="center">
@@ -85,7 +89,10 @@ parameter-recovery table. The simulation is repeated many times, each time
 redrawing true dates and observation noise from the same generating process
 while keeping the date windows fixed. Sigma is the cleanest scalar target
 because it has a known true value (2.5), and it also links directly to the
-linear and changepoint simulations.
+linear and changepoint simulations. This means the GP repeated study answers a
+different question from the combined sigma-vs-window figure: it checks whether
+the latent-date GP is calibrated under one fixed window structure, not how
+performance changes across a range of average dating-window widths.
 
 Under a well-calibrated model the true sigma should be equally likely to land
 anywhere in the posterior, so posterior ranks across replications should be
@@ -93,6 +100,16 @@ roughly uniform. A histogram piled up on the right means the model
 systematically underestimates sigma; a histogram piled up on the left means it
 systematically overestimates it. The midpoint model is expected to distort sigma
 because unmodelled date uncertainty is absorbed into the residual variance.
+
+In the current 100-run study, the latent-date GP passes this calibration check
+reasonably well for the fixed-window design. Its empirical sigma coverage was
+56% for the nominal 50% interval and 94% for the nominal 90% interval, with no
+fit errors, no divergent transitions, median max R-hat 1.004, and worst max
+R-hat 1.069 across the 100 fits. That makes the calibration-coverage figure
+methodologically sound as a GP-specific fixed-design check. By contrast, the
+midpoint GP is clearly miscalibrated: its sigma posterior is shifted upward and
+the true sigma was inside neither the 50% nor the 90% interval in this 100-run
+study.
 
 <p align="center">
 <img src="figures/calibration_coverage.png" height="500" text-align="center"/>
