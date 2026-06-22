@@ -94,10 +94,15 @@ Two extra checks are tracked for the difficult changepoint case. First,
 `sigma_vs_window.png` shows that the midpoint model increasingly overestimates the
 generative noise scale as dating windows widen, while the latent-date model stays
 close to unbiased. Second, `convergence_diagnostic.png` asks whether dropped fits
-look like weak-signal cases or simply hard posterior geometries: in these
-simulations, non-convergence is more strongly associated with wide dating windows
-than with low changepoint detectability, so the discarded fits are not just the
-datasets with the faintest kink.
+look like weak-signal cases or simply hard posterior geometries. Detectability
+here is summarised by a kink/noise ratio: the size of the slope change times the
+distance from the changepoint to the nearer data edge, divided by the noise scale
+sigma. The numerator is how far the two slopes have visibly separated within the
+data (larger when the bend is sharp and sits away from the edges), and dividing by
+sigma reflects that the same bend is harder to see when the scatter is wider. In
+these simulations, non-convergence is more strongly associated with wide dating
+windows than with a low kink/noise ratio, so the discarded fits are not just the
+datasets with the faintest changepoint.
 
 **Findings.** Both models recover the baseline, the first slope, and the
 changepoint location at close to the nominal rates. They diverge in two places.
