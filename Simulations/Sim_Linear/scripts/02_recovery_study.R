@@ -18,7 +18,7 @@ source(here("Simulations", "Sim_Linear", "scripts", "simulate.R"))
 set.seed(2026)
 
 output_csv  <- Sys.getenv("RECOVERY_OUT",
-  here("Simulations", "Sim_Linear", "output", "recovery_results.csv"))
+                          here("Simulations", "Sim_Linear", "output", "recovery_results.csv"))
 n_datasets  <- as.integer(Sys.getenv("RECOVERY_K", "400"))
 n_workers   <- as.integer(Sys.getenv("RECOVERY_WORKERS", "18"))  # concurrent fits
 
@@ -30,7 +30,7 @@ datasets <- tibble(
   slope      = runif(n_datasets, -0.03, 0.03), # trend up or down over ~800 yr
   sigma      = runif(n_datasets, 0.5, 4),      # low to high scatter
   mean_width = runif(n_datasets, 20, 450),     # typical dating-window width (yr)
-  N          = sample(100:500, n_datasets, replace = TRUE)
+  N          = sample(100:500, n_datasets, replace = TRUE) # sample size
 )
 
 # One job per (dataset, model)
