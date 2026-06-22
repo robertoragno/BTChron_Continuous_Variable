@@ -8,7 +8,7 @@ TMIN <- 100
 TMAX <- 900
 
 # These are the settings of the bell-shaped curve we use as the hidden truth.
-# The GP is not trying to recover these names directly; they just define the
+# The GP is not trying to recover these values directly; they just define the
 # example signal we simulate from.
 TRUE_BASELINE <- 8
 TRUE_AMPLITUDE <- 12
@@ -62,7 +62,9 @@ simulate_date_windows <- function(n, seed = 42) {
 
   set.seed(seed + 81)
   # A small adjustment for some samples so the end date is not always sitting
-  # exactly on the 25-year grid.
+  # exactly on the 25-year grid. This is a minor tweak to make the simulation
+  # slightly more realistic, since sometimes people record the end of a century 
+  # as 499 instead of 500, for example.
   censor_flag <- sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.35, 0.65))
   sim_data %>%
     mutate(End_date = if_else(censor_flag, End_date - 1L, End_date))

@@ -94,6 +94,34 @@ different question from the combined sigma-vs-window figure: it checks whether
 the latent-date GP is calibrated under one fixed window structure, not how
 performance changes across a range of average dating-window widths.
 
+The figure below makes the contrast concrete. Each bar is one observation's
+dating window and each dot is the hidden true date drawn inside it. In the GP
+study the two datasets share the same windows and only the true dates move; in
+the linear and changepoint studies every dataset draws its own windows.
+
+<p align="center">
+<img src="figures/replication_contrast.png" height="360" text-align="center"/>
+</p>
+
+Fixing the windows is a scope decision, not a way to make any single fit
+easier. Each dataset is fit independently, so a fit's difficulty depends only on
+that dataset's own windows, curve, and noise; whether the windows were drawn once
+and reused or drawn fresh each time is invisible to the fit. What does make a fit
+hard is wide windows, which give the latent dates more room to move and produce a
+flatter posterior that samples more slowly (the same pattern the changepoint
+convergence figure shows). The cost of the GP is separate again: each
+latent-date HSGP fit is heavy (about seven minutes), which is a property of the
+model, not of how the windows are generated.
+
+The fixed-window design is therefore chosen for what it isolates. The
+"midpoint absorbs date uncertainty as windows widen" result is already
+established cheaply by the linear and changepoint sweeps, so the GP is held at one
+realistic moderate-width structure to test the one thing only the flexible model
+can add: whether it stays calibrated. Sweeping window widths here would mainly add
+the slow, wide-window fits in order to re-derive a known result. Extending the
+check to more runs or a second window structure is the natural next step rather
+than a redesign.
+
 Under a well-calibrated model the true sigma should be equally likely to land
 anywhere in the posterior, so posterior ranks across replications should be
 roughly uniform. A histogram piled up on the right means the model
