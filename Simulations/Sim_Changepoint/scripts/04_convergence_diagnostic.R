@@ -1,13 +1,14 @@
 #' Why do some change-point fits fail to converge? This reads the fits already
 #' recorded by 02_recovery_study.R and shows the convergence rate
-#' against two properties of each dataset's generating parameters: the width of
-#' the dating windows, and how detectable the change-point is relative to the
-#' noise. The goal is a descriptive explanation of which datasets tend to fail:
-#' if convergence mainly falls with wider dating windows, but not with lower
-#' detectability, that suggests non-convergence is driven more by difficult
-#' posterior geometry than by intrinsically weak change-point signal. This helps
-#' show that the fits dropped by the convergence filter in 03 are not a biased
-#' subset defined by undetectable changepoints.
+#' against two properties of each dataset's generating parameters: the resolution
+#' of the periodisation (Shannon entropy H), and how detectable the change-point
+#' is relative to the noise. The goal is a descriptive explanation of which
+#' datasets tend to fail: if convergence mainly falls with coarser periodisations
+#' (low H, where one long phase dominates), but not with lower detectability, that
+#' suggests non-convergence is driven more by difficult posterior geometry than by
+#' intrinsically weak change-point signal. This helps show that the fits dropped by
+#' the convergence filter in 03 are not a biased subset defined by undetectable
+#' changepoints.
 
 library(ggplot2)
 library(patchwork)
@@ -30,7 +31,7 @@ results$detectability <- abs(results$true_slope_2 - results$true_slope_1) *
                          shorter_arm / results$true_sigma
 
 results$model <- factor(results$model, c("latent", "midpoint"),
-                        c("Latent-date", "Midpoint"))
+                        c("EIV", "Midpoint"))
 
 # Convergence rate within quintiles of a chosen property, separately per model.
 # Returns the rate and the median property value in each quintile (for the x axis).
@@ -53,43 +54,17 @@ rate_by_quintile <- function(values, property_label) {
   out
 }
 
-# Convergence rate within fixed width bins. Here the x-position is the midpoint
-# of each bin (e.g. 20-100 years is plotted at 60), not the median dataset.
-rate_by_width_bin <- function(values, property_label, breaks) {
-  bin_centres <- (breaks[-length(breaks)] + breaks[-1]) / 2
-  binned <- data.frame(
-    model     = results$model,
-    converged = results$converged,
-    width_bin = cut(values, breaks, include.lowest = TRUE, right = TRUE)
-  )
-  rate <- aggregate(converged ~ width_bin + model, binned, mean)
-  centre <- data.frame(width_bin = levels(binned$width_bin), value = bin_centres)
-  out <- merge(rate, centre, by = "width_bin")
-  names(out)[names(out) == "width_bin"] <- "group"
-  out$property <- property_label
-  out
-}
-
 plot_data <- rbind(
-  rate_by_width_bin(results$mean_width,   "Mean window width (years)",
-                    breaks = c(20, 100, 200, 300, 400, 500)),
+  rate_by_quintile(results$H,             "Shannon entropy of the periodisation (H)"),
   rate_by_quintile(results$detectability, "Change-point detectability (kink / noise)")
 )
-# Keep width as the left panel (it is the property that matters).
+# Keep entropy as the left panel (it is the property that matters).
 plot_data$property <- factor(plot_data$property,
-                             c("Mean window width (years)",
+                             c("Shannon entropy of the periodisation (H)",
                                "Change-point detectability (kink / noise)"))
 
-model_colours <- c(`Latent-date` = "#780000", Midpoint = "grey25")
-model_shapes  <- c(`Latent-date` = 16, Midpoint = 17)
-window_breaks <- c(20, 100, 200, 300, 400, 500)
-width_bands <- data.frame(
-  band_start = window_breaks[-6],
-  band_end = window_breaks[-1],
-  band_centre = (window_breaks[-6] + window_breaks[-1]) / 2,
-  label = c("Precise", "Fairly precise", "Moderate", "Vague", "Very vague"),
-  shade = c("grey88", "grey91", "grey94", "grey97", "white")
-)
+model_colours <- c(`EIV` = "#780000", Midpoint = "grey25")
+model_shapes  <- c(`EIV` = 16, Midpoint = 17)
 
 panel_theme <- theme_classic(base_size = 11) +
   theme(plot.title = element_text(size = 12, face = "bold"),
@@ -129,14 +104,11 @@ build_panel <- function(data, panel_title, x_label, show_y = TRUE, bands = NULL)
   p
 }
 
-width_panel <- build_panel(
-  subset(plot_data, property == "Mean window width (years)"),
-  "Mean window width",
-  "Years",
-  bands = width_bands
-) +
-  coord_cartesian(xlim = c(20, 500), expand = FALSE) +
-  scale_x_continuous(breaks = seq(100, 400, 100))
+entropy_panel <- build_panel(
+  subset(plot_data, property == "Shannon entropy of the periodisation (H)"),
+  "Periodisation resolution",
+  "Shannon entropy (H)"
+)
 
 detect_panel <- build_panel(
   subset(plot_data, property == "Change-point detectability (kink / noise)"),
@@ -145,10 +117,10 @@ detect_panel <- build_panel(
   show_y = FALSE
 )
 
-diagnostic_plot <- wrap_plots(width_panel, detect_panel, nrow = 1, guides = "collect") +
+diagnostic_plot <- wrap_plots(entropy_panel, detect_panel, nrow = 1, guides = "collect") +
   plot_annotation(
     tag_levels = "A",
-    title = "Non-convergence tracks wide dating windows, not weak signal",
+    title = "Non-convergence tracks coarse periodisation (low H), not weak signal",
     subtitle = "Convergence rate within quintiles of each generating property",
     theme = theme(plot.title = element_text(size = 13, face = "bold"),
                   plot.subtitle = element_text(size = 9),
@@ -170,7 +142,7 @@ print(round(100 * mean(!results$converged), 1))
 # Percent of fits dropped by model:
 print(round(100 * tapply(!results$converged, results$model, mean), 1))
 
-# Convergence rate by mean-window quartile:
-width_quartile <- cut(results$mean_width, quantile(results$mean_width, 0:4 / 4),
-                      include.lowest = TRUE)
-print(round(tapply(results$converged, width_quartile, mean), 2))
+# Convergence rate by entropy quartile:
+entropy_quartile <- cut(results$H, quantile(results$H, 0:4 / 4),
+                        include.lowest = TRUE)
+print(round(tapply(results$converged, entropy_quartile, mean), 2))

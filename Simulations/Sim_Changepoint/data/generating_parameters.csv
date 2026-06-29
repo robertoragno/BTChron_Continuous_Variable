@@ -4,3 +4,6 @@ slope_1,0.015
 slope_2,-0.01
 changepoint,500
 sigma_noise,1.5
+n_phases,6
+alpha_conc,1
+shannon_H,1.2160784649034564
