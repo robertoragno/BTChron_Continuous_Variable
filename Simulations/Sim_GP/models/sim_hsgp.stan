@@ -62,7 +62,10 @@ transformed data {
   // c > 1 ensures the normalised data (in [0, 1]) sits strictly inside [-L, L]
   real L = c;
 
-  // Prediction basis is constant across iterations, so build it here once
+  // Prediction basis, built once here since the grid never changes across
+  // iterations. PHI_pred is [N_pred x M]: row p holds the M basis functions
+  // evaluated at grid time x_pred_norm[p]. Multiplied by the weights beta_gp
+  // later, it turns the basis into one trend value per grid point.
   matrix[N_pred, M] PHI_pred = PHI(N_pred, M, L, x_pred_norm);
 }
 
@@ -110,11 +113,19 @@ generated quantities {
       log_lik[n] = normal_lpdf(y[n] | mu + PHI_obs_gq[n] * beta_gp, sigma);
   }
 
-  // Noise-free trend evaluated at the prediction grid
+  // --- Posterior predictive quantities on the prediction grid ---
+  // The grid is the N_pred times in x_pred where the fitted curve is drawn for
+  // plotting, independent of the observed dates.
+
+  // mu_pred: noise-free trend at each grid point (the fitted curve itself).
   array[N_pred] real mu_pred;
-  // Posterior predictive draws that include observation noise
+  // y_rep: a simulated new observation at each grid point (mu_pred plus noise).
+  // Use mu_pred for the mean trend line, y_rep for the wider predictive band.
   array[N_pred] real y_rep;
   {
+    // The GP trend at every grid point in one matrix-vector product:
+    // PHI_pred is [N_pred x M] and beta_gp is length M, so PHI_pred * beta_gp is
+    // a length-N_pred vector; adding the mean mu gives the trend at each point.
     vector[N_pred] f_grid = mu + PHI_pred * beta_gp;
     for (p in 1:N_pred) {
       mu_pred[p] = f_grid[p];

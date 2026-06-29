@@ -1,11 +1,13 @@
 # Recovery study for the changepoint model.
 #
 # Many random plausible datasets are simulated: each draws its own baseline,
-# two slopes, changepoint location, noise sigma, sample size, and (mixed)
-# dating-window widths. Both the latent-date and midpoint models are fit to
-# each, and we record whether each 50% / 90% credible interval contains the
-# true value (recovery) and how wide it is (precision). Nothing is held fixed
-# except the structure of the question.
+# two slopes, changepoint location, noise sigma, sample size, and periodisation
+# (a Dirichlet broken stick of K phases with concentration alpha_conc). Each
+# dataset's dating resolution is summarised by the Shannon entropy H of its
+# phase weights. Both the latent-date and midpoint models are fit to each, and
+# we record whether each 50% / 90% credible interval contains the true value
+# (accuracy) and how wide it is (precision). Nothing is held fixed except the
+# structure of the question.
 #
 # Slope scheme: slope_1 ~ U(-0.03, 0.03); then slope_2 = slope_1 + delta
 # where delta = ±U(0.01, 0.05). This guarantees |delta_slope| >= 0.01, so
@@ -29,8 +31,12 @@ output_csv <- Sys.getenv("RECOVERY_OUT",
   here("Simulations", "Sim_Changepoint", "output", "recovery_results.csv"))
 n_datasets <- as.integer(Sys.getenv("RECOVERY_K", "400"))
 n_workers  <- as.integer(Sys.getenv("RECOVERY_WORKERS", "18"))
+iter_warmup   <- as.integer(Sys.getenv("RECOVERY_WARMUP", "500"))
+iter_sampling <- as.integer(Sys.getenv("RECOVERY_SAMPLING", "500"))
 
-# Draw one plausible parameter set per dataset
+# One parameter set per dataset. K and alpha_conc set the periodisation;
+# alpha_conc leans low (Beta over [0.1, 10]) so lumpy phases are common. N sweeps
+# four levels to read precision against sample size; everything else is random.
 
 delta_sign <- sample(c(-1, 1), n_datasets, replace = TRUE)
 
@@ -42,8 +48,9 @@ datasets <- tibble(
   slope_2      = slope_1 + delta,
   cp           = runif(n_datasets, 300, 700),
   sigma        = runif(n_datasets, 0.5, 4),
-  mean_width   = runif(n_datasets, 20, 450),
-  N            = sample(100:500, n_datasets, replace = TRUE)
+  K            = sample(3:10, n_datasets, replace = TRUE),
+  alpha_conc   = 10^(-1 + 2 * rbeta(n_datasets, 2, 3.5)),  # leans low (lumpy)
+  N            = rep(c(50, 100, 200, 400), length.out = n_datasets)
 ) %>% select(-delta)
 
 jobs <- expand_grid(dataset_id = datasets$dataset_id,
@@ -78,8 +85,10 @@ run_one_job <- function(job_index) {
   one_dataset <- simulate_changepoint(
     N = job$N, baseline = job$baseline, slope_1 = job$slope_1,
     slope_2 = job$slope_2, cp = job$cp, sigma = job$sigma,
-    mean_width = job$mean_width, seed = job$dataset_id
+    K = job$K, alpha_conc = job$alpha_conc, seed = job$dataset_id
   )
+  entropy_H  <- attr(one_dataset, "H")
+  mean_width <- mean(one_dataset$End_date - one_dataset$Start_date)
 
   stan_data <- list(N = nrow(one_dataset), y = one_dataset$Value,
                     start_date = one_dataset$Start_date,
@@ -91,7 +100,7 @@ run_one_job <- function(job_index) {
   summary_row <- tryCatch({
     fit <- chosen_model$sample(
       data = stan_data, chains = 4, parallel_chains = 4,
-      iter_warmup = 500, iter_sampling = 500,
+      iter_warmup = iter_warmup, iter_sampling = iter_sampling,
       adapt_delta = 0.95, max_treedepth = 12,
       refresh = 0, show_messages = FALSE, show_exceptions = FALSE
     )
@@ -116,7 +125,8 @@ run_one_job <- function(job_index) {
     job %>% select(dataset_id, model,
                    true_baseline = baseline, true_slope_1 = slope_1,
                    true_slope_2 = slope_2, true_cp = cp, true_sigma = sigma,
-                   mean_width, N),
+                   K, alpha_conc, N),
+    tibble(H = entropy_H, mean_width = mean_width),
     summary_row
   )
 }

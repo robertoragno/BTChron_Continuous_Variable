@@ -8,61 +8,70 @@ f(t) = baseline + slope_1 * (t - t_min)                              for t <= ch
 f(t) = baseline + slope_1 * (changepoint - t_min) + slope_2 * (t - changepoint) for t > changepoint
 ```
 
-Each observation carries a dating range `[Start_date, End_date]` (of varying
-width) rather than a known year. The question is whether treating each date as a
-latent parameter within its range recovers the trend better than collapsing the
-range to its midpoint.
+Each observation is dated only to a phase `[Start_date, End_date]`, not to a
+year. Does treating each date as a latent parameter within its phase recover the
+trend better than collapsing the phase to its midpoint?
 
-Generating parameters (worked example): **baseline = 8**, **slope_1 = 0.015**,
-**slope_2 = -0.01**, **changepoint = 500 CE**, **noise ~ N(0, 1.5)**.
+As a single example: baseline = 8, slope_1 = 0.015, slope_2 = -0.01,
+changepoint = 500 CE, noise ~ N(0, 1.5). The timeline is 100–900 CE, periodised
+into 6 phases.
+
+## Periodisation and dating resolution
+
+Periodisation works as in the linear simulation: the timeline is split into `K`
+phases by a Dirichlet broken stick, and each observation inherits the
+`[Start_date, End_date]` of its phase, so dating uncertainty is structured, not
+random. Each dataset draws its own `K ~ U{3, …, 10}` and concentration
+`alpha_conc = 10^(2·Beta(2, 3.5) − 1)`. Resolution is summarised by the Shannon
+entropy of the phase weights, `H = −Σ p · log p`: even phases give high H, one
+dominant phase gives low H. The prior predictive check lives with the linear
+simulation (`Sim_Linear/00_periodisation_check.R`).
 
 ## Scripts
 
 `simulate.R` holds the shared generating process (the `simulate_changepoint()`
-function and constants); it is sourced by both the worked example and the study,
-so the two provably use the same process. The pipeline is then three scripts:
+function, the `partition_timeline()` periodisation helper, and constants); it is
+sourced by both the worked example and the study, so the two provably use the same
+process. The pipeline is then:
 
 | Script | Purpose | Output |
 |---|---|---|
 | `01_example.R` | draw ONE dataset, show it, fit both models, compare | `figures/exploratory_panel.png`, `model_comparison_single_fit.png`, `individual_date_posteriors.png` |
-| `02_recovery_study.R` | draw MANY random plausible datasets (each with its own baseline, two slopes, changepoint, noise, sample size, mixed windows), fit both models, record whether each interval contains the truth | `output/recovery_results.csv` |
-| `03_recovery_plots.R` | the study figures | `figures/recovery.png`, `coverage.png`, `sigma_vs_window.png` |
-| `04_convergence_diagnostic.R` | inspect which datasets fail to converge, contrasting dating-window width with changepoint detectability | `figures/convergence_diagnostic.png` |
+| `02_recovery_study.R` | draw MANY random plausible datasets (each with its own baseline, two slopes, changepoint, noise, sample size, and periodisation), fit both models, record whether each interval contains the truth and how wide it is | `output/recovery_results.csv` |
+| `03_recovery_plots.R` | the study figures | `figures/recovery.png`, `accuracy.png`, `precision_vs_entropy.png`, `sigma_vs_entropy.png`, `accuracy_vs_entropy.png`, `precision_boxplots.png`, `precision_vs_n.png` |
+| `04_convergence_diagnostic.R` | inspect which datasets fail to converge, contrasting periodisation resolution with changepoint detectability | `figures/convergence_diagnostic.png` |
 
-The worked example (`01`) fits in seconds, so it is self-contained. The study
-(`02`) takes about 11 minutes (800 fits), so its plotting (`03`) is kept separate
-— figures can be restyled without refitting. So that every dataset poses a genuine
-changepoint problem, the two slopes are drawn as `slope_1 ~ U(-0.03, 0.03)` and
-`slope_2 = slope_1 ± U(0.01, 0.05)`: the slope change is random over a range but
-never negligible, which keeps the changepoint identifiable.
+The example (`01`) fits in seconds; the study (`02`) is ~800 fits over a few
+minutes, so plotting (`03`) is separate. Sample size is swept across
+`N = 50, 100, 200, 400`. To keep every changepoint genuine, the slopes are drawn
+as `slope_1 ~ U(-0.03, 0.03)` and `slope_2 = slope_1 ± U(0.01, 0.05)` — the slope
+change is random but never negligible, so the changepoint stays identifiable.
 
 ## Exploratory panel
 <p align="center">
 <img src="figures/exploratory_panel.png" height="700" text-align="center"/>
 </p>
 
-## Latent-date inference
+## Errors-in-variables (EIV) inference
 
-The latent-date model treats each observation's true date as an unknown
-parameter, uniform within its `[Start_date, End_date]` window:
+The EIV model treats each true date as a latent parameter, uniform within its
+phase:
 
 ```
 mu(t) = alpha + beta1*t + (beta2 - beta1) * max(0, t - changepoint)
 y_n ~ Normal(mu(true_date_n), sigma)
 ```
 
-Before the changepoint `max(0, t - changepoint) = 0` and the mean reduces to
-`alpha + beta1*t`; after it the slope shifts to `beta2`, the two segments meeting
-continuously at the changepoint, so `beta2 - beta1` is the change in slope. The
-changepoint itself is a free parameter with a uniform prior over the time range,
-sampled jointly with everything else; the true value (500 CE) is only used
-afterwards to check recovery.
+Before the changepoint the last term is zero and the mean is `alpha + beta1*t`;
+after it the slope becomes `beta2`, the segments meeting continuously, so
+`beta2 - beta1` is the change in slope. The changepoint is a free parameter with a
+uniform prior, fit jointly; its true value (500 CE) is only used afterwards to
+check recovery.
 
-For a sample of observations, the left panels show the recovered trend with the
-sample's date range (shaded) and observed value (dashed); the right panels show
-the posterior for each estimated date, with the range boundaries (dashed) and the
-true generating date (solid). Wide-window dates stay broadly uncertain — the model
-correctly declines to invent precision it does not have.
+Left panels: the recovered trend with a sample's phase (shaded) and value
+(dashed). Right panels: each date's posterior, with the phase boundaries (dashed)
+and the true date (solid). Observations in a long phase stay broadly uncertain —
+the model does not invent precision it lacks.
 
 <p align="center">
 <img src="figures/individual_date_posteriors.png" height="900" text-align="center"/>
@@ -70,10 +79,9 @@ correctly declines to invent precision it does not have.
 
 ## Model comparison on a single dataset
 
-The midpoint model fixes each date at the midpoint of its range. On one dataset
-both approaches recover the trend within the 90% credible interval, but the
-midpoint model returns a larger sigma, because unmodelled date uncertainty is
-absorbed into the residual variance.
+The midpoint model fixes each date at the centre of its phase. On a single
+dataset both recover the trend, but the midpoint returns a larger sigma: the
+within-phase date spread it ignores ends up in the residual.
 
 <p align="center">
 <img src="figures/model_comparison_single_fit.png" height="800" text-align="center"/>
@@ -81,44 +89,42 @@ absorbed into the residual variance.
 
 ## Recovery study
 
-A single dataset tests the method at one point and cannot rule out a favourable
-choice of parameters. Instead the study simulates many random plausible datasets:
-each draws its own baseline, two slopes, changepoint location, noise level, sample
-size, and a realistic mix of dating-window widths. Both models are fit to every
-dataset, and we count how often each 50% / 90% credible interval contains the true
-value. The changepoint posterior is harder to sample than the linear one, so about
-a fifth of fits are dropped for non-convergence (max Rhat > 1.05 or divergences);
-the coverage rates are essentially unchanged whether or not this filter is applied.
+One dataset cannot rule out lucky parameters, so the study draws many — each with
+its own baseline, two slopes, changepoint, noise, sample size, and periodisation.
+Both models are fit to all of them, recording how often the 50% / 90% interval
+holds the truth (accuracy) and how wide it is (precision). The changepoint
+posterior is harder to sample than the linear one, so about a fifth of fits are
+dropped for non-convergence (max Rhat > 1.05 or divergences); the accuracy rates
+are essentially unchanged with or without the filter.
 
-Two extra checks are tracked for the difficult changepoint case. First,
-`sigma_vs_window.png` shows that the midpoint model increasingly overestimates the
-generative noise scale as dating windows widen, while the latent-date model stays
-close to unbiased. Second, `convergence_diagnostic.png` asks whether dropped fits
-look like weak-signal cases or simply hard posterior geometries. Detectability
-here is summarised by a kink/noise ratio: the size of the slope change times the
-distance from the changepoint to the nearer data edge, divided by the noise scale
-sigma. The numerator is how far the two slopes have visibly separated within the
-data (larger when the bend is sharp and sits away from the edges), and dividing by
-sigma reflects that the same bend is harder to see when the scatter is wider. In
-these simulations, non-convergence is more strongly associated with wide dating
-windows than with a low kink/noise ratio, so the discarded fits are not just the
-datasets with the faintest changepoint.
+`04_convergence_diagnostic.R` asks whether the dropped fits are weak-signal cases
+or just hard geometries. Detectability is a kink/noise ratio: the slope change
+times the distance from the changepoint to the nearer data edge, over sigma (a
+sharp bend away from the edges is easy to see; wide scatter hides it).
+Non-convergence tracks the periodisation resolution — coarse periodisations (low
+H, one long phase) converge less often — far more than it tracks a faint kink, so
+the dropped fits are not simply the weakest changepoints.
 
-**Findings.** Both models recover the baseline, the first slope, and the
-changepoint location at close to the nominal rates. They diverge in two places.
-First, as in the linear case, the noise level sigma: the midpoint absorbs dating
-uncertainty into the residual and overestimates sigma, and the error grows as a
-dataset's dating becomes vaguer, while the latent-date model recovers sigma
-whatever the dating precision (see `sigma_vs_window.png`). Second, the
-post-changepoint slope `slope_2` is mildly under-covered even by the latent model
-(about 79% at the 90% level) and noticeably worse under the midpoint model (about
-67%) — the segment after the changepoint rests on fewer observations and is
-entangled with the changepoint location, so it is the hardest parameter to pin
-down, and ignoring date uncertainty makes it harder still.
+**Findings.** Both recover the baseline, first slope, and changepoint location at
+near-nominal accuracy, at any resolution. They diverge in three places. Precision
+— the EIV intervals for the structural parameters are much tighter, roughly
+35–70% narrower for the baseline, both slopes, and the changepoint, since the
+midpoint throws away the within-phase spread that constrains the trend. Sigma —
+the midpoint reads the within-phase date spread as noise and overestimates it, so
+its 90% interval holds the true sigma only ~31% of the time against ~90% for EIV,
+and worse as phases coarsen. And `slope_2` — the post-changepoint segment is
+under-covered even by EIV (~76% at 90%) and worse for the midpoint (~64%): it
+rests on fewer points and entangles with the changepoint, the hardest parameter
+to pin down, and ignoring date uncertainty makes it harder still. Precision
+improves with sample size for both models, as expected.
 
 <p align="center">
 <img src="figures/recovery.png" height="320" text-align="center"/>
-<img src="figures/coverage.png" height="360" text-align="center"/>
-<img src="figures/sigma_vs_window.png" height="400" text-align="center"/>
+<img src="figures/accuracy.png" height="340" text-align="center"/>
+<img src="figures/accuracy_vs_entropy.png" height="300" text-align="center"/>
+<img src="figures/precision_vs_entropy.png" height="300" text-align="center"/>
+<img src="figures/sigma_vs_entropy.png" height="340" text-align="center"/>
+<img src="figures/precision_boxplots.png" height="320" text-align="center"/>
+<img src="figures/precision_vs_n.png" height="320" text-align="center"/>
 <img src="figures/convergence_diagnostic.png" height="400" text-align="center"/>
 </p>

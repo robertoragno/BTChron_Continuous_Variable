@@ -26,12 +26,16 @@ panel_theme <- theme_classic(base_size = 11) +
 intercept <- 5
 slope <- 0.015
 sigma <- 1.5
-mean_width <- 200
+n_phases <- 6        # K: number of periodisation phases
+alpha_conc <- 1      # Dirichlet concentration (moderately even phases)
 n_observations <- 300
 
-sim_data <- simulate_linear(N = n_observations, intercept = intercept,
-                            slope = slope, sigma = sigma,
-                            mean_width = mean_width, seed = 42) %>%
+sim_raw <- simulate_linear(N = n_observations, intercept = intercept,
+                           slope = slope, sigma = sigma,
+                           K = n_phases, alpha_conc = alpha_conc, seed = 42)
+entropy_H <- attr(sim_raw, "H")
+
+sim_data <- sim_raw %>%
   mutate(ID = row_number(),
          Site_name = sample(c("Site A", "Site B", "Site C", "Site D"),
                             n_observations, replace = TRUE)) %>%
@@ -42,8 +46,10 @@ ground_truth <- tibble(Year = seq(TMIN, TMAX),
 
 write_csv(sim_data, here("Simulations", "Sim_Linear", "data", "simulated_data.csv"))
 write_csv(ground_truth, here("Simulations", "Sim_Linear", "data", "ground_truth.csv"))
-write_csv(tibble(parameter = c("baseline", "slope", "sigma_noise"),
-                 value = c(intercept, slope, sigma)),
+write_csv(tibble(parameter = c("baseline", "slope", "sigma_noise",
+                               "n_phases", "alpha_conc", "shannon_H"),
+                 value = c(intercept, slope, sigma,
+                           n_phases, alpha_conc, entropy_H)),
           here("Simulations", "Sim_Linear", "data", "generating_parameters.csv"))
 
 # 2. Exploratory panel ---------------------------------------------------------
@@ -141,9 +147,9 @@ parameter_posteriors <- function(fit, model_label) {
 }
 
 both_posteriors <- bind_rows(
-  parameter_posteriors(fit_latent, "Latent dates"),
+  parameter_posteriors(fit_latent, "EIV"),
   parameter_posteriors(fit_midpoint, "Midpoint dates")) %>%
-  mutate(Model = factor(Model, c("Latent dates", "Midpoint dates")),
+  mutate(Model = factor(Model, c("EIV", "Midpoint dates")),
          Region = factor(Region, c("50% CI", "90% CI", "Tail")))
 
 true_value_lines <- tibble(
@@ -165,7 +171,7 @@ posteriors_panel <- ggplot(both_posteriors, aes(Value, fill = Region)) +
                       legend.position = "bottom")
 
 comparison_figure <-
-  (make_trend_panel(fit_latent, expression(bold("A.") ~ "Trend — latent dates")) |
+  (make_trend_panel(fit_latent, expression(bold("A.") ~ "Trend — EIV")) |
    make_trend_panel(fit_midpoint, expression(bold("B.") ~ "Trend — midpoint dates"))) /
   posteriors_panel + plot_layout(heights = c(1, 1.2))
 
@@ -215,4 +221,3 @@ ggsave(figure_path("individual_date_posteriors.png"),
        wrap_plots(date_panels, ncol = 1),
        width = 12, height = 18, dpi = 300, bg = "white")
 
-cat("Wrote exploratory_panel.png, model_comparison_single_fit.png, individual_date_posteriors.png\n")

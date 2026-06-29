@@ -1,7 +1,6 @@
 // =============================================================================
 // Simple Linear Regression with Latent Date Inference
 // =============================================================================
-// Adapted from lsi_lm_ind.stan, stripped of taxon and individual structure.
 //
 //   trend(x) = alpha + beta * x
 //   y_n ~ Normal(trend(true_date_n), sigma)
