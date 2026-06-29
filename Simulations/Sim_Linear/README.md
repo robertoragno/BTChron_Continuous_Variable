@@ -17,10 +17,10 @@ dating uncertainty is structured rather than random (as would be the case instea
 
 The resolution of a periodisation is summarised by the Shannon entropy of the
 phase weights, `H = −Σ p · log p`. Even phases have high H (the
-ceiling is about 2.3 for ten equal phases), whereas one dominant phase would have low H. A
-prior-predictive check on this scheme is in `00_periodisation_check.R`.
+ceiling is about 2.3 for ten equal phases), whereas one dominant phase would have instead low H. We also run a
+prior-predictive check located in `00_periodisation_check.R`.
 
-*[1] Beta(2, 3.5) leans toward low concentrations (lumpier, lower-H periodisations); raise the second shape parameter for a stronger lean.*
+*[1] With Beta(2, 3.5) the distribution leans toward low concentrations (coarser, lower-H periodisations). alpha_conc is 10 exponentiated to this Beta so that we get values that are between 0 and 10, but the mass is placed more towards coarser phases.*
 
 <p align="center">
 <img src="figures/periodisation_H_distribution.png" height="320" text-align="center"/>
