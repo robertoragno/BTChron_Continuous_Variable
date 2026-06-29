@@ -92,8 +92,7 @@ accuracy_plot <- ggplot(accuracy_rates, aes(parameter, value, fill = model)) +
   scale_fill_manual(values = model_fills, name = NULL) +
   scale_linetype_manual(values = "dashed", name = NULL) +
   scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
-  labs(x = NULL, y = "Datasets where the interval contained the truth (95% Jeffreys)",
-       title = "Accuracy") +
+  labs(x = NULL, y = "Datasets containing the truth", title = "Accuracy") +
   panel_theme
 
 ggsave(figure_path("accuracy.png"), accuracy_plot,
