@@ -45,6 +45,7 @@ plotting (`03`) is kept separate and figures can be restyled without refitting.
 Sample size is swept across `N = 50, 100, 200, 400` to read precision against N.
 
 ## Exploratory panel
+This is a single example that is used as a figure in the paper to illustrate the data generating process.
 <p align="center">
 <img src="figures/exploratory_panel.png" height="700" text-align="center"/>
 </p>
@@ -93,8 +94,25 @@ become finer). As expected, the precision improves with sample size for both mod
 
 <p align="center">
 <img src="figures/recovery.png" height="320" text-align="center"/>
+</p>
+
+<p align="center">
 <img src="figures/accuracy.png" height="340" text-align="center"/>
+</p>
+
+Overall calibration. For each parameter, the number of datasets whose 50% and 90%
+interval (dashed line) actually held the true value. The whiskers are 95% Jeffreys intervals.
+
+<p align="center">
 <img src="figures/accuracy_vs_entropy.png" height="320" text-align="center"/>
+</p>
+
+The same 90% accuracy, laid out by dating resolution (entropy H). This is to
+check that calibration survives coarse periodisations: the lines stay close to the 90%
+mark whether phases are coarse (low H) or even (high H), so a single long phase does not
+quietly break coverage.
+
+<p align="center">
 <img src="figures/precision_vs_entropy.png" height="320" text-align="center"/>
 <img src="figures/sigma_vs_entropy.png" height="340" text-align="center"/>
 <img src="figures/precision_boxplots.png" height="340" text-align="center"/>

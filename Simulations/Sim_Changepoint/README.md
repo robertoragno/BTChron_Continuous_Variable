@@ -120,8 +120,27 @@ improves with sample size for both models, as expected.
 
 <p align="center">
 <img src="figures/recovery.png" height="320" text-align="center"/>
+</p>
+
+<p align="center">
 <img src="figures/accuracy.png" height="340" text-align="center"/>
+</p>
+
+Overall calibration. For each parameter, the share of datasets whose 50% and 90%
+interval actually held the true value. The dashed line is the rate a well-behaved
+interval should hit; the whiskers are 95% Jeffreys intervals, marking how firmly each
+bar is pinned down by the number of datasets behind it.
+
+<p align="center">
 <img src="figures/accuracy_vs_entropy.png" height="300" text-align="center"/>
+</p>
+
+The same 90% accuracy, now broken out by dating resolution (entropy H). This is the
+check that calibration survives coarse periodisations: the lines stay close to the 90%
+mark whether phases are lumpy (low H) or even (high H), so a single long phase does not
+quietly break coverage.
+
+<p align="center">
 <img src="figures/precision_vs_entropy.png" height="300" text-align="center"/>
 <img src="figures/sigma_vs_entropy.png" height="340" text-align="center"/>
 <img src="figures/precision_boxplots.png" height="320" text-align="center"/>
