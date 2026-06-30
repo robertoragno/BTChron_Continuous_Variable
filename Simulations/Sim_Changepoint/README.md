@@ -38,7 +38,7 @@ process. The pipeline is then:
 |---|---|---|
 | `01_example.R` | draw ONE dataset, show it, fit both models, compare | `figures/exploratory_panel.png`, `model_comparison_single_fit.png`, `individual_date_posteriors.png` |
 | `02_recovery_study.R` | draw MANY random plausible datasets (each with its own baseline, two slopes, changepoint, noise, sample size, and periodisation), fit both models, record whether each interval contains the truth and how wide it is | `output/recovery_results.csv` |
-| `03_recovery_plots.R` | the study figures | `figures/recovery.png`, `accuracy.png`, `precision_vs_entropy.png`, `sigma_vs_entropy.png`, `accuracy_vs_entropy.png`, `precision_boxplots.png`, `precision_vs_n.png` |
+| `03_recovery_plots.R` | the study figures | `figures/recovery.png`, `accuracy.png`, `accuracy_precision_composite.png`, `precision_vs_entropy.png`, `sigma_vs_entropy.png`, `accuracy_vs_entropy.png`, `precision_boxplots.png`, `precision_vs_n.png` |
 | `04_convergence_diagnostic.R` | inspect which datasets fail to converge, contrasting periodisation resolution with changepoint detectability | `figures/convergence_diagnostic.png` |
 
 The example (`01`) fits in seconds; the study (`02`) is ~800 fits over a few
@@ -94,29 +94,32 @@ its own baseline, two slopes, changepoint, noise, sample size, and periodisation
 Both models are fit to all of them, recording how often the 50% / 90% interval
 holds the truth (accuracy) and how wide it is (precision). The changepoint
 posterior is harder to sample than the linear one, so about a fifth of fits are
-dropped for non-convergence (max Rhat > 1.05 or divergences); the accuracy rates
-are essentially unchanged with or without the filter.
+dropped for non-convergence (max Rhat > 1.05 or divergences). The accuracy rates
+are essentially unchanged with or without this filter.
 
 `04_convergence_diagnostic.R` asks whether the dropped fits are weak-signal cases
 or just hard geometries. Detectability is a kink/noise ratio: the slope change
 times the distance from the changepoint to the nearer data edge, over sigma (a
 sharp bend away from the edges is easy to see; wide scatter hides it).
 Non-convergence tracks the periodisation resolution — coarse periodisations (low
-H, one long phase) converge less often — far more than it tracks a faint kink, so
+H, one long phase) converge less often — far more than it tracks a weak kink, so
 the dropped fits are not simply the weakest changepoints.
 
-**Findings.** Both recover the baseline, first slope, and changepoint location at
-near-nominal accuracy, at any resolution. They diverge in three places. Precision
-— the EIV intervals for the structural parameters are much tighter, roughly
+*Preliminary results*. Both recover the baseline, first slope, and changepoint location at
+near-nominal accuracy, at any resolution. They diverge mainly in three places. 
+
+1. Precision: the EIV intervals for the structural parameters are tighter, roughly
 35–70% narrower for the baseline, both slopes, and the changepoint, since the
-midpoint throws away the within-phase spread that constrains the trend. Sigma —
-the midpoint reads the within-phase date spread as noise and overestimates it, so
-its 90% interval holds the true sigma only ~31% of the time against ~90% for EIV,
-and worse as phases coarsen. And `slope_2` — the post-changepoint segment is
-under-covered even by EIV (~76% at 90%) and worse for the midpoint (~64%): it
-rests on fewer points and entangles with the changepoint, the hardest parameter
-to pin down, and ignoring date uncertainty makes it harder still. Precision
-improves with sample size for both models, as expected.
+midpoint throws away the within-phase spread that constrains the trend (I think?). 
+
+2. Sigma: the midpoint reads the within-phase date spread as noise and overestimates it, so
+its 90% interval contains the true sigma only ~31% of the time against ~90% for EIV,
+and worse as phases coarsen. 
+
+3. `slope_2`: the post-changepoint segment is
+under-covered by both models. In the EIV model accuracy is ~76% at 90%; in the midpoint model is slightly worse (~64% at 90% interval). 
+
+Precision improves with sample size for both models, as expected.
 
 <p align="center">
 <img src="figures/recovery.png" height="320" text-align="center"/>
@@ -127,23 +130,42 @@ improves with sample size for both models, as expected.
 </p>
 
 Overall calibration. For each parameter, the share of datasets whose 50% and 90%
-interval actually held the true value. The dashed line is the rate a well-behaved
-interval should hit; the whiskers are 95% Jeffreys intervals, marking how firmly each
-bar is pinned down by the number of datasets behind it.
+interval actually held the true value. The dashed line shows the nominal rates; the whiskers are 95% Jeffreys intervals.
+
+### Accuracy and precision against dating resolution
+
+These plots show if an interval is accurate (does the 90% interval hold the truth?) and
+precise (width of the 90% interval). Panel A shows the accuracy and panel B shows the
+precision, both across the entropy range.
 
 <p align="center">
-<img src="figures/accuracy_vs_entropy.png" height="300" text-align="center"/>
+<img src="figures/accuracy_precision_composite.png" height="560" text-align="center"/>
 </p>
 
-The same 90% accuracy, now broken out by dating resolution (entropy H). This is the
-check that calibration survives coarse periodisations: the lines stay close to the 90%
-mark whether phases are lumpy (low H) or even (high H), so a single long phase does not
-quietly break coverage.
+Unlike the linear case, the trend here bends at the changepoint, meaning that the midpoint is no
+longer the average of the possible dates. The two models diverge on the parameters near the kink: for Slope 2, the changepoint, and sigma the midpoint misses the truth more
+often than EIV and is also wider. For coarser phases, sigma is more accurate in the EIV model:
 
 <p align="center">
-<img src="figures/precision_vs_entropy.png" height="300" text-align="center"/>
+<img src="figures/precision_boxplots.png" height="340" text-align="center"/>
 <img src="figures/sigma_vs_entropy.png" height="340" text-align="center"/>
-<img src="figures/precision_boxplots.png" height="320" text-align="center"/>
+</p>
+
+
+### Further checks #1: Sample size
+
+We also check how sample size affects the precision: both models show a steady improvement
+in precision as sample size increases.
+
+<p align="center">
 <img src="figures/precision_vs_n.png" height="320" text-align="center"/>
+</p>
+
+
+### Further checks #2: Convergence
+
+The changepoint posterior is harder to sample. Since some fits did not converge, we tried to also check which fits in particular were failing (see the preliminary results above and `04_convergence_diagnostic.R`).
+
+<p align="center">
 <img src="figures/convergence_diagnostic.png" height="400" text-align="center"/>
 </p>

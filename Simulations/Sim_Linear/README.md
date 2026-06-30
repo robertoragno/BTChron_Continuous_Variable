@@ -38,7 +38,7 @@ example and the study so they use the same process.
 | `00_periodisation_check.R` | prior predictive check: draw the priors, simulate datasets, show H, example phases, and the values they imply | `figures/periodisation_H_distribution.png`, `periodisation_examples.png`, `prior_predictive.png` |
 | `01_example.R` | one dataset, shown and fit with both models | `figures/exploratory_panel.png`, `model_comparison_single_fit.png`, `individual_date_posteriors.png` |
 | `02_recovery_study.R` | many random datasets (each its own intercept, slope, noise, sample size, periodisation), both models fit, intervals recorded | `output/recovery_results.csv` |
-| `03_recovery_plots.R` | the study figures | `figures/recovery.png`, `accuracy.png`, `precision_vs_entropy.png`, `sigma_vs_entropy.png`, `accuracy_vs_entropy.png`, `precision_boxplots.png`, `precision_vs_n.png` |
+| `03_recovery_plots.R` | the study figures | `figures/recovery.png`, `accuracy.png`, `accuracy_precision_composite.png`, `precision_vs_entropy.png`, `sigma_vs_entropy.png`, `accuracy_vs_entropy.png`, `precision_boxplots.png`, `precision_vs_n.png` |
 
 The example (`01`) fits in less than a minute; the study (`02`) takes a few minutes (around 10 circa), so
 plotting (`03`) is kept separate and figures can be restyled without refitting.
@@ -85,7 +85,7 @@ its own intercept, slope, noise, sample size, and periodisation. Both models (EI
 fit to all of them, recording how often the 50% / 90% interval holds the truth
 (accuracy) and how wide the interval is (precision).
 
-**Preliminary results*. Both models recover the intercept and slope near the 50% an 90% CIs: for
+*Preliminary results*. Both models recover the intercept and slope near the 50% an 90% CIs: for
 a straight line the midpoint is the average of the possible dates, so it should not
 bias the trend. The EIV intervals for intercept and slope are 12% narrower (more precise), as the midpoint model discards the within-phase spread. 
 Sigma also varies: the midpoint reads the within-phase date spread as noise and overestimates it (by simulation design construction?), so its
@@ -103,18 +103,27 @@ become finer). As expected, the precision improves with sample size for both mod
 Overall calibration. For each parameter, the number of datasets whose 50% and 90%
 interval (dashed line) actually held the true value. The whiskers are 95% Jeffreys intervals.
 
+### Accuracy and precision against dating resolution
+
+These plots show if an interval is accurate (does the 90% interval hold the truth?) and precise (width of the 90% interval). Panel A shows the accuracy and panel B shows the precision, both across the entropy range.
+
+
 <p align="center">
-<img src="figures/accuracy_vs_entropy.png" height="320" text-align="center"/>
+<img src="figures/accuracy_precision_composite.png" height="620" text-align="center"/>
 </p>
 
-The same 90% accuracy, laid out by dating resolution (entropy H). This is to
-check that calibration survives coarse periodisations: the lines stay close to the 90%
-mark whether phases are coarse (low H) or even (high H), so a single long phase does not
-quietly break coverage.
+Again, no much difference between the two models for the intercept and slope, what changes is sigma. For coarser phases, sigma is better captured by the EIV model: 
 
 <p align="center">
-<img src="figures/precision_vs_entropy.png" height="320" text-align="center"/>
-<img src="figures/sigma_vs_entropy.png" height="340" text-align="center"/>
 <img src="figures/precision_boxplots.png" height="340" text-align="center"/>
+<img src="figures/sigma_vs_entropy.png" height="340" text-align="center"/>
+</p>
+
+
+### Further checks: Sample size
+
+We also check how sample size affects the precision: both models show a steady improvement in precision as sample size increases. 
+
+<p align="center">
 <img src="figures/precision_vs_n.png" height="320" text-align="center"/>
 </p>
