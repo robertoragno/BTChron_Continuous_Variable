@@ -13,6 +13,8 @@ TMAX <- 900
 #' IMPORTANT: IF WE MAKE MIN_YEARS SOMETHING AS 25, IT WILL FORCE THE H DISTRIBUTION TO AVOID LOW VALUES
 #' WHICH IS A BIT UNREALISTIC. This at least for a dataset of 800 years.
 #' Boundaries are whole years. Attaches the phase proportions and entropy H.
+#' The rest of the logic is described better in the same simulate file but in the
+#' changepoint folder. NOTE TO MYSELF: FIX THIS, OR MAYBE MOVE THIS FN TO A COMMON FILE
 partition_timeline <- function(N, K, alpha_conc, min_years = 1) {
   weights <- rgamma(K, shape = alpha_conc, rate = 1)
   weights <- weights / sum(weights)
