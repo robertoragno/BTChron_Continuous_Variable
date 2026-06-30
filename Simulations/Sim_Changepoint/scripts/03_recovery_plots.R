@@ -4,6 +4,7 @@
 #   precision_vs_entropy.png - 90% interval width vs Shannon entropy, per param
 #   sigma_vs_entropy.png     - midpoint sigma error grows as dating coarsens
 #   accuracy_vs_entropy.png  - 90% interval accuracy vs Shannon entropy
+#   accuracy_precision_composite.png - accuracy (A) over precision (B), stacked
 #   precision_boxplots.png   - EIV vs midpoint 90% width per parameter,
 #                              across low / mid / high entropy
 #   precision_vs_n.png        - 90% interval width vs sample size N, per param
@@ -15,6 +16,7 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 library(ggplot2)
+library(patchwork)
 
 # The changepoint posterior is harder to sample than the linear one: about a
 # fifth of fits do not fully converge (max Rhat > 1.05 or divergences), spread
@@ -114,7 +116,7 @@ accuracy_plot <- ggplot(accuracy_rates, aes(parameter, value, fill = model)) +
   scale_fill_manual(values = model_fills, name = NULL) +
   scale_linetype_manual(values = "dashed", name = NULL) +
   scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
-  labs(x = NULL, y = "Datasets containing the truth", title = "Accuracy") +
+  labs(x = NULL, y = "% of intervals containing the true value", title = "Accuracy") +
   panel_theme
 
 ggsave(figure_path("accuracy.png"), accuracy_plot,
@@ -152,7 +154,7 @@ precision_entropy_plot <- ggplot(width_long, aes(H, width90)) +
   scale_shape_manual(values = model_shapes, name = NULL) +
   guides(colour = guide_legend(override.aes = list(size = 2.5, alpha = 1))) +
   labs(x = "Shannon entropy of the periodisation (H)",
-       y = "90% interval width (less is more precise)",
+       y = "Width of the 90% interval",
        title = "Precision against dating resolution",
        caption = "Lines and markers: per-bin median width.") +
   panel_theme
@@ -183,7 +185,7 @@ binned_sigma <- sigma_by_H %>%
   mutate(x = bin_centre + ifelse(model == "EIV", -0.04, 0.04))
 
 y_limits_sg <- quantile(sigma_by_H$sigma_err, c(0.004, 0.996))
-label_y_sg  <- y_limits_sg[1] + 0.04 * diff(y_limits_sg)
+label_y_sg  <- y_limits_sg[2] - 0.04 * diff(y_limits_sg)
 
 sigma_entropy_plot <- ggplot() +
   geom_rect(data = resolution_bands,
@@ -192,14 +194,14 @@ sigma_entropy_plot <- ggplot() +
   scale_fill_identity() +
   geom_hline(yintercept = 0, linetype = "dotted", colour = "grey45") +
   geom_point(data = sigma_by_H, aes(H, sigma_err, colour = model, shape = model),
-             size = 0.55, alpha = 0.65) +
+             size = 0.35, alpha = 0.35) +
   geom_errorbar(data = binned_sigma,
                 aes(x = x, ymin = q25, ymax = q75, colour = model),
                 width = 0.06, linewidth = 0.7) +
   geom_point(data = binned_sigma, aes(x, median_error, colour = model,
                                       shape = model), size = 2) +
   geom_text(data = resolution_bands, aes(band_centre, label_y_sg, label = label),
-            colour = "grey30", size = 3) +
+            colour = "grey20", size = 3.3, fontface = "bold") +
   scale_colour_manual(values = model_colours, name = NULL) +
   scale_shape_manual(values = model_shapes, name = NULL) +
   guides(colour = guide_legend(override.aes = list(size = 2.5, alpha = 1))) +
@@ -245,12 +247,38 @@ accuracy_entropy_plot <- ggplot(accuracy_by_entropy,
   scale_linetype_manual(values = "dashed", name = NULL) +
   scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
   labs(x = "Shannon entropy of the periodisation (H)",
-       y = "90% interval accuracy",
-       title = "Accuracy against dating resolution (90% interval)") +
+       y = "% of 90% intervals containing the true value",
+       title = "Accuracy against dating resolution") +
   panel_theme
 
 ggsave(figure_path("accuracy_vs_entropy.png"), accuracy_entropy_plot,
        width = 14, height = 4, dpi = 300, bg = "white")
+
+# accuracy_precision_composite.png : the accuracy (A) and precision (B) figures
+# stacked so the honesty-vs-sharpness trade-off reads at a glance. Same x-axis
+# (entropy) and parameter columns; one shared legend. Built from the two plots
+# above, which are still saved on their own. Panel A gets a per-parameter y-axis
+# (limits stay fixed at 0-1 via its own scale) so both rows share the same facet
+# structure and the columns line up.
+
+acc_panel  <- accuracy_entropy_plot + labs(title = NULL, x = NULL) +
+  facet_wrap(~ parameter, scales = "free_y", nrow = 1)
+prec_panel <- precision_entropy_plot +
+  labs(title = NULL, caption = NULL) +
+  guides(colour = "none", shape = "none") +
+  theme(strip.text = element_blank())
+
+accuracy_precision_composite <- (acc_panel / prec_panel) +
+  plot_layout(guides = "collect", axes = "collect_x") +
+  plot_annotation(tag_levels = "A",
+                  title = "Accuracy and precision against dating resolution") &
+  theme(legend.position = "top",
+        plot.title = element_text(size = 11, face = "bold"),
+        plot.tag = element_text(size = 15, face = "bold"),
+        plot.tag.location = "margin")
+
+ggsave(figure_path("accuracy_precision_composite.png"), accuracy_precision_composite,
+       width = 14, height = 7.5, dpi = 300, bg = "white")
 
 # precision_boxplots.png : the latent-vs-midpoint precision gap as boxplots,
 # split into low / mid / high entropy thirds.
@@ -266,7 +294,7 @@ precision_boxplots <- ggplot(width_by_entropy,
   facet_wrap(~ parameter, scales = "free_y", nrow = 1) +
   scale_fill_manual(values = model_fills, name = NULL) +
   labs(x = "Shannon entropy (H)",
-       y = "90% interval width (less is more precise)",
+       y = "Width of the 90% interval",
        title = "EIV vs midpoint precision across the entropy range") +
   panel_theme
 
@@ -317,7 +345,7 @@ precision_n_plot <- ggplot(mapping = aes(N, colour = model, shape = model)) +
   scale_shape_manual(values = model_shapes, name = NULL) +
   guides(colour = guide_legend(override.aes = list(size = 2.5, alpha = 1))) +
   labs(x = "Sample size (N)",
-       y = "90% interval width (less is more precise)",
+       y = "Width of the 90% interval",
        title = "Precision against sample size",
        caption = "Markers: per-N median; bars: interquartile range.") +
   panel_theme
