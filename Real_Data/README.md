@@ -18,6 +18,9 @@ trend, relative to collapsing the window to its midpoint.
 Subset: Great Britain, nuclear-family houses, positive roofed area, dated window
 (`EndHouse > BeginHouse`), midpoint year in `[-100, 1000]` — **2682 houses**.
 
+> [!IMPORTANT]
+>  Alternatively there is this paper, but it is missing a chronological range: https://www.frontiersin.org/journals/ecology-and-evolution/articles/10.3389/fevo.2023.1191274/full
+
 ### Scripts
 
 | Script | Purpose | Output |
