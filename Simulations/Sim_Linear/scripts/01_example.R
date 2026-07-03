@@ -121,15 +121,37 @@ summarise_trend <- function(fit) {
          upper_50 = apply(trend_matrix, 2, quantile, 0.75))
 }
 
+# Periodisation phases, shared by both trend panels for the top strip.
+# Alternating grey just separates neighbouring phases visually.
+phase_bounds <- sim_data %>%
+  distinct(Start_date, End_date) %>%
+  arrange(Start_date) %>%
+  mutate(shade = factor(row_number() %% 2))
+
+phase_strip <- function(title_label) {
+  ggplot(phase_bounds) +
+    geom_rect(aes(xmin = Start_date, xmax = End_date, ymin = 0, ymax = 1,
+                  fill = shade), colour = "white", linewidth = 0.3) +
+    scale_fill_manual(values = c("0" = "grey85", "1" = "grey65"), guide = "none") +
+    scale_x_continuous(limits = range(prediction_grid), expand = c(0.01, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    labs(title = title_label) +
+    theme_void(base_size = 11) +
+    theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+          plot.margin = margin(2, 10, 0, 10))
+}
+
 make_trend_panel <- function(fit, title_label) {
-  ggplot(summarise_trend(fit)) +
+  trend <- ggplot(summarise_trend(fit)) +
     geom_ribbon(aes(Year, ymin = lower_90, ymax = upper_90), fill = "grey80") +
     geom_ribbon(aes(Year, ymin = lower_50, ymax = upper_50), fill = "grey60") +
     geom_line(aes(Year, median), linewidth = 0.6, colour = "black") +
     geom_line(data = ground_truth, aes(Year, True_value), linewidth = 0.7,
               colour = "black", linetype = "dashed") +
-    scale_x_continuous(breaks = seq(100, 900, 200), expand = c(0.01, 0)) +
-    labs(title = title_label, x = "Year (CE)", y = "Value") + panel_theme
+    scale_x_continuous(breaks = seq(100, 900, 200), expand = c(0.01, 0),
+                       limits = range(prediction_grid)) +
+    labs(x = "Year (CE)", y = "Value") + panel_theme
+  phase_strip(title_label) / trend + plot_layout(heights = c(0.06, 1))
 }
 
 parameter_posteriors <- function(fit, model_label) {

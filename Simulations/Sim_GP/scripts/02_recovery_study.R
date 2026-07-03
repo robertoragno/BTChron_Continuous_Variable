@@ -1,324 +1,166 @@
-# Repeated calibration study for the GP simulation.
+# Recovery study for the GP model.
 #
-# The GP is non-parametric, so the repeated study tracks a few simple recovery
-# targets: sigma plus curve features (peak year, peak value, width at half
-# height). We repeatedly redraw true dates and observation noise, refit both
-# models, and save the posterior summaries needed for the recovery plots.
+# Many random plausible datasets are simulated: each draws its own smooth wavy
+# curve, noise sigma, sample size, and periodisation (a Dirichlet broken stick of
+# K phases with concentration alpha_conc). Each dataset's dating resolution is
+# summarised by the Shannon entropy H of its phase weights. Both the EIV
+# (latent-date) and midpoint models are fit to each.
+#
+# The GP is non-parametric, so the curve itself is the recovery target: for each
+# fit we record the proportion of the true curve caught by the 50% / 90% band
+# over a time grid (accuracy) and the mean band width (precision). sigma is kept
+# as a scalar target, as in the linear and changepoint studies, since it carries
+# the "midpoint mistakes dating spread for noise" story and links the three sims.
+#
+# GP fits are heavy, so this is the expensive step. Run it in a tmux session.
 
 library(here)
-library(tidyverse)
 library(cmdstanr)
+library(posterior)
+library(dplyr)
+library(tidyr)
+library(parallel)
 
 source(here("Simulations", "Sim_GP", "scripts", "simulate.R"))
 
-sim_data <- read_csv(here("Simulations", "Sim_GP", "data", "simulated_data.csv"),
-                     show_col_types = FALSE)
+set.seed(2026)
 
-n <- nrow(sim_data)
-mean_width <- mean(sim_data$End_date - sim_data$Start_date)
-pred_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
-true_targets <- evaluation_targets() %>% select(target, value)
-K <- as.integer(Sys.getenv("RECOVERY_K", "20"))
-N_CHAINS <- as.integer(Sys.getenv("RECOVERY_CHAINS", "2"))
-N_WARMUP <- as.integer(Sys.getenv("RECOVERY_WARMUP", "500"))
-N_SAMPLING <- as.integer(Sys.getenv("RECOVERY_SAMPLING", "500"))
-ADAPT_DELTA <- as.numeric(Sys.getenv("RECOVERY_ADAPT_DELTA", "0.99"))
-output_dir <- Sys.getenv(
-  "GP_RECOVERY_OUTPUT_DIR",
-  here("Simulations", "Sim_GP", "output")
+# Environment variables
+output_csv  <- Sys.getenv("RECOVERY_OUT",
+                          here("Simulations", "Sim_GP", "output", "recovery_results.csv"))
+n_datasets    <- as.integer(Sys.getenv("RECOVERY_K", "60"))
+n_workers     <- as.integer(Sys.getenv("RECOVERY_WORKERS", "16"))  # concurrent fits (each uses 4 chains)
+iter_warmup   <- as.integer(Sys.getenv("RECOVERY_WARMUP", "1000"))
+iter_sampling <- as.integer(Sys.getenv("RECOVERY_SAMPLING", "1000"))
+M_basis       <- as.integer(Sys.getenv("RECOVERY_M", "20"))
+c_boundary    <- as.numeric(Sys.getenv("RECOVERY_C", "1.5"))
+# The latent-date GP has a hard posterior geometry, so it needs a high adapt_delta
+# (as the earlier fixed-window GP study did) to keep divergences down.
+adapt_delta   <- as.numeric(Sys.getenv("RECOVERY_ADAPT_DELTA", "0.99"))
+
+# One parameter set per dataset. K and alpha_conc set the periodisation, matching
+# the linear and changepoint studies; alpha_conc leans low (Beta over [0.1, 10])
+# so lumpy phases are common. N sweeps two levels (low / high) to read precision
+# against sample size. The curve (baseline, amplitudes, periods, phases) is drawn
+# fresh per dataset by draw_curve and stored as a list column.
+datasets <- tibble(
+  dataset_id = seq_len(n_datasets),
+  sigma      = runif(n_datasets, 0.5, 4),
+  K          = sample(3:10, n_datasets, replace = TRUE),
+  alpha_conc = 10^(-1 + 2 * rbeta(n_datasets, 2, 3.5)),
+  N          = rep(c(50, 200), length.out = n_datasets),
+  curve      = replicate(n_datasets, draw_curve(), simplify = FALSE)
 )
-dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
-# These columns are the new curve-feature summaries. If an older cached CSV does
-# not have them, we know it came from the earlier sigma-only study and must be
-# recomputed before the new recovery plots can be trusted.
-feature_columns <- c(
-  "peak_year_q05", "peak_year_q25", "peak_year_q50", "peak_year_q75", "peak_year_q95",
-  "peak_value_q05", "peak_value_q25", "peak_value_q50", "peak_value_q75", "peak_value_q95",
-  "fwhm_years_q05", "fwhm_years_q25", "fwhm_years_q50", "fwhm_years_q75", "fwhm_years_q95"
-)
+# One job per dataset and model.
+jobs <- expand_grid(dataset_id = datasets$dataset_id,
+                    model = c("latent", "midpoint")) %>%
+  left_join(datasets, by = "dataset_id") %>%
+  mutate(job_id = row_number())
 
-extract_curve_features <- function(curve, years) {
-  peak_idx <- which.max(curve)
-  peak_year <- years[peak_idx]
-  peak_value <- curve[peak_idx]
-  # FWHM = full width at half maximum. For this single-peaked bell curve it is
-  # a simple way to describe how spread out the recovered peak is.
-  half_height <- min(curve) + 0.5 * (peak_value - min(curve))
-  above_half <- which(curve >= half_height)
-  fwhm_years <- years[max(above_half)] - years[min(above_half)]
+model_latent   <- cmdstan_model(here("Simulations", "Sim_GP", "models", "sim_hsgp.stan"))
+model_midpoint <- cmdstan_model(here("Simulations", "Sim_GP", "models", "sim_hsgp_midpoint.stan"))
 
-  c(
-    peak_year = peak_year,
-    peak_value = peak_value,
-    fwhm_years = fwhm_years
-  )
-}
+# Time grid on which the recovered curve is compared with the truth. Fixed across
+# datasets so curve coverage is measured the same way everywhere.
+prediction_grid <- seq(TMIN, TMAX, by = 10)
 
-read_existing_results <- function(path, expected_rows, label) {
-  if (!file.exists(path)) {
-    return(NULL)
-  }
-
-  existing <- read_csv(path, show_col_types = FALSE)
-  if (nrow(existing) == expected_rows) {
-    if (!"n_divergent" %in% names(existing)) {
-      existing <- existing %>% mutate(n_divergent = 0)
-    }
-    if (!"max_rhat" %in% names(existing)) {
-      existing <- existing %>% mutate(max_rhat = 1)
-    }
-    if (!"error" %in% names(existing)) {
-      existing <- existing %>% mutate(error = NA_character_)
-    }
-    missing_features <- setdiff(feature_columns, names(existing))
-    if (length(missing_features) > 0) {
-      cat(sprintf(
-        "Existing %s results are missing GP feature summaries (%s). Refitting.\n",
-        label,
-        paste(missing_features, collapse = ", ")
-      ))
-      return(NULL)
-    }
-    cat(sprintf("Loading existing %s results (%d rows).\n", label, nrow(existing)))
-    return(existing)
-  }
-
-  cat(sprintf(
-    "Existing %s results have %d row%s, but RECOVERY_K = %d. Refitting.\n",
-    label,
-    nrow(existing),
-    ifelse(nrow(existing) == 1, "", "s"),
-    expected_rows
-  ))
-  NULL
-}
-
-extract_results <- function(fit, seed_id, runtime_seconds) {
-  draws <- fit$draws(format = "df")
-  sg <- draws$sigma
-  trend_cols <- grep("^mu_pred\\[", names(draws), value = TRUE)
-  trend_mat <- as.matrix(draws[, trend_cols, drop = FALSE])
-  # Each posterior draw gives one whole recovered curve on the prediction grid.
-  # We turn each draw into a few interpretable summaries (peak year/value/FWHM),
-  # then summarise those across draws exactly like we do for sigma.
-  curve_features <- t(vapply(
-    seq_len(nrow(trend_mat)),
-    function(i) extract_curve_features(trend_mat[i, ], pred_grid),
-    numeric(3)
-  ))
-  colnames(curve_features) <- c("peak_year", "peak_value", "fwhm_years")
-  diagnostics <- fit$diagnostic_summary(quiet = TRUE)
-  sigma_rhat <- fit$summary("sigma")$rhat
-  sigma_q <- quantile(sg, c(0.05, 0.25, 0.5, 0.75, 0.95), names = FALSE)
-
-  feature_q <- function(name) {
-    quantile(curve_features[, name], c(0.05, 0.25, 0.5, 0.75, 0.95), names = FALSE)
-  }
-
-  peak_year_q <- feature_q("peak_year")
-  peak_value_q <- feature_q("peak_value")
-  fwhm_years_q <- feature_q("fwhm_years")
-
+# Scalar-parameter summary (used for sigma): median, whether the 50%/90% interval
+# held the truth, the 90% width, and the signed error.
+summarise_scalar <- function(posterior_draws, true_value, name) {
+  q <- quantile(posterior_draws, c(0.05, 0.25, 0.5, 0.75, 0.95), names = FALSE)
   tibble(
-    seed = seed_id,
-    runtime_seconds = runtime_seconds,
-    sigma_q05 = sigma_q[1],
-    sigma_q25 = sigma_q[2],
-    sigma_q50 = sigma_q[3],
-    sigma_q75 = sigma_q[4],
-    sigma_q95 = sigma_q[5],
-    peak_year_q05 = peak_year_q[1],
-    peak_year_q25 = peak_year_q[2],
-    peak_year_q50 = peak_year_q[3],
-    peak_year_q75 = peak_year_q[4],
-    peak_year_q95 = peak_year_q[5],
-    peak_value_q05 = peak_value_q[1],
-    peak_value_q25 = peak_value_q[2],
-    peak_value_q50 = peak_value_q[3],
-    peak_value_q75 = peak_value_q[4],
-    peak_value_q95 = peak_value_q[5],
-    fwhm_years_q05 = fwhm_years_q[1],
-    fwhm_years_q25 = fwhm_years_q[2],
-    fwhm_years_q50 = fwhm_years_q[3],
-    fwhm_years_q75 = fwhm_years_q[4],
-    fwhm_years_q95 = fwhm_years_q[5],
-    sigma_rank = sum(sg < TRUE_SIGMA),
-    n_divergent = sum(diagnostics$num_divergent),
-    max_rhat = max(sigma_rhat, na.rm = TRUE),
-    error = NA_character_
+    !!paste0(name, "_med")     := q[3],
+    !!paste0(name, "_cov50")   := true_value >= q[2] & true_value <= q[4],
+    !!paste0(name, "_cov90")   := true_value >= q[1] & true_value <= q[5],
+    !!paste0(name, "_width90") := q[5] - q[1],
+    !!paste0(name, "_err")     := q[3] - true_value
   )
 }
 
-run_one_model <- function(model_path, output_csv, label) {
-  existing <- read_existing_results(output_csv, K, label)
-  if (!is.null(existing)) {
-    return(existing)
-  }
-
-  model <- cmdstan_model(model_path)
-  results <- vector("list", K)
-
-  for (k in seq_len(K)) {
-    set.seed(k)
-    new_true_dates <- runif(n, min = sim_data$Start_date, max = sim_data$End_date)
-    new_values <- round(f_true(new_true_dates) + rnorm(n, 0, TRUE_SIGMA), 1)
-
-    stan_data <- list(
-      N = n,
-      y = new_values,
-      start_date = sim_data$Start_date,
-      end_date = sim_data$End_date,
-      N_pred = length(pred_grid),
-      x_pred = pred_grid,
-      M = 20,
-      c = 1.5
-    )
-
-    fit_start <- Sys.time()
-    fit <- model$sample(
-      data = stan_data,
-      chains = N_CHAINS,
-      parallel_chains = N_CHAINS,
-      iter_warmup = N_WARMUP,
-      iter_sampling = N_SAMPLING,
-      seed = k,
-      adapt_delta = ADAPT_DELTA,
-      max_treedepth = 12,
-      refresh = 0,
-      show_messages = FALSE
-    )
-    fit_seconds <- as.numeric(difftime(Sys.time(), fit_start, units = "secs"))
-
-    results[[k]] <- extract_results(fit, k, fit_seconds)
-    cat(sprintf("[%s] %s seed %3d / %d done (%.1f min)\n",
-                format(Sys.time(), "%H:%M:%S"), label, k, K, fit_seconds / 60))
-  }
-
-  results <- bind_rows(results)
-  write_csv(results, output_csv)
-  results
-}
-
-summarise_feature_recovery <- function(results, model_code) {
-  make_target_rows <- function(target_name, q05, q25, q50, q75, q95) {
-    truth <- true_targets$value[match(target_name, true_targets$target)]
-
-    tibble(
-      dataset_id = results$seed,
-      model = model_code,
-      target = target_name,
-      true_value = truth,
-      estimate_med = q50,
-      cov50 = truth >= q25 & truth <= q75,
-      cov90 = truth >= q05 & truth <= q95,
-      width90 = q95 - q05,
-      err = q50 - truth,
-      runtime_seconds = results$runtime_seconds,
-      mean_width = mean_width,
-      N = n,
-      n_divergent = results$n_divergent,
-      max_rhat = results$max_rhat,
-      error = results$error
-    )
-  }
-
-  # Bind the four GP targets into one long table so the plotting script can use
-  # the same "target / estimate / coverage / error" structure as the parametric
-  # simulations.
-  bind_rows(
-    make_target_rows("peak_year",
-                     results$peak_year_q05, results$peak_year_q25, results$peak_year_q50,
-                     results$peak_year_q75, results$peak_year_q95),
-    make_target_rows("peak_value",
-                     results$peak_value_q05, results$peak_value_q25, results$peak_value_q50,
-                     results$peak_value_q75, results$peak_value_q95),
-    make_target_rows("fwhm_years",
-                     results$fwhm_years_q05, results$fwhm_years_q25, results$fwhm_years_q50,
-                     results$fwhm_years_q75, results$fwhm_years_q95),
-    make_target_rows("sigma_noise",
-                     results$sigma_q05, results$sigma_q25, results$sigma_q50,
-                     results$sigma_q75, results$sigma_q95)
+# Curve summary: over the grid, the proportion of the true curve inside the 50%
+# and 90% bands (accuracy) and the mean band width (precision).
+summarise_curve <- function(trend_matrix, true_curve) {
+  lower90 <- apply(trend_matrix, 2, quantile, 0.05)
+  upper90 <- apply(trend_matrix, 2, quantile, 0.95)
+  lower50 <- apply(trend_matrix, 2, quantile, 0.25)
+  upper50 <- apply(trend_matrix, 2, quantile, 0.75)
+  tibble(
+    curve_cov50   = mean(true_curve >= lower50 & true_curve <= upper50),
+    curve_cov90   = mean(true_curve >= lower90 & true_curve <= upper90),
+    curve_width50 = mean(upper50 - lower50),
+    curve_width90 = mean(upper90 - lower90),
+    curve_rmse    = sqrt(mean((apply(trend_matrix, 2, median) - true_curve)^2))
   )
 }
 
-latent_csv <- file.path(output_dir, "calibration_results.csv")
-midpoint_csv <- file.path(output_dir, "calibration_results_midpoint.csv")
-recovery_csv <- file.path(output_dir, "recovery_results.csv")
-feature_csv <- file.path(output_dir, "feature_recovery_results.csv")
-runtime_csv <- file.path(output_dir, "runtime_summary.csv")
+# Simulate one dataset, fit one model, return a one-row summary.
+run_one_job <- function(job_index) {
+  job         <- jobs[job_index, ]
+  curve       <- job$curve[[1]]
+  one_dataset <- simulate_gp(N = job$N, sigma = job$sigma, K = job$K,
+                             alpha_conc = job$alpha_conc, curve = curve,
+                             seed = job$dataset_id)
+  entropy_H  <- attr(one_dataset, "H")
+  mean_width <- mean(one_dataset$End_date - one_dataset$Start_date)
+  true_curve <- f_true(prediction_grid, curve)
 
-latent_results <- run_one_model(
-  here("Simulations", "Sim_GP", "models", "sim_hsgp.stan"),
-  latent_csv,
-  "latent"
-)
+  stan_data <- list(N = nrow(one_dataset), y = one_dataset$Value,
+                    start_date = one_dataset$Start_date,
+                    end_date = one_dataset$End_date,
+                    N_pred = length(prediction_grid), x_pred = prediction_grid,
+                    M = M_basis, c = c_boundary)
 
-midpoint_results <- run_one_model(
-  here("Simulations", "Sim_GP", "models", "sim_hsgp_midpoint.stan"),
-  midpoint_csv,
-  "midpoint"
-)
+  chosen_model <- if (job$model == "latent") model_latent else model_midpoint
 
-recovery_results <- bind_rows(
-  latent_results %>%
-    transmute(
-      dataset_id = seed,
-      model = "latent",
-      true_sigma = TRUE_SIGMA,
-      mean_width = mean_width,
-      N = n,
-      sigma_med = sigma_q50,
-      sigma_cov50 = TRUE_SIGMA >= sigma_q25 & TRUE_SIGMA <= sigma_q75,
-      sigma_cov90 = TRUE_SIGMA >= sigma_q05 & TRUE_SIGMA <= sigma_q95,
-      sigma_width90 = sigma_q95 - sigma_q05,
-      sigma_err = sigma_q50 - TRUE_SIGMA,
-      n_divergent,
-      max_rhat,
-      error
-    ),
-  midpoint_results %>%
-    transmute(
-      dataset_id = seed,
-      model = "midpoint",
-      true_sigma = TRUE_SIGMA,
-      mean_width = mean_width,
-      N = n,
-      sigma_med = sigma_q50,
-      sigma_cov50 = TRUE_SIGMA >= sigma_q25 & TRUE_SIGMA <= sigma_q75,
-      sigma_cov90 = TRUE_SIGMA >= sigma_q05 & TRUE_SIGMA <= sigma_q95,
-      sigma_width90 = sigma_q95 - sigma_q05,
-      sigma_err = sigma_q50 - TRUE_SIGMA,
-      n_divergent,
-      max_rhat,
-      error
+  summary_row <- tryCatch({
+    fit <- chosen_model$sample(
+      data = stan_data, chains = 4, parallel_chains = 4,
+      iter_warmup = iter_warmup, iter_sampling = iter_sampling,
+      adapt_delta = adapt_delta, max_treedepth = 12,
+      refresh = 0, show_messages = FALSE, show_exceptions = FALSE
     )
-)
+    draws        <- fit$draws(format = "df")
+    trend_matrix <- as.matrix(draws[, paste0("mu_pred[", seq_along(prediction_grid), "]")])
+    diagnostics  <- fit$diagnostic_summary(quiet = TRUE)
+    # Convergence is recorded per target so 03 can gate each metric on its own:
+    # the curve accuracy/width/RMSE need the grid curve (mu_pred) to have mixed,
+    # the sigma metric needs sigma to have mixed. The two can fail independently
+    # (a wide-window, low-noise dataset leaves sigma weakly identified even when
+    # the curve is fine, and vice versa). The latent dates are left out entirely:
+    # they are often legitimately multimodal, so their Rhat should not gate anything.
+    curve_rhat <- max(fit$summary("mu_pred")$rhat, na.rm = TRUE)
+    sigma_rhat <- fit$summary("sigma")$rhat
+    bind_cols(
+      summarise_curve(trend_matrix, true_curve),
+      summarise_scalar(draws$sigma, job$sigma, "sigma"),
+      tibble(n_divergent = sum(diagnostics$num_divergent),
+             curve_rhat  = curve_rhat, sigma_rhat = sigma_rhat,
+             error = NA_character_)
+    )
+  }, error = function(e) tibble(error = conditionMessage(e)))
 
-write_csv(recovery_results, recovery_csv)
-
-feature_results <- bind_rows(
-  summarise_feature_recovery(latent_results, "latent"),
-  summarise_feature_recovery(midpoint_results, "midpoint")
-)
-
-write_csv(feature_results, feature_csv)
-
-runtime_summary <- bind_rows(
-  latent_results %>% mutate(model = "latent"),
-  midpoint_results %>% mutate(model = "midpoint")
-) %>%
-  group_by(model) %>%
-  summarise(
-    fits = n(),
-    total_minutes = sum(runtime_seconds) / 60,
-    mean_minutes = mean(runtime_seconds) / 60,
-    median_minutes = median(runtime_seconds) / 60,
-    min_minutes = min(runtime_seconds) / 60,
-    max_minutes = max(runtime_seconds) / 60,
-    .groups = "drop"
+  bind_cols(
+    tibble(dataset_id = job$dataset_id, model = job$model,
+           true_sigma = job$sigma, K = job$K, alpha_conc = job$alpha_conc,
+           N = job$N, H = entropy_H, mean_width = mean_width),
+    summary_row
   )
+}
 
-write_csv(runtime_summary, runtime_csv)
-
-cat("Wrote calibration_results.csv, calibration_results_midpoint.csv, recovery_results.csv, feature_recovery_results.csv, and runtime_summary.csv\n")
+if (file.exists(output_csv)) {
+  cat("recovery_results.csv already exists; move it aside to re-run.\n")
+} else {
+  cat(sprintf("Running %d fits (%d datasets x 2 models) on %d workers...\n",
+              nrow(jobs), n_datasets, n_workers))
+  start_time <- Sys.time()
+  results <- bind_rows(mclapply(seq_len(nrow(jobs)), run_one_job,
+                                mc.cores = n_workers, mc.preschedule = FALSE))
+  readr::write_csv(results, output_csv)
+  cat(sprintf("Done in %.1f min. Wrote %s\n",
+              as.numeric(difftime(Sys.time(), start_time, units = "mins")),
+              output_csv))
+  n_errored <- sum(!is.na(results$error))
+  if (n_errored > 0)
+    cat(sprintf("WARNING: %d/%d fits with errors\n", n_errored, nrow(results)))
+}

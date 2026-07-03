@@ -1,7 +1,7 @@
 // HSGP regression model with latent date inference.
 //
 // The GP trend f(t) = mu + PHI(t)' * beta approximates a squared-exponential
-// GP via the Hilbert-space low-rank basis expansion (Solin & Sarkka 2020).
+// GP via the Hilbert-space low-rank basis expansion (https://link.springer.com/article/10.1007/s11222-019-09886-w).
 // The basis functions are fixed harmonic modes on [-L, L]; the spectral
 // weights beta are scaled by the EQ spectral density evaluated at each
 // eigenfrequency. This avoids building and inverting an N×N covariance matrix.
@@ -93,10 +93,17 @@ transformed parameters {
 
 model {
   mu    ~ normal(0, 15);      // weakly informative over the observed value range
-  alpha ~ normal(0, 10);      // half-normal; amplitude up to ~12 is plausible
-  rho   ~ inv_gamma(5, 2.5);  // peaks near 0.5 on [0,1]; rules out near-zero and near-1
+  alpha ~ normal(0, 10);      // half-normal; amplitude of the wiggles
+  // rho is the GP length-scale on the normalised [0,1] axis. inv_gamma(5, 0.9)
+  // puts the 90% mass on roughly 0.10-0.46, i.e. ~80-370 years on an 800-year
+  // span: the signal is expected to change over a century or a few, not to be
+  // either flat across the whole period or spikier than the dating can resolve.
+  rho   ~ inv_gamma(5, 0.9);
   z     ~ std_normal();
-  sigma ~ exponential(1);
+  // half-normal, weakly informative over the generating range (sigma ~ 0.5-4).
+  // exponential(1) has mean 1, too tight here: it fights the data and biases
+  // sigma low. Widening it also eases the latent-date sampling geometry.
+  sigma ~ normal(0, 5);
 
   // true_date_norm changes every iteration, so PHI_obs must be rebuilt here
   matrix[N, M] PHI_obs = PHI(N, M, L, true_date_norm);

@@ -1,144 +1,168 @@
 # Simulation 3: Gaussian Process
 
-A continuous measurement is assumed to follow a smooth bell-shaped temporal
-trend,
+A continuous measurement is assumed to follow a smooth but wavy temporal trend
+`f(t)`, observed with Gaussian noise. Each observation is dated only to a phase
+with `[Start_date, End_date]` rather than to a known year. Does treating each
+date as a latent parameter within its phase recover the curve better than
+collapsing the phase to its midpoint?
+
+Unlike the linear and changepoint simulations, the trend here has no small set of
+generating parameters to recover one-for-one: the fitted model is a
+non-parametric Gaussian process. The truth is instead a wavy curve — a baseline
+plus a few sine waves — and the question is asked of the whole curve.
 
 ```
-f(t) = baseline + amplitude * exp(-((t - peak) / width)^2)
+f(t) = baseline + Σ amp_k · sin(2π (t − 100) / period_k + phase_k),   k = 1..3
+y_n  ~ Normal(f(true_date_n), sigma)
 ```
 
-observed with Gaussian noise. Each observation carries a dating range
-`[Start_date, End_date]` rather than a known year. The question is whether
-treating each date as a latent parameter within its range recovers the smooth
-trend better than collapsing the range to its midpoint.
+Each dataset draws its own curve: `baseline ~ U(2, 15)`, three amplitudes
+`~ U(2, 8)`, three periods of roughly 200–530 years, and random phases. The
+periods are deliberately kept on the same scale as the dating phases (a few
+hundred years): a curve that bends inside a dating window is where the midpoint
+shortcut can go wrong, whereas a curve much flatter than the windows would behave
+like the linear case and one much wavier could not be recovered by any model. The
+truth is built from sine waves while the model assumes a generic smooth GP, so
+recovering it is a fair test rather than one rigged in the model's favour.
 
-Generating parameters (worked example): **baseline = 8**, **amplitude = 12**,
-**peak = 450 CE**, **width = 200**, **noise ~ N(0, 2.5)**.
+## Periodisation and dating resolution
 
-Because the fitted model is non-parametric, the GP is not judged by recovering
-those named generator parameters one-for-one. Instead the key checks are whether
-it recovers the true curve, simple curve features such as the peak, and the
-known residual noise scale.
+The dating step is identical to the linear and changepoint simulations. The
+timeline (100–900 CE) is divided into `K` phases by a Dirichlet broken stick, and
+every observation inherits the `[Start_date, End_date]` of the phase its true
+date falls in, so observations in the same phase share an identical window and the
+dating uncertainty is structured rather than random. Each dataset draws its own
+number of phases (`K ~ U{3, …, 10}`) and Dirichlet concentration
+(`alpha_conc = 10^(2·Beta(2, 3.5) − 1)`), giving anything from a few even phases
+to one long phase dominating.
+
+The resolution of a periodisation is summarised by the Shannon entropy of the
+phase weights, `H = −Σ p · log p`. Even phases have high H (the ceiling is about
+2.3 for ten equal phases); one dominant coarse phase gives low H. Higher H means
+finer, more balanced periods and better-resolved dating, so H is the natural axis
+to read accuracy and precision against. A prior-predictive check is in
+`00_periodisation_check.R`.
 
 ## Scripts
 
-`simulate.R` holds the shared generating process (the true bell-shaped curve,
-date-window generator, and truth tables); it is sourced by both the worked
-example and the repeated study, so they provably use the same process. The
-pipeline is then four scripts:
+`simulate.R` holds the shared generating process: `simulate_gp()`, the wavy-curve
+generator (`draw_curve` / `f_true`), and the `partition_timeline()` helper shared
+with the other simulations. It is sourced by both the example and the study so
+they use the same process.
 
 | Script | Purpose | Output |
 |---|---|---|
-| `01_example.R` | draw ONE dataset, show it, fit both models, compare | `figures/exploratory_panel.png`, `model_results_panel.png`, `model_comparison.png` |
-| `02_recovery_study.R` | redraw true dates and noise many times on the same fixed date windows, fit both models, record sigma calibration summaries, and also write a sigma recovery table for inspection | `output/calibration_results.csv`, `output/calibration_results_midpoint.csv`, `output/recovery_results.csv`, `output/runtime_summary.csv` |
-| `03_recovery_plots.R` | the repeated-study figure | `figures/calibration_coverage.png` |
-| `04_prior_predictive_check.R` | draw from the HSGP priors and compare the implied trends and values with the observed range | `figures/prior_predictive_check.png` |
+| `00_periodisation_check.R` | prior predictive check: draw the priors, simulate datasets, show H, example phases, and the curves and values they imply | `figures/periodisation_H_distribution.png`, `periodisation_examples.png`, `prior_predictive.png` |
+| `01_example.R` | one dataset, shown and fit with both models | `figures/exploratory_panel.png`, `model_comparison_single_fit.png`, `individual_date_posteriors.png` |
+| `02_recovery_study.R` | many random datasets (each its own curve, noise, sample size, periodisation), both models fit, curve and sigma recorded | `output/recovery_results.csv` |
+| `03_recovery_plots.R` | the study figures and the recovery table | `figures/accuracy_vs_entropy.png`, `precision_vs_entropy.png`, `precision_vs_n.png`, `sigma_vs_entropy.png`, `curve_recovery.png`, `output/recovery_table.csv` |
 
-The worked example (`01`) writes the single simulated dataset and all
-single-dataset figures. The repeated study (`02`) is kept separate because it is
-the expensive step; its plotting (`03`) can then be restyled without refitting.
-That repeated study also writes `output/recovery_results.csv`, but the current
-paper-level combined sigma-vs-window figure excludes GP because the GP study is
-a fixed-window calibration design, not a varying-window recovery design like the
-linear and changepoint simulations. The prior predictive check (`04`) is
-separate because it is about the priors, not about recovery from one realised
-dataset.
+The latent-date GP is the heaviest of the three models to fit (several minutes per
+dataset), so the study (`02`) is the expensive step and is run in a tmux session;
+plotting (`03`) is kept separate so figures can be restyled without refitting.
+Sample size is swept across `N = 50, 200` (low / high) to read precision against N.
+
+## The model
+
+A Hilbert-space approximation to a squared-exponential GP (Solin & Särkkä 2020):
+the trend is `f(t) = mu + PHI(t)' · beta`, a low-rank basis expansion that avoids
+inverting an N×N covariance matrix. The EIV model treats each true date as a
+latent parameter, uniform within its phase, inferred jointly with the GP; the
+midpoint model fixes each date at the centre of its phase. Both share the same
+priors, so the two are directly comparable. The GP length-scale prior
+(`rho ~ inv_gamma(5, 0.9)`, ~80–370 years) and noise prior (`sigma ~ normal(0, 5)`
+half-normal, over the generating range) are set for this wavy-curve, varying-truth
+design; the latent-date model needs `adapt_delta = 0.99` to sample its harder
+geometry.
 
 ## Exploratory panel
+
+A single example used in the paper to illustrate the data-generating process.
+
 <p align="center">
 <img src="figures/exploratory_panel.png" height="700" text-align="center"/>
 </p>
 
-## Prior predictive check
+## Model comparison on one dataset
 
-Before fitting any data, 200 parameter sets were drawn from the priors and GP realisations were generated through the HSGP parameterisation. Panel **A** shows the resulting trend curves (trimmed to the 90th percentile by absolute magnitude for legibility); the blue band marks the observed data range. Panel **B** compares the density of prior predictive observations against the actual observed values. The priors are intentionally wide — they should cover the data range without being tightly centred on it.
-
-<p align="center">
-<img src="figures/prior_predictive_check.png" height="700" text-align="center"/>
-</p>
-
-## Model 1: HSGP regression with latent date inference
-
-A Hilbert-space GP regression with latent date inference. Each observation's true date is modelled as a uniform draw within its `[Start_date, End_date]` window, and the trend is approximated via a low-rank basis expansion of a squared-exponential GP:
-
-```
-f(t) = mu + PHI(t)' * beta
-y_n  ~ Normal(f(true_date_n), sigma)
-```
-
-Panel **A** shows the recovered trend (median and 50%/90% credible intervals) against the true Gaussian bell curve used to generate the data (dashed). Panel **B** is a date recovery plot: each dot is one sample, with the true generating date on the x-axis and the posterior median on the y-axis — vertical bars are 90% CIs. Panel **C** shows posterior distributions for sigma (dashed line marks the true generating value), the GP mean mu, and the GP length-scale rho in original time units; mu and rho do not have simple true values since they are inferred non-parametric properties of the fitted curve.
+The example dataset fit with both models: recovered curve (median and 50%/90%
+band) against the true wavy curve, and the sigma / mu / length-scale posteriors.
+This is one dataset for illustration only — the systematic result is the recovery
+study below.
 
 <p align="center">
-<img src="figures/model_results_panel.png" height="700" text-align="center"/>
+<img src="figures/model_comparison_single_fit.png" height="800" text-align="center"/>
 </p>
-
-## Model comparison: latent dates vs midpoint dates
-
-A second model fixes each observation's date at the midpoint of its `[Start_date, End_date]` window and runs the same HSGP regression on those fixed dates, ignoring temporal uncertainty entirely.
-
-Panels **A–B** compare trend recovery between the two models. Panel **C** shows the posterior for sigma under each model, with the true generating value (2.5) marked by a dashed line. The midpoint model places its sigma posterior noticeably above 2.5 because unmodelled date uncertainty is absorbed into the residual variance — the same pattern seen in the linear and changepoint simulations.
 
 <p align="center">
-<img src="figures/model_comparison.png" height="700" text-align="center"/>
+<img src="figures/individual_date_posteriors.png" height="900" text-align="center"/>
 </p>
 
-## Repeated study
+## Recovery study
 
-For the GP case, the repeated study is a calibration check rather than a
-parameter-recovery table. The simulation is repeated many times, each time
-redrawing true dates and observation noise from the same generating process
-while keeping the date windows fixed. Sigma is the cleanest scalar target
-because it has a known true value (2.5), and it also links directly to the
-linear and changepoint simulations. This means the GP repeated study answers a
-different question from the combined sigma-vs-window figure: it checks whether
-the latent-date GP is calibrated under one fixed window structure, not how
-performance changes across a range of average dating-window widths.
+The dataset above is just one example; the real study draws many datasets — each
+with its own curve, noise, sample size, and periodisation. Both models are fit to
+all of them. Because the GP target is the curve, accuracy is measured as the
+**proportion of the true curve inside the credible band**, averaged over a time
+grid, at the 50% and 90% levels; precision is the mean band width. `sigma` is kept
+as a scalar target, as in the other two simulations, since it carries the
+"midpoint mistakes dating spread for noise" story and links the three studies.
 
-The figure below makes the contrast concrete. Each bar is one observation's
-dating window and each dot is the hidden true date drawn inside it. In the GP
-study the two datasets share the same windows and only the true dates move; in
-the linear and changepoint studies every dataset draws its own windows.
+Convergence is checked per target, because the two can fail independently: `03`
+keeps a fit for the curve figures only if the grid curve (`mu_pred`) mixed
+(Rhat ≤ 1.05, no divergences), and for the sigma figure only if sigma mixed, and
+reports how many were kept.
+
+### The noise scale is the headline result
+
+As in the linear and changepoint simulations, the robust and consistent finding
+is on **sigma**: the midpoint model reads the within-phase date spread as
+measurement noise and overestimates it (roughly doubling the true value under
+coarse dating), while EIV recovers it. The error grows as phases coarsen (low H).
+This is the result the whole simulation section rests on, and it holds across
+every fit.
 
 <p align="center">
-<img src="figures/replication_contrast.png" height="360" text-align="center"/>
+<img src="figures/sigma_vs_entropy.png" height="340" text-align="center"/>
 </p>
 
-Fixing the windows is a scope decision, not a way to make any single fit
-easier. Each dataset is fit independently, so a fit's difficulty depends only on
-that dataset's own windows, curve, and noise; whether the windows were drawn once
-and reused or drawn fresh each time is invisible to the fit. What does make a fit
-hard is wide windows, which give the latent dates more room to move and produce a
-flatter posterior that samples more slowly (the same pattern the changepoint
-convergence figure shows). The cost of the GP is separate again: each
-latent-date HSGP fit is heavy (about seven minutes), which is a property of the
-model, not of how the windows are generated.
+### The curve, where it is identifiable
 
-The fixed-window design is therefore chosen for what it isolates. The
-"midpoint absorbs date uncertainty as windows widen" result is already
-established cheaply by the linear and changepoint sweeps, so the GP is held at one
-realistic moderate-width structure to test the one thing only the flexible model
-can add: whether it stays calibrated. Sweeping window widths here would mainly add
-the slow, wide-window fits in order to re-derive a known result. Extending the
-check to more runs or a second window structure is the natural next step rather
-than a redesign.
-
-Under a well-calibrated model the true sigma should be equally likely to land
-anywhere in the posterior, so posterior ranks across replications should be
-roughly uniform. A histogram piled up on the right means the model
-systematically underestimates sigma; a histogram piled up on the left means it
-systematically overestimates it. The midpoint model is expected to distort sigma
-because unmodelled date uncertainty is absorbed into the residual variance.
-
-In the current 100-run study, the latent-date GP passes this calibration check
-reasonably well for the fixed-window design. Its empirical sigma coverage was
-56% for the nominal 50% interval and 94% for the nominal 90% interval, with no
-fit errors, no divergent transitions, median max R-hat 1.004, and worst max
-R-hat 1.069 across the 100 fits. That makes the calibration-coverage figure
-methodologically sound as a GP-specific fixed-design check. By contrast, the
-midpoint GP is clearly miscalibrated: its sigma posterior is shifted upward and
-the true sigma was inside neither the 50% nor the 90% interval in this 100-run
-study.
+The curve is reported over the subset of datasets where the latent-date GP curve
+converged. It is **not** recovered everywhere: with dates left latent, the GP
+length-scale is only weakly identified — the data can be explained by a smoother
+curve with dates arranged one way or a wavier curve with dates arranged another —
+so on coarser-dated datasets the curve posterior is multimodal and does not
+converge (chains settle on different curves). This is a property of the
+latent-date GP itself, not of the periodisation redesign: the earlier
+single-bell study only ever checked sigma's convergence, so the same weak
+identifiability was present but unmeasured. Where the curve *does* converge (finer
+dating, higher H), EIV matches the midpoint's point accuracy with a narrower,
+better-calibrated band; the midpoint's occasional higher coverage is bought with
+wider bands and an inflated sigma, not better point accuracy. How deep to take the
+GP curve validation (up to full simulation-based calibration) is an open question
+for the professor.
 
 <p align="center">
-<img src="figures/calibration_coverage.png" height="500" text-align="center"/>
+<img src="figures/accuracy_vs_entropy.png" height="340" text-align="center"/>
 </p>
+
+<p align="center">
+<img src="figures/precision_vs_entropy.png" height="320" text-align="center"/>
+<img src="figures/curve_recovery.png" height="320" text-align="center"/>
+</p>
+
+### Sample size
+
+Precision against sample size, as a sanity check that more data tightens the
+intervals for both models.
+
+<p align="center">
+<img src="figures/precision_vs_n.png" height="320" text-align="center"/>
+</p>
+
+## Scope
+
+This is a recovery study (simulate → fit → check recovery across many datasets),
+not simulation-based calibration from the GP prior. Full SBC remains an open
+option for the methods appendix, to be decided with the professor.

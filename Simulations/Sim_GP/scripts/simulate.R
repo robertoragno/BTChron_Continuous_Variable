@@ -1,152 +1,105 @@
 # Shared data-generating process for the GP simulation.
-# Sourced by the worked example and the repeated calibration study so both use
-# the same bell-shaped truth and date-window generator.
-
-library(tidyverse)
+# Sourced by 01_example.R (one dataset) and 02_recovery_study.R (many datasets),
+# so the worked example and the study use the same process.
+#
+# The truth is a smooth, gently undulating curve rather than a single bell. A bell
+# is locally almost linear away from its peak, so the midpoint shortcut barely
+# suffers; the interesting failure for a nonlinear trend is where the curve bends
+# inside a dating window. The curve is a sum of two sine waves with periods longer
+# than a typical dating window (350-550 years). This keeps two things in tension:
+# the curve must bend within the windows for the midpoint shortcut to go wrong,
+# but a wave shorter than the window is averaged away by it and cannot be recovered
+# by any model (a window spanning a full oscillation carries no information about
+# it). Periods a bit longer than the windows sit on the right side of that line.
 
 TMIN <- 100
 TMAX <- 900
 
-# These are the settings of the bell-shaped curve we use as the hidden truth.
-# The GP is not trying to recover these values directly; they just define the
-# example signal we simulate from.
-TRUE_BASELINE <- 8
-TRUE_AMPLITUDE <- 12
-TRUE_PEAK <- 450
-TRUE_WIDTH <- 200
-TRUE_SIGMA <- 2.5
+# Number of sine components summed into the truth.
+N_COMPONENTS <- 2
 
-SITE_NAMES <- c("Site A", "Site B", "Site C", "Site D")
-DATE_GRID <- seq(TMIN, TMAX, by = 25)
+# Dirichlet broken stick (after EC diristick in beyond_aoristic): split
+# [TMIN, TMAX] into K phases with Dirichlet(alpha_conc) lengths, then give each
+# observation the [start, end] of the phase it falls in. Low alpha_conc makes
+# coarser phases, high alpha_conc more even ones. This is the same partition used
+# by the linear and changepoint simulations, so dating resolution is comparable
+# across all three. Boundaries are whole years; H is the Shannon entropy of the
+# phase weights.
+partition_timeline <- function(N, K, alpha_conc, min_years = 1) {
+  weights <- rgamma(K, shape = alpha_conc, rate = 1)
+  weights <- weights / sum(weights)
 
-# The underlying smooth trend. Later we will only observe noisy values at
-# unknown dates inside each sample's dating window.
-f_true <- function(t,
-                   baseline = TRUE_BASELINE,
-                   amplitude = TRUE_AMPLITUDE,
-                   peak = TRUE_PEAK,
-                   width = TRUE_WIDTH) {
-  baseline + amplitude * exp(-((t - peak) / width)^2)
+  # reserve min_years per phase, then Dirichlet-share the rest of the span
+  phase_spans <- min_years + weights * ((TMAX - TMIN) - K * min_years)
+  phase_p     <- phase_spans / (TMAX - TMIN)
+
+  boundaries        <- round(TMIN + c(0, cumsum(phase_spans)))
+  boundaries[1]     <- TMIN
+  boundaries[K + 1] <- TMAX
+
+  true_date <- round(runif(N, TMIN, TMAX))
+  phase     <- findInterval(true_date, boundaries, rightmost.closed = TRUE,
+                            all.inside = TRUE)
+
+  windows <- data.frame(
+    Start_date = boundaries[phase],
+    End_date   = boundaries[phase + 1],
+    True_date  = true_date
+  )
+  attr(windows, "H")          <- -sum(phase_p * log(phase_p))
+  attr(windows, "K")          <- K
+  attr(windows, "alpha_conc") <- alpha_conc
+  attr(windows, "weights")    <- phase_p
+  windows
 }
 
-simulate_date_windows <- function(n, seed = 42) {
-  set.seed(seed)
-
-  # First create one dating window per observation.
-  sim_data <- tibble(
-    ID = seq_len(n),
-    Site_name = sample(SITE_NAMES, n, replace = TRUE)
-  ) %>%
-    rowwise() %>%
-    mutate(
-      # Start dates can begin anywhere up to 700 so there is still room for the
-      # window to extend to the right.
-      Start_date = sample(DATE_GRID[DATE_GRID <= 700], 1),
-      End_date = {
-        possible_ends <- DATE_GRID[DATE_GRID > Start_date & DATE_GRID <= TMAX]
-        if (length(possible_ends) < 2) {
-          sample(possible_ends, 1)
-        } else {
-          # This weighting makes shorter and medium windows more common than
-          # extreme ones, while still leaving some wide windows in the mix.
-          weights <- dnorm(
-            seq_along(possible_ends),
-            mean = length(possible_ends) * 0.35,
-            sd = length(possible_ends) * 0.25
-          )
-          sample(possible_ends, 1, prob = weights)
-        }
-      }
-    ) %>%
-    ungroup()
-
-  set.seed(seed + 81)
-  # A small adjustment for some samples so the end date is not always sitting
-  # exactly on the 25-year grid. This is a minor tweak to make the simulation
-  # slightly more realistic, since sometimes people record the end of a century 
-  # as 499 instead of 500, for example.
-  censor_flag <- sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.35, 0.65))
-  sim_data %>%
-    mutate(End_date = if_else(censor_flag, End_date - 1L, End_date))
-}
-
-simulate_gp_dataset <- function(n = 300, seed_windows = 42, seed_values = 123) {
-  sim_data <- simulate_date_windows(n, seed = seed_windows)
-
-  set.seed(seed_values)
-  sim_data %>%
-    rowwise() %>%
-    mutate(
-      # The "real" date is hidden from the model and sampled somewhere inside
-      # the dating window.
-      True_date = runif(1, min = Start_date, max = End_date),
-      # This is the noiseless value on the true curve at that hidden date.
-      True_value = f_true(True_date),
-      # Add Gaussian observation noise around the true curve value, then round to
-      # one decimal place to mimic a recorded continuous measurement.
-      Value = round(True_value + rnorm(1, 0, TRUE_SIGMA), 1)
-    ) %>%
-    ungroup()
-}
-
-ground_truth_grid <- function(by = 1) {
-  # A dense version of the true curve, used only for plotting and comparison.
-  tibble(
-    Year = seq(TMIN, TMAX, by = by),
-    True_value = f_true(Year)
+# Draw one random smooth curve: a baseline plus two sine waves. Periods sit in
+# 350-550 years, longer than a typical dating window, so the undulation is
+# recoverable while still bending inside the windows. Returns the parameters; the
+# curve is evaluated by f_true.
+draw_curve <- function() {
+  list(
+    baseline = runif(1, 2, 15),
+    amp      = runif(N_COMPONENTS, 3, 8),
+    period   = runif(N_COMPONENTS, 350, 550),
+    phase    = runif(N_COMPONENTS, 0, 2 * pi)
   )
 }
 
-generating_parameters <- function() {
-  tibble(
-    parameter = c("baseline", "amplitude", "peak", "width", "sigma_noise"),
-    value = c(TRUE_BASELINE, TRUE_AMPLITUDE, TRUE_PEAK, TRUE_WIDTH, TRUE_SIGMA)
-  )
+# The true curve value at times t (scalar or vector), for a curve from
+# draw_curve. This is the hidden signal we simulate from and later score the fits
+# against; the models never see it. They only get noisy values at dates that are
+# themselves uncertain (known to fall in a window, not exactly when). The truth
+# is built from sine waves on purpose, a different shape from the GP the model
+# assumes, so recovering it is a fair test rather than a rigged one.
+f_true <- function(t, curve) {
+  components <- sapply(seq_along(curve$amp), function(k)
+    curve$amp[k] * sin(2 * pi * (t - TMIN) / curve$period[k] + curve$phase[k]))
+  if (is.null(dim(components))) components <- matrix(components, nrow = length(t))
+  curve$baseline + rowSums(components)
 }
 
-evaluation_targets <- function() {
-  # For the GP, these are more useful checks than the generator's named
-  # parameters: a known scalar target (sigma) and simple features of the curve.
-  truth <- ground_truth_grid()
-  half_height <- min(truth$True_value) + 0.5 * (max(truth$True_value) - min(truth$True_value))
-  above_half <- which(truth$True_value >= half_height)
-  fwhm_years <- truth$Year[max(above_half)] - truth$Year[min(above_half)]
-# fhwm_years means "full width at half maximum" in years. 
-# It is a measure of the width of the peak of the curve, specifically the distance between 
-# the two points on the curve where the value is half of the maximum value. 
-# In this context, it is calculated by finding the years corresponding to the maximum and 
-#  minimum indices of the values that are above half of the maximum value, and then taking the difference between those two years. 
-# This gives an indication of how wide or narrow the peak of the curve is.
-
-  tibble(
-    target = c("peak_year", "peak_value", "fwhm_years", "sigma_noise"),
-    value = c(TRUE_PEAK, f_true(TRUE_PEAK), fwhm_years, TRUE_SIGMA),
-    description = c(
-      "Year where the true curve reaches its maximum",
-      "Maximum value of the true curve",
-      "Full width at half maximum of the true curve",
-      "Residual noise SD used to generate observations"
-    )
+# One dataset: dates placed by the broken stick above, values are the true curve
+# at each hidden date plus Gaussian noise, rounded like a recorded measurement.
+# H is carried along as an attribute.
+simulate_gp <- function(N, sigma, K, alpha_conc, curve, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+  windows <- partition_timeline(N, K, alpha_conc)
+  out <- data.frame(
+    Start_date = windows$Start_date,
+    End_date   = windows$End_date,
+    True_date  = windows$True_date,
+    Value      = round(f_true(windows$True_date, curve) + rnorm(N, 0, sigma), 1)
   )
+  attr(out, "H")          <- attr(windows, "H")
+  attr(out, "K")          <- K
+  attr(out, "alpha_conc") <- alpha_conc
+  out
 }
 
-write_example_files <- function(sim_data) {
-  # Keep all the single-example inputs in CSV form so the plotting and fitting
-  # scripts can be rerun without rebuilding everything by hand.
-  write_csv(
-    sim_data %>% select(ID, Site_name, Start_date, End_date, True_date, Value),
-    here("Simulations", "Sim_GP", "data", "simulated_data.csv")
-  )
-  write_csv(
-    ground_truth_grid(),
-    here("Simulations", "Sim_GP", "data", "ground_truth.csv")
-  )
-  write_csv(
-    generating_parameters(),
-    here("Simulations", "Sim_GP", "data", "generating_parameters.csv")
-  )
-  write_csv(
-    evaluation_targets(),
-    here("Simulations", "Sim_GP", "data", "evaluation_targets.csv")
-  )
+# Dense version of the true curve on a yearly grid, for plotting and for checking
+# how much of the curve the fitted band covers.
+truth_grid <- function(curve, by = 1) {
+  years <- seq(TMIN, TMAX, by = by)
+  data.frame(Year = years, True_value = f_true(years, curve))
 }
