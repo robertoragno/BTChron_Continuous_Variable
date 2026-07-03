@@ -77,9 +77,12 @@ transformed parameters {
 model {
   mu    ~ normal(0, 15);
   alpha ~ normal(0, 10);
-  rho   ~ inv_gamma(5, 2.5);
+  // GP length-scale prior; same as the latent model so the two are comparable.
+  // ~80-370 years (90% mass) on the normalised [0,1] axis. See sim_hsgp.stan.
+  rho   ~ inv_gamma(5, 0.9);
   z     ~ std_normal();
-  sigma ~ exponential(1);
+  // half-normal over the generating range; same as the latent model. See sim_hsgp.stan.
+  sigma ~ normal(0, 5);
 
   for (n in 1:N)
     y[n] ~ normal(mu + PHI_mid[n] * beta_gp, sigma);

@@ -1,7 +1,11 @@
-# Worked example for the GP simulation.
+# Worked example: ONE dataset drawn from the shared generating process
+# (simulate.R), shown and fitted, to illustrate what a single GP dataset and fit
+# look like. The systematic analysis is in 02_recovery_study.R, which draws many
+# datasets from the same generator.
 #
-# This mirrors the 01_example.R scripts in the linear and changepoint folders:
-# write one dataset, fit both models, and produce the single-dataset figures.
+# Produces: exploratory_panel.png, model_comparison_single_fit.png,
+#           individual_date_posteriors.png
+# Fits are kept in memory (fast enough for one dataset), not cached to disk.
 
 library(here)
 library(tidyverse)
@@ -11,396 +15,232 @@ library(patchwork)
 
 source(here("Simulations", "Sim_GP", "scripts", "simulate.R"))
 
-sim_data <- simulate_gp_dataset()
-ground_truth <- ground_truth_grid()
-true_params <- generating_parameters()
-write_example_files(sim_data)
+figure_path <- function(name) here("Simulations", "Sim_GP", "figures", name)
 
-glimpse(sim_data)
-summary(sim_data$Value)
-cat("Wrote simulated_data.csv, ground_truth.csv, generating_parameters.csv, and evaluation_targets.csv\n")
+panel_theme <- theme_classic(base_size = 11) +
+  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+        plot.margin = margin(5, 10, 2, 10))
 
-# Exploratory panel
+# HSGP settings. M basis functions and boundary factor c; kept as data so the
+# same model file serves the example and the study. M around 25 is enough to
+# represent curves on the wiggle scale here; more modes only make the latent-date
+# geometry harder to sample, not the fit better.
+M_BASIS <- 20
+C_BOUNDARY <- 1.5
 
-sim_data_expl <- sim_data %>%
+# 1. One illustrative dataset --------------------------------------------------
+
+# A fixed gently undulating curve so the figure is stable between runs. Two waves
+# with periods longer than a typical dating window.
+curve <- list(
+  baseline = 8,
+  amp      = c(6, 4),
+  period   = c(520, 380),
+  phase    = c(0, 1.5)
+)
+sigma <- 2.5
+n_phases <- 6         # K: number of periodisation phases
+alpha_conc <- 1       # Dirichlet concentration (moderately even phases)
+n_observations <- 250
+
+sim_raw <- simulate_gp(N = n_observations, sigma = sigma, K = n_phases,
+                       alpha_conc = alpha_conc, curve = curve, seed = 42)
+entropy_H <- attr(sim_raw, "H")
+
+sim_data <- sim_raw %>%
+  mutate(ID = row_number(),
+         Site_name = sample(c("Site A", "Site B", "Site C", "Site D"),
+                            n_observations, replace = TRUE)) %>%
+  select(ID, Site_name, Start_date, End_date, True_date, Value)
+
+ground_truth <- truth_grid(curve)
+
+write_csv(sim_data, here("Simulations", "Sim_GP", "data", "simulated_data.csv"))
+write_csv(ground_truth, here("Simulations", "Sim_GP", "data", "ground_truth.csv"))
+write_csv(tibble(parameter = c("baseline", "sigma_noise", "n_components",
+                               "n_phases", "alpha_conc", "shannon_H"),
+                 value = c(curve$baseline, sigma, N_COMPONENTS,
+                           n_phases, alpha_conc, entropy_H)),
+          here("Simulations", "Sim_GP", "data", "generating_parameters.csv"))
+
+# 2. Exploratory panel ---------------------------------------------------------
+
+exploratory <- sim_data %>%
   mutate(Midpoint = (Start_date + End_date) / 2) %>%
   arrange(Midpoint) %>%
-  mutate(rank = row_number(), rank_spaced = rank * 1.8)
+  mutate(row_position = row_number() * 1.8)
 
-theme_panel <- theme_classic(base_size = 11) +
-  theme(
-    plot.title = element_text(size = 11, face = "bold", hjust = 0),
-    plot.margin = margin(5, 10, 2, 10),
-    axis.title.x = element_blank()
-  )
-
-p_hist <- ggplot(sim_data_expl, aes(x = Value)) +
+values_histogram <- ggplot(exploratory, aes(Value)) +
   geom_histogram(binwidth = 2, fill = "grey70", colour = "black", linewidth = 0.3) +
-  labs(
-    title = expression(bold("A.") ~ "Distribution of values"),
-    y = "Count"
-  ) +
-  theme_panel +
-  theme(axis.title.x = element_text())
+  labs(title = expression(bold("A.") ~ "Distribution of values"), x = "Value",
+       y = "Count") + panel_theme
 
-tick_h <- 0.5
-
-p_dur <- ggplot(sim_data_expl, aes(y = rank_spaced)) +
-  geom_segment(aes(x = Start_date, xend = End_date, yend = rank_spaced),
+date_ranges_plot <- ggplot(exploratory, aes(y = row_position)) +
+  geom_segment(aes(x = Start_date, xend = End_date, yend = row_position),
                linewidth = 0.2, colour = "grey40") +
-  geom_segment(aes(x = Start_date, xend = Start_date,
-                   y = rank_spaced - tick_h, yend = rank_spaced + tick_h),
-               linewidth = 0.3, colour = "grey30") +
-  geom_segment(aes(x = End_date, xend = End_date,
-                   y = rank_spaced - tick_h, yend = rank_spaced + tick_h),
-               linewidth = 0.3, colour = "grey30") +
   geom_point(aes(x = Midpoint), shape = 15, size = 0.35, colour = "black") +
   scale_x_continuous(breaks = seq(100, 900, 100), expand = c(0.01, 0)) +
-  scale_y_continuous(expand = expansion(mult = 0.02)) +
-  labs(
-    title = expression(bold("B.") ~ "Sampled date ranges"),
-    x = "Year CE",
-    y = "Sample (ordered)"
-  ) +
-  theme_panel +
-  theme(
-    axis.title.x = element_text(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
+  labs(title = expression(bold("B.") ~ "Sampled date ranges"), x = "Year CE",
+       y = "Sample (ordered)") +
+  panel_theme + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
 
-p_val <- ggplot(sim_data_expl, aes(x = Midpoint, y = Value)) +
-  geom_linerange(aes(xmin = Start_date, xmax = End_date),
-                 linewidth = 0.15, colour = "grey60", alpha = 0.5) +
+values_over_time <- ggplot(exploratory, aes(Midpoint, Value)) +
+  geom_linerange(aes(xmin = Start_date, xmax = End_date), linewidth = 0.15,
+                 colour = "grey60", alpha = 0.5) +
   geom_point(shape = 15, size = 0.6, colour = "black", alpha = 0.7) +
-  geom_line(data = ground_truth, aes(x = Year, y = True_value),
-            linewidth = 0.7, colour = "black", linetype = "dashed") +
+  geom_line(data = ground_truth, aes(Year, True_value), linewidth = 0.7,
+            colour = "black", linetype = "dashed") +
   scale_x_continuous(breaks = seq(100, 900, 100), expand = c(0.01, 0)) +
-  labs(
-    title = expression(bold("C.") ~ "Distribution of values across time"),
-    x = "Year CE",
-    y = "Value"
-  ) +
-  theme_panel +
-  theme(axis.title.x = element_text())
+  labs(title = expression(bold("C.") ~ "Values across time"), x = "Year CE",
+       y = "Value") + panel_theme
 
-p_exploratory <- (p_hist | p_dur | p_val) +
-  plot_layout(widths = c(0.8, 1.8, 0.8)) +
-  plot_annotation(
-    caption = "Dashed line (C): true Gaussian bell-curve trend used to generate the simulated values.",
-    theme = theme(plot.caption = element_text(hjust = 0, size = 8, colour = "grey40"))
-  )
+ggsave(figure_path("exploratory_panel.png"),
+       (values_histogram | date_ranges_plot | values_over_time) +
+         plot_layout(widths = c(0.8, 1.8, 0.8)),
+       width = 14, height = 4.5, dpi = 300, bg = "white")
 
-ggsave(here("Simulations", "Sim_GP", "figures", "exploratory_panel.png"),
-       p_exploratory, width = 14, height = 4.5, dpi = 300, bg = "white")
-cat("Saved to", here("Simulations", "Sim_GP", "figures", "exploratory_panel.png"), "\n")
+# 3. Fit both models -----------------------------------------------------------
 
-# Fit the latent-date model
+prediction_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
+n_prediction_points <- length(prediction_grid)
+stan_data <- list(N = n_observations, y = sim_data$Value,
+                  start_date = sim_data$Start_date, end_date = sim_data$End_date,
+                  N_pred = n_prediction_points, x_pred = prediction_grid,
+                  M = M_BASIS, c = C_BOUNDARY)
 
-pred_grid <- seq(min(sim_data$Start_date), max(sim_data$End_date), by = 1)
-stan_data <- list(
-  N = nrow(sim_data),
-  y = sim_data$Value,
-  start_date = sim_data$Start_date,
-  end_date = sim_data$End_date,
-  N_pred = length(pred_grid),
-  x_pred = pred_grid,
-  M = 20,
-  c = 1.5
-)
+fit_latent <- cmdstan_model(here("Simulations", "Sim_GP", "models",
+                                 "sim_hsgp.stan"))$sample(
+  data = stan_data, chains = 4, parallel_chains = 4, iter_warmup = 1000,
+  iter_sampling = 1000, seed = 42, adapt_delta = 0.99, max_treedepth = 12,
+  refresh = 0, show_messages = FALSE)
 
-model_latent <- cmdstan_model(here("Simulations", "Sim_GP", "models", "sim_hsgp.stan"))
-latent_fit_path <- here("Simulations", "Sim_GP", "output", "fit_hsgp.rds")
+fit_midpoint <- cmdstan_model(here("Simulations", "Sim_GP", "models",
+                                   "sim_hsgp_midpoint.stan"))$sample(
+  data = stan_data, chains = 4, parallel_chains = 4, iter_warmup = 1000,
+  iter_sampling = 1000, seed = 42, adapt_delta = 0.99, max_treedepth = 12,
+  refresh = 0, show_messages = FALSE)
 
-if (file.exists(latent_fit_path)) {
-  cat("Loading existing latent-date fit.\n")
-  fit_latent <- readRDS(latent_fit_path)
-  ran_latent_fit <- FALSE
-} else {
-  fit_latent <- model_latent$sample(
-    data = stan_data,
-    chains = 4,
-    parallel_chains = 4,
-    iter_warmup = 1000,
-    iter_sampling = 1000,
-    seed = 42,
-    adapt_delta = 0.99,
-    max_treedepth = 12
-  )
-  fit_latent$save_object(latent_fit_path)
-  ran_latent_fit <- TRUE
+# 4. Model comparison (curve recovery + parameter posteriors) ------------------
+
+summarise_trend <- function(fit) {
+  trend_matrix <- as.matrix(
+    fit$draws(format = "df")[, paste0("mu_pred[", 1:n_prediction_points, "]")])
+  tibble(Year = prediction_grid,
+         median   = apply(trend_matrix, 2, median),
+         lower_90 = apply(trend_matrix, 2, quantile, 0.05),
+         upper_90 = apply(trend_matrix, 2, quantile, 0.95),
+         lower_50 = apply(trend_matrix, 2, quantile, 0.25),
+         upper_50 = apply(trend_matrix, 2, quantile, 0.75))
 }
 
-if (ran_latent_fit) fit_latent$cmdstan_diagnose()
-fit_latent$summary(variables = c("mu", "alpha", "rho", "sigma", "rho_actual"))
-
-cat("\n-- Generating parameters --\n")
-print(true_params)
-
-# Latent-date model results
-
-draws_latent <- fit_latent$draws(format = "df")
-N_pred <- length(pred_grid)
-trend_cols <- paste0("mu_pred[", seq_len(N_pred), "]")
-trend_mat <- as.matrix(draws_latent[, trend_cols])
-
-trend_summary <- tibble(
-  Year = pred_grid,
-  Median = apply(trend_mat, 2, median),
-  Lower_90 = apply(trend_mat, 2, quantile, 0.05),
-  Upper_90 = apply(trend_mat, 2, quantile, 0.95),
-  Lower_50 = apply(trend_mat, 2, quantile, 0.25),
-  Upper_50 = apply(trend_mat, 2, quantile, 0.75)
-)
-
-p_trend <- ggplot(trend_summary) +
-  geom_ribbon(aes(x = Year, ymin = Lower_90, ymax = Upper_90, fill = "90% CI")) +
-  geom_ribbon(aes(x = Year, ymin = Lower_50, ymax = Upper_50, fill = "50% CI")) +
-  geom_line(aes(x = Year, y = Median), linewidth = 0.6, colour = "black") +
-  geom_line(data = ground_truth, aes(x = Year, y = True_value),
-            linewidth = 0.7, colour = "black", linetype = "dashed") +
-  geom_rug(data = sim_data, aes(y = Value),
-           sides = "r", colour = "grey50", alpha = 0.3, length = grid::unit(3, "pt")) +
-  scale_fill_manual(
-    name = NULL,
-    values = c("90% CI" = "grey80", "50% CI" = "grey60"),
-    guide = guide_legend(override.aes = list(alpha = 1))
-  ) +
-  scale_x_continuous(breaks = seq(100, 900, 100), expand = c(0.01, 0)) +
-  labs(
-    title = expression(bold("A.") ~ "Recovered trend vs true trend"),
-    x = "Year CE",
-    y = "Value"
-  ) +
-  theme_panel +
-  theme(
-    axis.title.x = element_text(),
-    legend.position = c(0.05, 0.95),
-    legend.justification = c(0, 1),
-    legend.background = element_rect(fill = alpha("white", 0.8), colour = NA),
-    legend.key.size = grid::unit(10, "pt"),
-    legend.text = element_text(size = 8)
-  )
-
-date_cols <- paste0("true_date_actual[", seq_len(nrow(sim_data)), "]")
-date_mat <- as.matrix(draws_latent[, date_cols])
-
-date_recovery <- tibble(
-  True_date = sim_data$True_date,
-  Inferred_med = apply(date_mat, 2, median),
-  Inferred_lo_90 = apply(date_mat, 2, quantile, 0.05),
-  Inferred_hi_90 = apply(date_mat, 2, quantile, 0.95)
-)
-
-p_dates <- ggplot(date_recovery, aes(x = True_date, y = Inferred_med)) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed",
-              colour = "black", linewidth = 0.5) +
-  geom_linerange(aes(ymin = Inferred_lo_90, ymax = Inferred_hi_90),
-                 linewidth = 0.15, colour = "grey50", alpha = 0.5) +
-  geom_point(shape = 16, size = 0.5, colour = "black", alpha = 0.6) +
-  scale_x_continuous(breaks = seq(100, 900, 100), expand = c(0.01, 0)) +
-  scale_y_continuous(breaks = seq(100, 900, 100), expand = c(0.01, 0)) +
-  coord_equal() +
-  labs(
-    title = expression(bold("B.") ~ "Latent date recovery"),
-    subtitle = "Each point = one sample. Dashed line = perfect 1:1 recovery.",
-    x = "True generating date (CE)",
-    y = "Posterior median date (CE)"
-  ) +
-  theme_panel +
-  theme(
-    axis.title.x = element_text(),
-    plot.subtitle = element_text(size = 9, colour = "grey40", hjust = 0)
-  )
-
-post_df <- tibble(
-  Sigma = draws_latent$sigma,
-  Mu = draws_latent$mu,
-  Rho_actual = draws_latent$rho_actual
-) %>%
-  pivot_longer(everything(), names_to = "Parameter", values_to = "Value") %>%
-  mutate(Parameter = factor(Parameter, levels = c("Sigma", "Mu", "Rho_actual"),
-                            labels = c("sigma", "mu", "rho (CE)")))
-
-ci_df <- post_df %>%
-  group_by(Parameter) %>%
-  summarise(
-    q05 = quantile(Value, 0.05),
-    q25 = quantile(Value, 0.25),
-    q75 = quantile(Value, 0.75),
-    q95 = quantile(Value, 0.95),
-    .groups = "drop"
-  )
-
-post_df <- post_df %>%
-  left_join(ci_df, by = "Parameter") %>%
-  mutate(
-    Region = case_when(
-      Value >= q25 & Value <= q75 ~ "50% CI",
-      Value >= q05 & Value <= q95 ~ "90% CI",
-      TRUE ~ "Tail"
-    ),
-    Region = factor(Region, levels = c("50% CI", "90% CI", "Tail"))
-  )
-
-true_sigma_line <- tibble(
-  Parameter = factor("sigma", levels = c("sigma", "mu", "rho (CE)")),
-  True = TRUE_SIGMA
-)
-
-p_post <- ggplot(post_df, aes(x = Value, fill = Region)) +
-  geom_histogram(colour = "black", linewidth = 0.2, bins = 40) +
-  geom_vline(data = true_sigma_line, aes(xintercept = True),
-             linetype = "dashed", linewidth = 0.6, colour = "black") +
-  scale_fill_manual(
-    name = NULL,
-    values = c("50% CI" = "grey40", "90% CI" = "grey65", "Tail" = "grey88")
-  ) +
-  facet_wrap(~ Parameter, scales = "free", nrow = 1) +
-  labs(
-    title = expression(bold("C.") ~ "Posterior distributions"),
-    caption = "Dashed line (sigma only): true generating value.",
-    y = "Count"
-  ) +
-  theme_panel +
-  theme(
-    axis.title.x = element_text(),
-    strip.background = element_blank(),
-    strip.text = element_text(face = "bold", size = 10),
-    legend.position = "bottom",
-    legend.text = element_text(size = 8),
-    legend.key.size = grid::unit(10, "pt"),
-    plot.caption = element_text(hjust = 0, size = 8, colour = "grey40")
-  )
-
-p_model_results <- (p_trend | p_dates) / p_post +
-  plot_layout(heights = c(1, 0.7)) +
-  plot_annotation(theme = theme(plot.margin = margin(5, 5, 5, 5)))
-
-ggsave(here("Simulations", "Sim_GP", "figures", "model_results_panel.png"),
-       p_model_results, width = 12, height = 8, dpi = 300, bg = "white")
-cat("Saved to", here("Simulations", "Sim_GP", "figures", "model_results_panel.png"), "\n")
-
-# Fit the midpoint model
-
-model_midpoint <- cmdstan_model(here("Simulations", "Sim_GP", "models", "sim_hsgp_midpoint.stan"))
-midpoint_fit_path <- here("Simulations", "Sim_GP", "output", "fit_hsgp_midpoint.rds")
-
-if (file.exists(midpoint_fit_path)) {
-  cat("Loading existing midpoint fit.\n")
-  fit_midpoint <- readRDS(midpoint_fit_path)
-  ran_midpoint_fit <- FALSE
-} else {
-  fit_midpoint <- model_midpoint$sample(
-    data = stan_data,
-    chains = 4,
-    parallel_chains = 4,
-    iter_warmup = 1000,
-    iter_sampling = 1000,
-    seed = 42,
-    adapt_delta = 0.99,
-    max_treedepth = 12
-  )
-  fit_midpoint$save_object(midpoint_fit_path)
-  ran_midpoint_fit <- TRUE
+# Proportion of the true curve caught by the 90% band, over the prediction grid.
+# This is the accuracy measure the recovery study uses for the whole curve.
+curve_coverage <- function(fit) {
+  trend <- summarise_trend(fit)
+  truth <- f_true(trend$Year, curve)
+  mean(truth >= trend$lower_90 & truth <= trend$upper_90)
 }
 
-if (ran_midpoint_fit) fit_midpoint$cmdstan_diagnose()
-fit_midpoint$summary(variables = c("mu", "alpha", "rho", "sigma", "rho_actual"))
-
-# Model comparison
-
-extract_trend <- function(fit) {
-  draws <- fit$draws(format = "df")
-  trend_mat <- as.matrix(draws[, paste0("mu_pred[", seq_len(N_pred), "]")])
-  tibble(
-    Year = pred_grid,
-    Median = apply(trend_mat, 2, median),
-    Lower_90 = apply(trend_mat, 2, quantile, 0.05),
-    Upper_90 = apply(trend_mat, 2, quantile, 0.95),
-    Lower_50 = apply(trend_mat, 2, quantile, 0.25),
-    Upper_50 = apply(trend_mat, 2, quantile, 0.75)
-  )
-}
-
-trend_latent <- extract_trend(fit_latent)
-trend_midpoint <- extract_trend(fit_midpoint)
-
-make_trend_panel <- function(df, title_label) {
-  ggplot(df) +
-    geom_ribbon(aes(x = Year, ymin = Lower_90, ymax = Upper_90), fill = "grey80") +
-    geom_ribbon(aes(x = Year, ymin = Lower_50, ymax = Upper_50), fill = "grey60") +
-    geom_line(aes(x = Year, y = Median), linewidth = 0.6, colour = "black") +
-    geom_line(data = ground_truth, aes(x = Year, y = True_value),
-              linewidth = 0.7, colour = "black", linetype = "dashed") +
+make_trend_panel <- function(fit, title_label) {
+  covered <- curve_coverage(fit)
+  ggplot(summarise_trend(fit)) +
+    geom_ribbon(aes(Year, ymin = lower_90, ymax = upper_90), fill = "grey80") +
+    geom_ribbon(aes(Year, ymin = lower_50, ymax = upper_50), fill = "grey60") +
+    geom_line(aes(Year, median), linewidth = 0.6, colour = "black") +
+    geom_line(data = ground_truth, aes(Year, True_value), linewidth = 0.7,
+              colour = "black", linetype = "dashed") +
     scale_x_continuous(breaks = seq(100, 900, 200), expand = c(0.01, 0)) +
-    labs(title = title_label, x = "Year CE", y = "Value") +
-    theme_panel
+    labs(title = title_label, x = "Year (CE)", y = "Value",
+         subtitle = sprintf("Proportion of the true curve inside the 90%% CI: %.0f%%",
+                            100 * covered)) +
+    panel_theme + theme(plot.subtitle = element_text(size = 9))
 }
 
-p_trend_latent <- make_trend_panel(
-  trend_latent,
-  expression(bold("A.") ~ "Trend recovery - latent dates")
-)
-p_trend_mid <- make_trend_panel(
-  trend_midpoint,
-  expression(bold("B.") ~ "Trend recovery - midpoint dates")
-)
-
-extract_sigma <- function(fit, model_label) {
+# sigma has a known true value; mu and rho are properties of the fitted curve
+# (no simple generator truth), shown for context.
+parameter_posteriors <- function(fit, model_label) {
   draws <- fit$draws(format = "df")
-  sigma <- draws$sigma
-  q05 <- quantile(sigma, 0.05)
-  q25 <- quantile(sigma, 0.25)
-  q75 <- quantile(sigma, 0.75)
-  q95 <- quantile(sigma, 0.95)
-
-  tibble(sigma = sigma, Model = model_label) %>%
-    mutate(
-      Region = case_when(
-        sigma >= q25 & sigma <= q75 ~ "50% CI",
-        sigma >= q05 & sigma <= q95 ~ "90% CI",
-        TRUE ~ "Tail"
-      ),
-      Region = factor(Region, levels = c("50% CI", "90% CI", "Tail"))
-    )
+  tibble(Sigma = draws$sigma, Mu = draws$mu, Rho = draws$rho_actual) %>%
+    pivot_longer(everything(), names_to = "Parameter", values_to = "Value") %>%
+    group_by(Parameter) %>%
+    mutate(Region = case_when(
+      Value >= quantile(Value, .25) & Value <= quantile(Value, .75) ~ "50% CI",
+      Value >= quantile(Value, .05) & Value <= quantile(Value, .95) ~ "90% CI",
+      TRUE ~ "Tail")) %>% ungroup() %>%
+    mutate(Parameter = factor(Parameter, c("Sigma", "Mu", "Rho")),
+           Model = model_label)
 }
 
-sigma_df <- bind_rows(
-  extract_sigma(fit_latent, "Latent dates"),
-  extract_sigma(fit_midpoint, "Midpoint dates")
-) %>%
-  mutate(Model = factor(Model, levels = c("Latent dates", "Midpoint dates")))
+both_posteriors <- bind_rows(
+  parameter_posteriors(fit_latent, "EIV"),
+  parameter_posteriors(fit_midpoint, "Midpoint dates")) %>%
+  mutate(Model = factor(Model, c("EIV", "Midpoint dates")),
+         Region = factor(Region, c("50% CI", "90% CI", "Tail")))
 
-p_sigma <- ggplot(sigma_df, aes(x = sigma, fill = Region)) +
+# Only sigma has a generator truth to mark.
+true_value_lines <- tibble(Parameter = factor("Sigma", c("Sigma", "Mu", "Rho")),
+                           True = sigma)
+
+posteriors_panel <- ggplot(both_posteriors, aes(Value, fill = Region)) +
   geom_histogram(colour = "black", linewidth = 0.2, bins = 40) +
-  geom_vline(xintercept = TRUE_SIGMA,
-             linetype = "dashed", linewidth = 0.6, colour = "black") +
-  scale_fill_manual(
-    name = NULL,
-    values = c("50% CI" = "grey40", "90% CI" = "grey65", "Tail" = "grey88")
-  ) +
-  facet_wrap(~ Model, scales = "free_y", nrow = 1) +
-  labs(
-    title = expression(bold("C.") ~ "Posterior sigma - latent vs midpoint"),
-    caption = "Dashed line: true generating sigma (2.5).",
-    x = "sigma",
-    y = "Count"
-  ) +
-  theme_panel +
-  theme(
-    strip.background = element_blank(),
-    strip.text = element_text(face = "bold", size = 10),
-    legend.position = "bottom",
-    legend.text = element_text(size = 8),
-    legend.key.size = grid::unit(10, "pt"),
-    plot.caption = element_text(hjust = 0, size = 8, colour = "grey40")
-  )
+  geom_vline(data = true_value_lines, aes(xintercept = True),
+             linetype = "dashed", linewidth = 0.6) +
+  scale_fill_manual(NULL, values = c("50% CI" = "grey40", "90% CI" = "grey65",
+                                     "Tail" = "grey88")) +
+  facet_grid(Model ~ Parameter, scales = "free_x") +
+  labs(title = expression(bold("C.") ~ "Posterior distributions"), x = NULL,
+       y = "Count") +
+  panel_theme + theme(strip.background = element_blank(),
+                      strip.text = element_text(face = "bold", size = 10),
+                      legend.position = "bottom")
 
-p_comparison <- (p_trend_latent | p_trend_mid) / p_sigma +
-  plot_layout(heights = c(1, 0.8)) +
-  plot_annotation(theme = theme(plot.margin = margin(5, 5, 5, 5)))
+comparison_figure <-
+  (make_trend_panel(fit_latent, expression(bold("A.") ~ "Curve — EIV")) |
+   make_trend_panel(fit_midpoint, expression(bold("B.") ~ "Curve — midpoint dates"))) /
+  posteriors_panel + plot_layout(heights = c(1, 1.2))
 
-ggsave(here("Simulations", "Sim_GP", "figures", "model_comparison.png"),
-       p_comparison, width = 12, height = 9, dpi = 300, bg = "white")
-cat("Saved to", here("Simulations", "Sim_GP", "figures", "model_comparison.png"), "\n")
+ggsave(figure_path("model_comparison_single_fit.png"), comparison_figure,
+       width = 12, height = 10, dpi = 300, bg = "white")
+
+# 5. Per-sample date posteriors (EIV model) ------------------------------------
+
+latent_draws <- fit_latent$draws(format = "df")
+latent_trend_matrix <- as.matrix(
+  latent_draws[, paste0("mu_pred[", 1:n_prediction_points, "]")])
+latent_trend <- tibble(Year = prediction_grid,
+                       median   = apply(latent_trend_matrix, 2, median),
+                       lower_90 = apply(latent_trend_matrix, 2, quantile, 0.05),
+                       upper_90 = apply(latent_trend_matrix, 2, quantile, 0.95))
+
+make_date_panel <- function(sample_index) {
+  sample_row   <- sim_data[sample_index, ]
+  sample_label <- paste0(sample_row$ID, " (value = ", round(sample_row$Value, 2), ")")
+
+  trend_with_sample <- ggplot(latent_trend) +
+    geom_ribbon(aes(Year, ymin = lower_90, ymax = upper_90), fill = "grey80") +
+    geom_line(aes(Year, median), linewidth = 0.6) +
+    annotate("rect", xmin = sample_row$Start_date, xmax = sample_row$End_date,
+             ymin = -Inf, ymax = Inf, fill = "grey50", alpha = 0.15) +
+    geom_hline(yintercept = sample_row$Value, linetype = "dashed",
+               linewidth = 0.5) +
+    labs(title = paste0(sample_label, " — curve vs observed value"),
+         x = "Date (CE)", y = "Value") + panel_theme
+
+  estimated_dates <- latent_draws[[paste0("true_date_actual[", sample_index, "]")]]
+  date_density <- ggplot(tibble(estimated_date = estimated_dates),
+                         aes(estimated_date)) +
+    geom_density(fill = "grey60", colour = "black", linewidth = 0.4, alpha = 0.5) +
+    geom_vline(xintercept = c(sample_row$Start_date, sample_row$End_date),
+               linetype = "dashed", colour = "grey40", linewidth = 0.5) +
+    geom_vline(xintercept = sample_row$True_date, linewidth = 0.6) +
+    labs(title = paste0(sample_label, " — posterior date estimate"),
+         x = "Estimated date (CE)", y = "Density") + panel_theme
+
+  trend_with_sample | date_density
+}
+
+set.seed(123)
+date_panels <- map(sort(sample(seq_len(n_observations), 6)), make_date_panel)
+ggsave(figure_path("individual_date_posteriors.png"),
+       wrap_plots(date_panels, ncol = 1),
+       width = 12, height = 18, dpi = 300, bg = "white")
