@@ -64,9 +64,11 @@ phase:
 $$
 \begin{aligned}
 \mu(t) &= \alpha + \beta_1 t + (\beta_2 - \beta_1) \max(0,\, t - \text{changepoint}) \\
-y_n &\sim \mathcal{N}\!\left(\mu(\text{true\_date}_n),\ \sigma\right)
+y_n &\sim \mathcal{N}\!\left(\mu(t_n),\ \sigma\right)
 \end{aligned}
 $$
+
+where $t_n$ is the latent true date of observation $n$.
 
 Before the changepoint the last term is zero and the mean is $\alpha + \beta_1 t$;
 after it the slope becomes $\beta_2$, the segments meeting continuously, so
