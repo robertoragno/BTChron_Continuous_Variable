@@ -63,13 +63,15 @@ phase. The regressor is known only to a phase, not to a year:
 $$
 \begin{aligned}
 \text{trend}(x) &= \alpha + \beta x \\
-y_n &\sim \mathcal{N}\!\left(\text{trend}(\text{true\_date}_n),\ \sigma\right)
+y_n &\sim \mathcal{N}\!\left(\text{trend}(t_n),\ \sigma\right)
 \end{aligned}
 $$
 
+where $t_n$ is the latent true date of observation $n$.
+
 Left panels: the recovered trend, with a sample's phase shaded and its observed
 value marked on a labelled dashed line. Right panels: each date's posterior, with
-the phase window (dashed grey) and the true date (solid red).
+the phase window (dashed grey) and the true date (red).
 
 The midpoint model cannot produce these. It gives every object the centre of its
 phase and nothing more. The EIV model uses the observed value together with the
