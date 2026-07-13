@@ -1,22 +1,25 @@
 # Simulation 1: Linear Regression
 
 A continuous measurement is assumed to follow a linear temporal trend
-`f(t) = baseline + slope * t`, observed with Gaussian noise. Each observation is
+$f(t) = \text{baseline} + \text{slope} \cdot t$, observed with Gaussian noise. Each observation is
 dated only to a phase with `[Start_date, End_date]` rather than to a known year. Does treating each date as a latent parameter within its phase recover the trend better than collapsing the phase to its midpoint?
 
 As a single example, we could say that: baseline = 5, slope = 0.015,
-noise ~ N(0, 1.5). The timeline is 100–900 CE, periodised into 6 phases.
+noise $\sim \mathcal{N}(0, 1.5)$. The timeline is 100–900 CE. The worked example uses a coarse
+periodisation, 3 uneven phases with one covering more than half the range. This
+is deliberate, as when phases are narrow the two models mostly agree, whereas with a coarse
+example we show differences between two models. 
 
 ## Periodisation and dating resolution
 
 We assume that, as common in archaeological relative dating, dates vary in the timeline by phase ("The sample X belongs to phase Y, which has a known duration `[Start_date, End_date]`"). To simulate this we divide the timeline into `K` phases by a Dirichlet broken stick, and every
 observation inherits the `[Start_date, End_date]` of the phase its true date
 falls in. In this way, observations in the same phase share an identical window and the
-dating uncertainty is structured rather than random (as would be the case instead for a radiocarbon date). Each dataset draws its own number of phases (`K ~ U{3, …, 10}`) and Dirichlet concentration
-(`alpha_conc = 10^(2·Beta(2, 3.5) − 1)`)[1], which could result either in few even phases or one long phase dominating others in the range. 
+dating uncertainty is structured rather than random (as would be the case instead for a radiocarbon date). Each dataset draws its own number of phases ($K \sim \mathcal{U}\{3, \ldots, 10\}$) and Dirichlet concentration
+($\alpha_{\text{conc}} = 10^{\,2 \cdot \text{Beta}(2,\, 3.5)\, -\, 1}$)[1], which could result either in few even phases or one long phase dominating others in the range. 
 
 The resolution of a periodisation is summarised by the Shannon entropy of the
-phase weights, `H = −Σ p · log p`. Even phases have high H (the
+phase weights, $H = -\sum_k p_k \log p_k$. Even phases have high H (the
 ceiling is about 2.3 for ten equal phases), whereas one dominant phase would have instead low H. We also run a
 prior-predictive check located in `00_periodisation_check.R`.
 
@@ -39,10 +42,12 @@ example and the study so they use the same process.
 | `01_example.R` | one dataset, shown and fit with both models | `figures/exploratory_panel.png`, `model_comparison_single_fit.png`, `individual_date_posteriors.png` |
 | `02_recovery_study.R` | many random datasets (each its own intercept, slope, noise, sample size, periodisation), both models fit, intervals recorded | `output/recovery_results.csv` |
 | `03_recovery_plots.R` | the study figures | `figures/recovery.png`, `accuracy.png`, `accuracy_precision_composite.png`, `precision_vs_entropy.png`, `sigma_vs_entropy.png`, `accuracy_vs_entropy.png`, `precision_boxplots.png`, `precision_vs_n.png` |
+| `05_scenarios.R` | four fixed archetype cases (fine dating, coarse dating, skewed deposition, diagnostic sampling), many datasets each, both models fit; also draws one example dataset per case | `output/scenarios.csv`, `figures/scenario_examples.png` |
+| `06_scenario_plots.R` | the scenario figures | `figures/scenario_accuracy_precision.png`, `scenario_sigma.png`, `output/scenario_table.csv` |
 
 The example (`01`) fits in less than a minute; the study (`02`) takes a few minutes (around 10 circa), so
 plotting (`03`) is kept separate and figures can be restyled without refitting.
-Sample size is swept across `N = 50, 100, 200, 400` to read precision against N.
+Sample size is swept across $N \in \{50, 100, 200, 400\}$ to read precision against N.
 
 ## Exploratory panel
 This is a single example that is used as a figure in the paper to illustrate the data generating process.
@@ -53,16 +58,27 @@ This is a single example that is used as a figure in the paper to illustrate the
 ## Errors-in-variables (EIV) inference
 
 The EIV model treats each true date as a latent parameter, uniform within its
-phase — the regressor is known only to a phase, not to a year:
+phase. The regressor is known only to a phase, not to a year:
 
-```
-trend(x) = alpha + beta * x
-y_n ~ Normal(trend(true_date_n), sigma)
-```
+$$
+\begin{aligned}
+\text{trend}(x) &= \alpha + \beta x \\
+y_n &\sim \mathcal{N}\!\left(\text{trend}(\text{true\_date}_n),\ \sigma\right)
+\end{aligned}
+$$
 
-Left panels: the recovered trend with a sample's phase (shaded) and value
-(dashed). Right panels: each date's posterior, with the phase boundaries (dashed)
-and the true date (solid).
+Left panels: the recovered trend, with a sample's phase shaded and its observed
+value marked on a labelled dashed line. Right panels: each date's posterior, with
+the phase window (dashed grey) and the true date (solid red).
+
+The midpoint model cannot produce these. It gives every object the centre of its
+phase and nothing more. The EIV model uses the observed value together with the
+trend to place the object inside its phase: a sample known only to somewhere in
+the wide 457 year phase comes back with a date estimate a few decades wide,
+pulled late when its value is high and early when it is low. It is not always on
+target (sample #195 sits in the tail of its own posterior, because noise pushed
+its value up), but the true date stays inside the range, which is what an honest
+estimate should do.
 
 <p align="center">
 <img src="figures/individual_date_posteriors.png" height="900" text-align="center"/>
@@ -70,9 +86,14 @@ and the true date (solid).
 
 ## Model comparison on one dataset
 
-The midpoint model fixes each date at the centre of its phase. On a single
-dataset both recover the trend, but the midpoint returns a larger sigma: the
-within-phase date spread it ignores ends up in the residual.
+The midpoint model fixes each date at the centre of its phase. Both recover the
+trend, and here they even agree on how uncertain the trend is. The slope leans on
+how far apart the dates sit across the whole 100–900 range, and blurring each
+date by a century or two barely moves that spread, so both models pin the slope
+about equally. What the midpoint cannot absorb is the within-phase date spread,
+so it reads that spread as noise and returns a larger sigma. On this coarse
+example the midpoint puts sigma near 2.1 against a true 1.5, while the EIV model
+sits on 1.5.
 
 <p align="center">
 <img src="figures/model_comparison_single_fit.png" height="800" text-align="center"/>
@@ -85,12 +106,25 @@ its own intercept, slope, noise, sample size, and periodisation. Both models (EI
 fit to all of them, recording how often the 50% / 90% interval holds the truth
 (accuracy) and how wide the interval is (precision).
 
-*Preliminary results*. Both models recover the intercept and slope near the 50% an 90% CIs: for
-a straight line the midpoint is the average of the possible dates, so it should not
-bias the trend. The EIV intervals for intercept and slope are 12% narrower (more precise), as the midpoint model discards the within-phase spread. 
-Sigma also varies: the midpoint reads the within-phase date spread as noise and overestimates it (by simulation design construction?), so its
-90% interval contains the true sigma only ~45% of the time against ~90% for EIV. This becomes worse as phases become coarser (~26% at the lowest H, recovering toward ~66% as they
-become finer). As expected, the precision improves with sample size for both models.
+*Preliminary results*. Both models recover the intercept and slope with about the
+right coverage. For a straight line the midpoint is the average of the possible
+dates within a symmetric phase, so it does not bias the trend. What the EIV model
+buys on the trend is precision, not a different answer: its slope interval is
+about 18% narrower and its intercept interval about 17% narrower, because the
+midpoint model throws away the within-phase spread.
+
+Sigma is where the two part company. The midpoint reads the within-phase date
+spread as measurement noise and overestimates it, so its 90% interval holds the
+true sigma only about 45% of the time against about 90% for EIV. This is the
+expected behaviour, not a simulation artefact: the midpoint has nowhere to put
+the date uncertainty except the residual. It gets worse as phases coarsen, from
+about 26% coverage at the lowest H up to about 66% at the finest. Precision
+improves with sample size for both models, as expected.
+
+The short version: when dating is fine the two models agree on what matters and
+the midpoint is a fair shortcut. The EIV model earns its place as phases get
+coarser, first through an honest sigma and narrower trend intervals, and above
+all through the per-object date estimates the midpoint cannot produce at all.
 
 <p align="center">
 <img src="figures/recovery.png" height="320" text-align="center"/>
@@ -126,4 +160,77 @@ We also check how sample size affects the precision: both models show a steady i
 
 <p align="center">
 <img src="figures/precision_vs_n.png" height="320" text-align="center"/>
+</p>
+
+## Scenario study
+
+The recovery study draws fully random datasets and shows the general
+relationship. When should we use EIV instead of midpoints? Is there an advantage? We test this with the script 
+`05_scenarios.R` with four cases with random intercept, slope and sigma so that each case shows:
+
+- **Fine dating**: many even phases, so the dates are tight.
+- **Coarse dating**: few uneven phases, one covering more than half the range.
+- **Skewed deposition**: coarse dating with the widest phase late on the
+  timeline and dates piling early inside it (deposition follows a Beta(1.5, 5)
+  over the timeline). The one configuration the data-generating-process checks
+  singled out as able to bend the trend, because the within-phase dates sit
+  away from the midpoint in a way that grows with time.
+- **Diagnostic sampling**: a periodisation with wide and narrow phases, but the
+  narrow ones are over-sampled (as when recognisable ceramics date a short
+  phase), so the sample lands in the well dated phases and still spans the
+  timeline.
+
+Small samples are not a case of their own; the recovery study already sweeps N.
+
+What the four cases look like as datasets, one draw each with the
+worked-example parameters. True dates are dots, midpoints squares; in the
+skewed deposition panel the dots pile toward the early edge of the wide late
+phase while the midpoints sit at its centre, which is the whole problem:
+
+<p align="center">
+<img src="figures/scenario_examples.png" height="560" text-align="center"/>
+</p>
+
+The figure reads top over bottom: accuracy (does the 90% interval hold the
+truth) above precision (how wide it is), so the two must be read together. A
+narrow interval that sits on the wrong value is not a good one, and a narrow
+interval that still covers is the win.
+
+<p align="center">
+<img src="figures/scenario_accuracy_precision.png" height="620" text-align="center"/>
+</p>
+
+When the dates are good (fine dating, and diagnostic sampling once the sample
+concentrates in the narrow phases) the two models agree on everything, sigma
+included, and the midpoint is a fair shortcut. Under coarse dating they separate:
+the EIV slope interval is about twice as narrow (0.0035 against 0.0075) at
+comparable coverage, and the EIV sigma sits on the truth while the midpoint
+reads it far too high (+1.2 on average), so the midpoint sigma interval holds
+the truth only 24% of the time against 92% for EIV.
+
+The skewed deposition case is the sobering one, and it cuts both ways. When
+the dates inside a wide late phase actually pile toward its early edge, the
+midpoint plants them at the centre and flattens the slope to about half its
+true value — and the EIV model does no better (slope ratio 0.53 against 0.54,
+90% coverage 17% for both, intercept coverage similarly collapsed). The reason
+is that EIV's within-phase prior is uniform, which is the same wrong
+assumption in a softer form, and the observed values are not informative
+enough to overrule it. EIV still reads the noise more honestly (77% against
+45% sigma coverage), but the trend is lost for both models. The practical
+reading: no estimator rescues a trend from coarse dating combined with a
+deposition process that drifts within phases — that information has to come
+from the dating itself, or from an informative within-phase prior, which is
+future work. (The raw signed slope error is not the right number to quote
+here: true slopes are drawn both positive and negative, so the attenuation —
+always toward zero — cancels out in a signed average. The ratio of estimated
+to true slope is what shows it.)
+
+Two honest points. Under coarse dating some EIV fits do not converge and are
+dropped (87 of 100 survive the R-hat and divergence filter). And the midpoint
+sigma interval is a touch narrower than EIV's, but it is narrow around the
+wrong value, so narrow is not the same as better. The direction of that error,
+the midpoint always reading sigma too high, is clearest here:
+
+<p align="center">
+<img src="figures/scenario_sigma.png" height="360" text-align="center"/>
 </p>

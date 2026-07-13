@@ -26,8 +26,8 @@ panel_theme <- theme_classic(base_size = 11) +
 intercept <- 5
 slope <- 0.015
 sigma <- 1.5
-n_phases <- 6        # K: number of periodisation phases
-alpha_conc <- 1      # Dirichlet concentration (moderately even phases)
+n_phases <- 3        # K: number of periodisation phases
+alpha_conc <- 0.3    # Dirichlet concentration: low = coarse, uneven phases (one wide)
 n_observations <- 300
 
 sim_raw <- simulate_linear(N = n_observations, intercept = intercept,
@@ -211,8 +211,8 @@ latent_trend <- tibble(Year = prediction_grid,
                        upper_90 = apply(latent_trend_matrix, 2, quantile, 0.95))
 
 make_date_panel <- function(sample_index) {
-  sample_row   <- sim_data[sample_index, ]
-  sample_label <- paste0(sample_row$ID, " (value = ", round(sample_row$Value, 2), ")")
+  sample_row <- sim_data[sample_index, ]
+  sample_tag <- paste0("Sample #", sample_row$ID)
 
   trend_with_sample <- ggplot(latent_trend) +
     geom_ribbon(aes(Year, ymin = lower_90, ymax = upper_90), fill = "grey80") +
@@ -221,17 +221,31 @@ make_date_panel <- function(sample_index) {
              ymin = -Inf, ymax = Inf, fill = "grey50", alpha = 0.15) +
     geom_hline(yintercept = sample_row$Value, linetype = "dashed",
                linewidth = 0.5) +
-    labs(title = paste0(sample_label, " — trend vs observed value"),
+    # Label the observed value on its own line, so it is not mistaken for a
+    # phase boundary (the other dashed line, shown in the legend).
+    annotate("text", x = min(prediction_grid) + 30, y = sample_row$Value,
+             label = paste0("value = ", round(sample_row$Value, 1)),
+             hjust = 0, vjust = -0.6, size = 3, colour = "grey20") +
+    labs(title = paste0(sample_tag, ": Observed value against trend"),
          x = "Date (CE)", y = "Value") + panel_theme
 
   estimated_dates <- latent_draws[[paste0("true_date_actual[", sample_index, "]")]]
+  # Mark the phase window (dashed grey) and the true date (solid red) so the
+  # posterior can be read against the truth it is trying to recover.
+  date_markers <- tibble(
+    position = c(sample_row$Start_date, sample_row$End_date, sample_row$True_date),
+    Marker   = c("Phase window", "Phase window", "True date"))
   date_density <- ggplot(tibble(estimated_date = estimated_dates),
                          aes(estimated_date)) +
-    geom_density(fill = "grey60", colour = "black", linewidth = 0.4, alpha = 0.5) +
-    geom_vline(xintercept = c(sample_row$Start_date, sample_row$End_date),
-               linetype = "dashed", colour = "grey40", linewidth = 0.5) +
-    geom_vline(xintercept = sample_row$True_date, linewidth = 0.6) +
-    labs(title = paste0(sample_label, " — posterior date estimate"),
+    geom_density(fill = "grey75", colour = "grey30", linewidth = 0.4, alpha = 0.6) +
+    geom_vline(data = date_markers,
+               aes(xintercept = position, colour = Marker, linetype = Marker),
+               linewidth = 0.7) +
+    scale_colour_manual(NULL, values = c("Phase window" = "grey40",
+                                         "True date" = "#780000")) +
+    scale_linetype_manual(NULL, values = c("Phase window" = "dashed",
+                                           "True date" = "solid")) +
+    labs(title = paste0(sample_tag, ": Posterior date estimate"),
          x = "Estimated date (CE)", y = "Density") + panel_theme
 
   trend_with_sample | date_density
@@ -240,6 +254,7 @@ make_date_panel <- function(sample_index) {
 set.seed(123)
 date_panels <- map(sort(sample(seq_len(n_observations), 6)), make_date_panel)
 ggsave(figure_path("individual_date_posteriors.png"),
-       wrap_plots(date_panels, ncol = 1),
+       wrap_plots(date_panels, ncol = 1) +
+         plot_layout(guides = "collect") & theme(legend.position = "bottom"),
        width = 12, height = 18, dpi = 300, bg = "white")
 
