@@ -13,8 +13,8 @@ BTChron_Paper_1/
 ├── Simulations/
 │   ├── Sim_Linear/        # Linear regression (baseline + slope)
 │   ├── Sim_Changepoint/   # Changepoint regression (two slopes)
-│   └── Sim_GP/            # Gaussian Process (bell-curve trend)
-│       └── (each contains: data/ figures/ scripts/ models/ output/)
+│   ├── archive/Sim_GP/    # Gaussian Process (bell-curve trend), on hold
+│   └── (each contains: data/ figures/ scripts/ models/ output/)
 ├── Real_Data/
 │   ├── data/
 │   │   ├── dataset_1/

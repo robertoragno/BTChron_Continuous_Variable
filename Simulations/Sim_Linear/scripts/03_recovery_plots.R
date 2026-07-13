@@ -38,6 +38,26 @@ panel_theme <- theme_classic(base_size = 11) +
         strip.text = element_text(face = "bold"),
         legend.position = "top")
 
+# Anchor markers on the entropy axis: where the well-specified scenario cases
+# of 05 sit on this continuum (mean H per case). The skewed case is left out
+# on purpose -- it breaks the uniform-within-phase assumption, so it lives off
+# this map. Only drawn if the scenario study has been run.
+scenario_table_file <- here("Simulations", "Sim_Linear", "output",
+                            "scenario_table.csv")
+anchor_layers <- if (file.exists(scenario_table_file)) {
+  scenario_anchors <- read_csv(scenario_table_file, show_col_types = FALSE) %>%
+    filter(case %in% c("fine", "coarse", "diagnostic")) %>%
+    group_by(case) %>%
+    summarise(H = mean(H), .groups = "drop") %>%
+    mutate(label = str_to_sentence(case))
+  list(
+    geom_vline(data = scenario_anchors, aes(xintercept = H),
+               linetype = "dotted", colour = "grey45", linewidth = 0.4),
+    geom_text(data = scenario_anchors, aes(H, Inf, label = label),
+              inherit.aes = FALSE, angle = 90, hjust = 1.15, vjust = -0.4,
+              size = 2.7, colour = "grey35"))
+} else NULL
+
 # recovery.png : estimated (posterior median) vs true value
 
 estimates_vs_truth <- recovery_results %>%
@@ -136,7 +156,8 @@ precision_entropy_plot <- ggplot(width_long, aes(H, width90)) +
        y = "Width of the 90% interval",
        title = "Precision against dating resolution",
        caption = "Lines and markers: per-bin median width.") +
-  panel_theme
+  panel_theme +
+  anchor_layers
 
 ggsave(figure_path("precision_vs_entropy.png"), precision_entropy_plot,
        width = 10, height = 4, dpi = 300, bg = "white")
@@ -228,7 +249,8 @@ accuracy_entropy_plot <- ggplot(accuracy_by_entropy,
   labs(x = "Shannon entropy of the periodisation (H)",
        y = "% of 90% intervals containing the true value",
        title = "Accuracy against dating resolution") +
-  panel_theme
+  panel_theme +
+  anchor_layers
 
 ggsave(figure_path("accuracy_vs_entropy.png"), accuracy_entropy_plot,
        width = 10, height = 4, dpi = 300, bg = "white")
