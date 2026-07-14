@@ -1,7 +1,7 @@
 # BTChron Continuous Variable
 
 > [!NOTE]  
-> Work in progress for the [first BTChron paper](https://www.overleaf.com/read/jjbchksqjpdr#694367). This readme will be updated soon with more details.
+> Work in progress for the [first BTChron paper](). This readme will be updated soon with more details.
 
 > [!IMPORTANT]
 > Note to self (RR): I need to clean up the code a bit, for instance I can move the partition function to a single helper. I also need to make some comments shorter and more elegant
