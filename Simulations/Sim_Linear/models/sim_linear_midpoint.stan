@@ -2,16 +2,17 @@
 // Linear Regression using Midpoint Dates (no latent date inference)
 // =============================================================================
 // Baseline comparison: dates are fixed at (start + end) / 2.
+// All dates are mapped to [-1, 1] internally, as in sim_linear.stan.
 // =============================================================================
 
 data {
   int<lower=1> N;
-  array[N] real y;
-  array[N] real start_date;
-  array[N] real end_date;
+  vector[N] y;
+  vector[N] start_date;
+  vector[N] end_date;
 
   int<lower=1> N_pred;
-  array[N_pred] real x_pred;
+  vector[N_pred] x_pred;
 }
 
 transformed data {
@@ -19,14 +20,9 @@ transformed data {
   real time_max   = max(end_date);
   real time_range = time_max - time_min;
 
-  vector[N] mid_norm;
-  vector[N_pred] x_pred_norm;
-
-  for (n in 1:N)
-    mid_norm[n] = ((start_date[n] + end_date[n]) / 2.0 - time_min) / time_range;
-
-  for (p in 1:N_pred)
-    x_pred_norm[p] = (x_pred[p] - time_min) / time_range;
+  vector[N] mid_norm =
+    2 * ((start_date + end_date) / 2 - time_min) / time_range - 1;
+  vector[N_pred] x_pred_norm = 2 * (x_pred - time_min) / time_range - 1;
 }
 
 parameters {
@@ -40,24 +36,22 @@ model {
   beta  ~ normal(0, 10);
   sigma ~ exponential(1);
 
-  for (n in 1:N)
-    y[n] ~ normal(alpha + beta * mid_norm[n], sigma);
+  y ~ normal(alpha + beta * mid_norm, sigma);
 }
 
 generated quantities {
   vector[N] log_lik;
-  for (n in 1:N)
-    log_lik[n] = normal_lpdf(y[n] | alpha + beta * mid_norm[n], sigma);
-
-  // Expected trend on prediction grid (noise-free)
-  array[N_pred] real mu_pred;
-  // Posterior predictive draws (includes observation noise)
-  array[N_pred] real y_rep;
-  for (p in 1:N_pred) {
-    mu_pred[p] = alpha + beta * x_pred_norm[p];
-    y_rep[p]   = normal_rng(mu_pred[p], sigma);
+  {
+    vector[N] mu = alpha + beta * mid_norm;
+    for (n in 1:N)
+      log_lik[n] = normal_lpdf(y[n] | mu[n], sigma);
   }
 
-  real slope_original    = beta / time_range;
-  real baseline_original = alpha - beta * time_min / time_range;
+  // Expected trend on prediction grid (noise-free)
+  vector[N_pred] mu_pred = alpha + beta * x_pred_norm;
+  // Posterior predictive draws (includes observation noise)
+  array[N_pred] real y_rep = normal_rng(mu_pred, sigma);
+
+  real slope_original    = 2 * beta / time_range;
+  real baseline_original = alpha - beta - 2 * beta * time_min / time_range;
 }

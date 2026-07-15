@@ -30,7 +30,11 @@ Subset: Great Britain, nuclear-family houses, positive roofed area, dated window
 | `03_compare.R` | comparison figure and per-house date posteriors | `figures/dataset_1_model_comparison.png`, `dataset_1_individual_date_posteriors.png` |
 
 Fitting is separated from plotting so figures can be restyled without refitting.
-Both models converged cleanly (0 divergences, max Rhat 1.01, min bulk ESS > 1200).
+Both models converged cleanly (0 divergences, max Rhat 1.002, min bulk ESS > 3100).
+Dates are mapped to `[-1, 1]` internally (not `[0, 1]`), which keeps alpha and
+beta from being strongly correlated in the posterior; on this dataset it
+roughly tripled the midpoint model's effective sample size (min bulk ESS 1253
+-> 3816) without moving either model's estimates.
 
 ### Exploratory panel
 <p align="center">
@@ -40,10 +44,14 @@ Both models converged cleanly (0 divergences, max Rhat 1.01, min bulk ESS > 1200
 ### Model comparison
 
 The two models agree on the trend within the credible intervals. The latent-date
-model returns a slightly steeper slope and a lower sigma than the midpoint model,
-consistent with the simulation finding: unmodelled date uncertainty is otherwise
-absorbed into the residual variance. With no ground truth on real data, the
-figures carry no truth overlay; the contrast between the two models is the point.
+model returns a slightly steeper slope (0.00186 vs 0.00179) and a lower sigma
+(0.963 vs 0.974) than the midpoint model, consistent with the simulation
+finding: unmodelled date uncertainty is otherwise absorbed into the residual
+variance. With no ground truth on real data, the figures carry no truth
+overlay; the contrast between the two models is the point. Per the simulation
+study, this gap is expected to be small under uniform-ish, reasonably fine
+dating, and to widen under coarser or skewed dating -- it is not, on its own,
+evidence that either model is "right" here.
 
 <p align="center">
 <img src="figures/dataset_1_model_comparison.png" height="800" text-align="center"/>

@@ -1,14 +1,16 @@
 # Figures for the recovery study:
-#   recovery.png              - estimated vs true value for each parameter
-#   accuracy.png              - how often each 50% / 90% interval held the truth
-#   precision_vs_entropy.png  - 90% interval width vs Shannon entropy, per param
-#   sigma_vs_entropy.png      - midpoint sigma error grows as dating coarsens
-#   accuracy_vs_entropy.png   - 90% interval accuracy vs Shannon entropy
-#   accuracy_precision_composite.png - accuracy (A) over precision (B), stacked
-#   precision_boxplots.png    - EIV vs midpoint 90% width per parameter,
-#                               across low / mid / high entropy
-#   precision_vs_n.png        - 90% interval width vs sample size N, per param
+#   accuracy_precision_composite.png - accuracy and precision against dating
+#                                       resolution (Shannon entropy H), stacked
+#   precision_vs_n.png               - 90% interval width against sample size N
 # Also writes recovery_table.csv (accuracy rates) for the paper's summary table.
+#
+# Six other cuts of this same H-resolved accuracy/precision relationship
+# (recovery.png, accuracy.png, accuracy_vs_entropy.png, precision_vs_entropy.png,
+# sigma_vs_entropy.png, precision_boxplots.png) were dropped from the main
+# script on 2026-07-15 as redundant with the composite above; the code that
+# produces them still lives in
+# archive/recovery_figures_trim_20260715/recovery_supplementary_figures.R
+# if any of them is wanted again.
 
 library(here)
 library(readr)
@@ -39,9 +41,9 @@ panel_theme <- theme_classic(base_size = 11) +
         legend.position = "top")
 
 # Anchor markers on the entropy axis: where the well-specified scenario cases
-# of 05 sit on this continuum (mean H per case). The skewed case is left out
-# on purpose -- it breaks the uniform-within-phase assumption, so it lives off
-# this map. Only drawn if the scenario study has been run.
+# of 05 sit on this continuum (mean H per case). The skewed cases are left out
+# on purpose -- they break the uniform-within-phase assumption, so they live
+# off this map. Only drawn if the scenario study has been run.
 scenario_table_file <- here("Simulations", "Sim_Linear", "output",
                             "scenario_table.csv")
 anchor_layers <- if (file.exists(scenario_table_file)) {
@@ -58,72 +60,8 @@ anchor_layers <- if (file.exists(scenario_table_file)) {
               size = 2.7, colour = "grey35"))
 } else NULL
 
-# recovery.png : estimated (posterior median) vs true value
-
-estimates_vs_truth <- recovery_results %>%
-  transmute(model = label_model(model),
-            Intercept_estimate = intercept_med, Intercept_true = true_intercept,
-            Slope_estimate = slope_med, Slope_true = true_slope,
-            Sigma_estimate = sigma_med, Sigma_true = true_sigma) %>%
-  pivot_longer(-model, names_to = c("parameter", ".value"), names_sep = "_") %>%
-  mutate(parameter = factor(parameter, c("Intercept", "Slope", "Sigma")))
-
-recovery_plot <- ggplot(estimates_vs_truth,
-                        aes(true, estimate, colour = model, shape = model)) +
-  geom_abline(aes(linetype = "1:1 (perfect recovery)"), slope = 1, intercept = 0,
-              colour = "grey40") +
-  geom_point(size = 0.7, alpha = 0.45) +
-  facet_wrap(~ parameter, scales = "free") +
-  scale_colour_manual(values = model_colours, name = NULL) +
-  scale_shape_manual(values = model_shapes, name = NULL) +
-  scale_linetype_manual(values = "dashed", name = NULL) +
-  guides(colour = guide_legend(override.aes = list(size = 2.5, alpha = 1))) +
-  labs(x = "True value", y = "Estimated (posterior median)",
-       title = "Recovery: estimated vs true value across random datasets") +
-  panel_theme
-
-ggsave(figure_path("recovery.png"), recovery_plot,
-       width = 10, height = 4, dpi = 300, bg = "white")
-
-# accuracy.png : how often each credible interval held the truth, with a 95%
-# Jeffreys interval on the rate (Beta posterior under the Jeffreys prior
-# Beta(1/2, 1/2): rate ~ Beta(successes + 1/2, misses + 1/2)).
-
-accuracy_rates <- recovery_results %>%
-  pivot_longer(matches("_cov(50|90)$"), names_to = c("parameter", "interval"),
-               names_sep = "_cov", values_to = "contained_truth") %>%
-  group_by(model, parameter, interval) %>%
-  summarise(successes = sum(contained_truth), n = n(),
-            value = mean(contained_truth), .groups = "drop") %>%
-  mutate(lower = qbeta(0.025, successes + 0.5, n - successes + 0.5),
-         upper = qbeta(0.975, successes + 0.5, n - successes + 0.5),
-         model = label_model(model),
-         parameter = factor(str_to_title(parameter),
-                            c("Intercept", "Slope", "Sigma")),
-         interval = paste0(interval, "% interval"),
-         target = ifelse(grepl("50", interval), 0.5, 0.9))
-
-accuracy_plot <- ggplot(accuracy_rates, aes(parameter, value, fill = model)) +
-  geom_col(position = position_dodge(0.7), width = 0.65, colour = "black",
-           linewidth = 0.2) +
-  geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(0.7),
-                width = 0.2, linewidth = 0.4) +
-  geom_hline(aes(yintercept = target, linetype = "Nominal coverage"),
-             colour = "grey40") +
-  facet_wrap(~ interval) +
-  scale_fill_manual(values = model_fills, name = NULL) +
-  scale_linetype_manual(values = "dashed", name = NULL) +
-  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
-  labs(x = NULL, y = "% of intervals containing the true value", title = "Accuracy") +
-  panel_theme
-
-ggsave(figure_path("accuracy.png"), accuracy_plot,
-       width = 9, height = 4.5, dpi = 300, bg = "white")
-
-# precision_vs_entropy.png : 90% interval width against the Shannon entropy of
-# each dataset's periodisation, for every parameter. Higher H (more even, finer
-# phases) should give tighter intervals; the midpoint model should be wider
-# throughout, not just for sigma.
+# precision_vs_entropy (panel B of the composite) : 90% interval width against
+# the Shannon entropy of each dataset's periodisation, for every parameter.
 
 width_long <- recovery_results %>%
   transmute(model = label_model(model), H,
@@ -159,66 +97,8 @@ precision_entropy_plot <- ggplot(width_long, aes(H, width90)) +
   panel_theme +
   anchor_layers
 
-ggsave(figure_path("precision_vs_entropy.png"), precision_entropy_plot,
-       width = 10, height = 4, dpi = 300, bg = "white")
-
-# sigma_vs_entropy.png : the entropy analogue of the old sigma-vs-window figure.
-# Midpoint mistakes within-phase date spread for measurement noise and over-
-# estimates sigma; the error grows as the periodisation gets coarser (low H).
-# Shaded bands mark dating resolution from coarse (low H) to fine (high H).
-
-sigma_by_H <- recovery_results %>% mutate(model = label_model(model))
-
-H_breaks <- seq(0, 2.5, by = 0.5)
-resolution_bands <- tibble(
-  band_start = H_breaks[-length(H_breaks)], band_end = H_breaks[-1],
-  band_centre = (H_breaks[-length(H_breaks)] + H_breaks[-1]) / 2,
-  label = c("Very coarse", "Coarse", "Moderate", "Fine", "Very fine"),
-  shade = c("white", "grey97", "grey94", "grey91", "grey88"))
-
-binned_sigma <- sigma_by_H %>%
-  mutate(bin_centre = (floor(pmin(H, 2.499) / 0.5) + 0.5) * 0.5) %>%
-  group_by(model, bin_centre) %>%
-  summarise(median_error = median(sigma_err),
-            q25 = quantile(sigma_err, 0.25),
-            q75 = quantile(sigma_err, 0.75), .groups = "drop") %>%
-  mutate(x = bin_centre + ifelse(model == "EIV", -0.04, 0.04))
-
-y_limits_sg <- quantile(sigma_by_H$sigma_err, c(0.004, 0.996))
-label_y_sg  <- y_limits_sg[2] - 0.04 * diff(y_limits_sg)
-
-sigma_entropy_plot <- ggplot() +
-  geom_rect(data = resolution_bands,
-            aes(xmin = band_start, xmax = band_end, ymin = -Inf, ymax = Inf,
-                fill = shade)) +
-  scale_fill_identity() +
-  geom_hline(yintercept = 0, linetype = "dotted", colour = "grey45") +
-  geom_point(data = sigma_by_H, aes(H, sigma_err, colour = model, shape = model),
-             size = 0.35, alpha = 0.35) +
-  geom_errorbar(data = binned_sigma,
-                aes(x = x, ymin = q25, ymax = q75, colour = model),
-                width = 0.06, linewidth = 0.7) +
-  geom_point(data = binned_sigma, aes(x, median_error, colour = model,
-                                      shape = model), size = 2) +
-  geom_text(data = resolution_bands, aes(band_centre, label_y_sg, label = label),
-            colour = "grey20", size = 3.3, fontface = "bold") +
-  scale_colour_manual(values = model_colours, name = NULL) +
-  scale_shape_manual(values = model_shapes, name = NULL) +
-  guides(colour = guide_legend(override.aes = list(size = 2.5, alpha = 1))) +
-  coord_cartesian(xlim = c(0, max(H_breaks)), ylim = y_limits_sg, expand = FALSE) +
-  scale_x_continuous(breaks = seq(0, 2.5, 0.5)) +
-  labs(x = "Shannon entropy (H)",
-       y = expression(sigma[err] == sigma[est] - sigma[true]),
-       title = "Midpoint over-estimates the noise as dating gets coarser",
-       caption = "Markers: bin median; bars: interquartile range.") +
-  panel_theme
-
-ggsave(figure_path("sigma_vs_entropy.png"), sigma_entropy_plot,
-       width = 8.5, height = 5.5, dpi = 300, bg = "white")
-
-# accuracy_vs_entropy.png : how often the 90% interval held the truth, binned by
-# entropy. This is the "coverage decreases as dating gets coarser" figure:
-# accuracy should rise with H, and midpoint should sit below latent.
+# accuracy_vs_entropy (panel A of the composite) : how often the 90% interval
+# held the truth, binned by entropy.
 
 accuracy_long <- recovery_results %>%
   transmute(model = label_model(model), H,
@@ -252,16 +132,11 @@ accuracy_entropy_plot <- ggplot(accuracy_by_entropy,
   panel_theme +
   anchor_layers
 
-ggsave(figure_path("accuracy_vs_entropy.png"), accuracy_entropy_plot,
-       width = 10, height = 4, dpi = 300, bg = "white")
+# accuracy_precision_composite.png : accuracy (A) over precision (B), per
+# parameter, so the two must be read together. A narrow interval that misses
+# the truth cannot pass for a good one, and a narrow interval that still
+# covers reads as the win it is.
 
-# accuracy_precision_composite.png : the accuracy (A) and precision (B) figures
-# stacked so the honesty-vs-sharpness trade-off reads at a glance. Same x-axis
-# (entropy) and parameter columns; one shared legend. Built from the two plots
-# above, which are still saved on their own.
-
-# Give panel A a per-parameter y-axis too (limits stay fixed at 0-1 via its own
-# scale), so both rows share the same facet structure and the columns line up.
 acc_panel  <- accuracy_entropy_plot + labs(title = NULL, x = NULL) +
   facet_wrap(~ parameter, scales = "free_y")
 prec_panel <- precision_entropy_plot +
@@ -280,27 +155,6 @@ accuracy_precision_composite <- (acc_panel / prec_panel) +
 
 ggsave(figure_path("accuracy_precision_composite.png"), accuracy_precision_composite,
        width = 10, height = 7.5, dpi = 300, bg = "white")
-
-# precision_boxplots.png : the latent-vs-midpoint precision gap as boxplots,
-# split into low / mid / high entropy thirds.
-
-width_by_entropy <- width_long %>%
-  mutate(entropy_band = cut(H, breaks = quantile(H, c(0, 1/3, 2/3, 1)),
-                            include.lowest = TRUE,
-                            labels = c("Low", "Mid", "High")))
-
-precision_boxplots <- ggplot(width_by_entropy,
-                             aes(entropy_band, width90, fill = model)) +
-  geom_boxplot(outlier.size = 0.3, linewidth = 0.3, position = position_dodge(0.8)) +
-  facet_wrap(~ parameter, scales = "free_y") +
-  scale_fill_manual(values = model_fills, name = NULL) +
-  labs(x = "Shannon entropy (H)",
-       y = "Width of the 90% interval",
-       title = "EIV vs midpoint precision across the entropy range") +
-  panel_theme
-
-ggsave(figure_path("precision_boxplots.png"), precision_boxplots,
-       width = 10, height = 4.5, dpi = 300, bg = "white")
 
 # precision_vs_n.png : 90% interval width against sample size N, per parameter.
 # Sanity check that precision improves (width shrinks) with more data, for both
@@ -375,3 +229,32 @@ write_csv(accuracy_table,
 
 
 print(as.data.frame(accuracy_table), row.names = FALSE)
+
+# recovery_width_summary.csv : how much narrower EIV's interval is, per
+# parameter. Paired by dataset_id (both models fit the same simulated data)
+# and summarised by MEDIAN, not mean: width90 is heavy-tailed (a handful of
+# datasets have a much wider-than-typical interval for one model), so a mean
+# ratio is pulled around by those few datasets and overstates the typical
+# gap. This is the number to quote in the README instead of a hand-typed one.
+
+width_pairs <- recovery_results %>%
+  filter(max_rhat <= 1.05, n_divergent == 0) %>%
+  select(dataset_id, model, intercept_width90, slope_width90, sigma_width90) %>%
+  pivot_longer(c(intercept_width90, slope_width90, sigma_width90),
+               names_to = "parameter", names_pattern = "(.*)_width90",
+               values_to = "width90") %>%
+  pivot_wider(names_from = model, values_from = width90) %>%
+  filter(!is.na(latent), !is.na(midpoint))
+
+width_summary <- width_pairs %>%
+  group_by(parameter) %>%
+  summarise(median_eiv = median(latent), median_midpoint = median(midpoint),
+            eiv_narrower_pct = round(100 * (1 - median(latent) / median(midpoint)), 1),
+            .groups = "drop") %>%
+  mutate(parameter = factor(str_to_title(parameter),
+                            c("Intercept", "Slope", "Sigma"))) %>%
+  arrange(parameter)
+
+write_csv(width_summary,
+          here("Simulations", "Sim_Linear", "output", "recovery_width_summary.csv"))
+print(as.data.frame(width_summary), row.names = FALSE)
