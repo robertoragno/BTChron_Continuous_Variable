@@ -229,7 +229,7 @@ make_date_panel <- function(sample_index) {
     labs(title = paste0(sample_tag, ": Observed value against trend"),
          x = "Date (CE)", y = "Value") + panel_theme
 
-  estimated_dates <- latent_draws[[paste0("true_date_actual[", sample_index, "]")]]
+  estimated_dates <- latent_draws[[paste0("date_actual[", sample_index, "]")]]
   # Mark the phase window (dashed grey) and the true date (solid red) so the
   # posterior can be read against the truth it is trying to recover.
   date_markers <- tibble(

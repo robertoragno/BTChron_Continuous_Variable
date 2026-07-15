@@ -3,20 +3,21 @@
 // =============================================================================
 //
 //   trend(x) = alpha + beta * x
-//   y_n ~ Normal(trend(true_date_n), sigma)
+//   y_n ~ Normal(trend(date_n), sigma)
 //
 // Latent dates are inferred uniformly within each [start, end] window.
-// All dates are normalised to [0, 1] internally for numerical stability.
+// All dates are mapped to [-1, 1] internally: centring the covariate keeps
+// alpha and beta from being strongly correlated in the posterior.
 // =============================================================================
 
 data {
   int<lower=1> N;
-  array[N] real y;
-  array[N] real start_date;
-  array[N] real end_date;
+  vector[N] y;
+  vector[N] start_date;
+  vector[N] end_date;
 
   int<lower=1> N_pred;
-  array[N_pred] real x_pred;
+  vector[N_pred] x_pred;
 }
 
 transformed data {
@@ -24,20 +25,13 @@ transformed data {
   real time_max   = max(end_date);
   real time_range = time_max - time_min;
 
-  vector[N] start_norm;
-  vector[N] end_norm;
-  vector[N_pred] x_pred_norm;
-
-  for (n in 1:N) {
-    start_norm[n] = (start_date[n] - time_min) / time_range;
-    end_norm[n]   = (end_date[n]   - time_min) / time_range;
-  }
-  for (p in 1:N_pred)
-    x_pred_norm[p] = (x_pred[p] - time_min) / time_range;
+  vector[N] start_norm = 2 * (start_date - time_min) / time_range - 1;
+  vector[N] end_norm   = 2 * (end_date   - time_min) / time_range - 1;
+  vector[N_pred] x_pred_norm = 2 * (x_pred - time_min) / time_range - 1;
 }
 
 parameters {
-  array[N] real<lower=0, upper=1> true_date_raw;
+  vector<lower=0, upper=1>[N] date_raw;
 
   real alpha;
   real beta;
@@ -45,10 +39,7 @@ parameters {
 }
 
 transformed parameters {
-  vector[N] true_date_norm;
-  for (n in 1:N)
-    true_date_norm[n] = start_norm[n]
-                        + true_date_raw[n] * (end_norm[n] - start_norm[n]);
+  vector[N] date_norm = start_norm + date_raw .* (end_norm - start_norm);
 }
 
 model {
@@ -56,35 +47,27 @@ model {
   beta  ~ normal(0, 10);
   sigma ~ exponential(1);
 
-  for (n in 1:N) {
-    real trend_n = alpha + beta * true_date_norm[n];
-    y[n] ~ normal(trend_n, sigma);
-  }
+  y ~ normal(alpha + beta * date_norm, sigma);
 }
 
 generated quantities {
   // Pointwise log-likelihood (LOO-CV)
   vector[N] log_lik;
-  for (n in 1:N) {
-    real trend_n = alpha + beta * true_date_norm[n];
-    log_lik[n] = normal_lpdf(y[n] | trend_n, sigma);
+  {
+    vector[N] mu = alpha + beta * date_norm;
+    for (n in 1:N)
+      log_lik[n] = normal_lpdf(y[n] | mu[n], sigma);
   }
 
   // Expected trend on prediction grid (noise-free)
-  array[N_pred] real mu_pred;
+  vector[N_pred] mu_pred = alpha + beta * x_pred_norm;
   // Posterior predictive draws (includes observation noise)
-  array[N_pred] real y_rep;
-  for (p in 1:N_pred) {
-    mu_pred[p] = alpha + beta * x_pred_norm[p];
-    y_rep[p]   = normal_rng(mu_pred[p], sigma);
-  }
+  array[N_pred] real y_rep = normal_rng(mu_pred, sigma);
 
   // Back-transform latent dates to original scale
-  array[N] real true_date_actual;
-  for (n in 1:N)
-    true_date_actual[n] = time_min + true_date_norm[n] * time_range;
+  vector[N] date_actual = time_min + (date_norm + 1) / 2 * time_range;
 
   // Back-transform trend parameters to original scale
-  real slope_original    = beta / time_range;
-  real baseline_original = alpha - beta * time_min / time_range;
+  real slope_original    = 2 * beta / time_range;
+  real baseline_original = alpha - beta - 2 * beta * time_min / time_range;
 }
