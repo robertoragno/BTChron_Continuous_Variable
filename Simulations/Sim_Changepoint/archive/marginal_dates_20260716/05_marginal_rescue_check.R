@@ -12,7 +12,13 @@
 # true parameters) that the latent model already failed to converge on in the
 # existing recovery study -- a direct rescue-rate check, not a full rerun.
 #
-# Produces: output/marginal_rescue_check.csv
+# Archived 2026-07-16: experimental, not part of the main recovery/scenario
+# pipeline (see Sim_Changepoint/README.md, "Marginalized latent dates"). Paths
+# below point out of this archive folder back to the live simulation, so it
+# can still be re-run in place if wanted; it was not re-run as part of the
+# archiving itself.
+#
+# Produces: marginal_rescue_check.csv (in this archive folder)
 
 library(here)
 library(cmdstanr)
@@ -22,8 +28,8 @@ library(parallel)
 
 source(here("Simulations", "Sim_Changepoint", "scripts", "simulate.R"))
 
-output_csv <- here("Simulations", "Sim_Changepoint", "output",
-                   "marginal_rescue_check.csv")
+output_csv <- here("Simulations", "Sim_Changepoint", "archive",
+                   "marginal_dates_20260716", "marginal_rescue_check.csv")
 n_workers  <- as.integer(Sys.getenv("RESCUE_WORKERS", "18"))
 
 recovery_results <- readr::read_csv(
@@ -33,7 +39,8 @@ recovery_results <- readr::read_csv(
 bad <- recovery_results %>%
   filter(model == "latent", is.na(error), (max_rhat > 1.05 | n_divergent > 0))
 
-model_marginal <- cmdstan_model(here("Simulations", "Sim_Changepoint", "models",
+model_marginal <- cmdstan_model(here("Simulations", "Sim_Changepoint", "archive",
+                                     "marginal_dates_20260716",
                                      "sim_changepoint_marginal.stan"))
 prediction_grid <- c(TMIN, TMAX)
 

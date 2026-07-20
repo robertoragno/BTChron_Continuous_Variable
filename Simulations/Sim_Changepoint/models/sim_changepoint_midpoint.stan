@@ -4,7 +4,7 @@
 // Baseline comparison model. Rather than inferring a latent date for each
 // observation, dates are fixed at (start + end) / 2 before sampling begins.
 //
-// This is computationally cheaper — no true_date_raw parameters, so the
+// This is computationally cheaper — no date_raw parameters, so the
 // parameter space is much smaller. The cost is that date uncertainty within
 // each [start, end] window is ignored entirely, which may underestimate
 // posterior uncertainty for observations with wide windows.
@@ -23,41 +23,38 @@
 // When t > cp: max(0, t - cp) = t - cp, and beta1 cancels algebraically:
 //   mu(t) = alpha + beta2*t + cp*(beta1 - beta2)   [second slope only]
 //
-// All dates are normalised to [0, 1] for numerical stability of HMC.
+// All dates are mapped to [-1, 1] internally, as in sim_changepoint.stan.
 // =============================================================================
 
 data {
   int<lower=1> N;                      // number of observations
-  array[N] real y;                     // response variable (e.g. LSI values)
-  array[N] real start_date;            // earliest possible date for each observation
-  array[N] real end_date;              // latest possible date for each observation
+  vector[N] y;                         // response variable (e.g. LSI values)
+  vector[N] start_date;                // earliest possible date for each observation
+  vector[N] end_date;                  // latest possible date for each observation
   int<lower=1> N_pred;                 // number of prediction points
-  array[N_pred] real x_pred;           // time points to predict at
+  vector[N_pred] x_pred;               // time points to predict at
 }
 
 transformed data {
   // Compute normalisation constants from the full date range.
-  // Everything is mapped to [0, 1] so that HMC priors (normal(0,10) etc.)
+  // Everything is mapped to [-1, 1] so that HMC priors (normal(0,10) etc.)
   // are on a sensible scale. Raw years (e.g. -200 to 400 CE) would produce
   // tiny slopes and poor sampler geometry.
   real time_min   = min(start_date);
   real time_max   = max(end_date);
   real time_range = time_max - time_min;
 
-  // mid_norm: the midpoint of each [start, end] window, normalised to [0,1].
-  // These are fixed constants computed once before sampling — unlike the
-  // latent date model, no per-observation date parameter is sampled.
-  vector[N] mid_norm;
-  vector[N_pred] x_pred_norm;
-
-  for (n in 1:N)
-    mid_norm[n] = ((start_date[n] + end_date[n]) / 2.0 - time_min) / time_range;
-  for (p in 1:N_pred)
-    x_pred_norm[p] = (x_pred[p] - time_min) / time_range;
+  // mid_norm: the midpoint of each [start, end] window, normalised to
+  // [-1, 1]. These are fixed constants computed once before sampling —
+  // unlike the latent date model, no per-observation date parameter is
+  // sampled.
+  vector[N] mid_norm =
+    2 * ((start_date + end_date) / 2 - time_min) / time_range - 1;
+  vector[N_pred] x_pred_norm = 2 * (x_pred - time_min) / time_range - 1;
 }
 
 parameters {
-  real alpha;                          // intercept at t_norm = 0 (i.e. at time_min)
+  real alpha;                          // intercept at t_norm = -1 (i.e. at time_min)
   real beta1;                          // slope before the changepoint (normalised scale)
   real beta2;                          // slope after the changepoint (normalised scale)
 
@@ -66,29 +63,26 @@ parameters {
   // each observation is implicitly assigned to the first or second slope
   // depending on whether its midpoint date falls before or after cp_norm,
   // and cp_norm settles where the total score across all N is highest.
-  real<lower=0, upper=1> cp_norm;
+  // The <lower=-1, upper=1> constraint IS the prior (flat) — no explicit
+  // ~ statement is needed.
+  real<lower=-1, upper=1> cp_norm;
 
   real<lower=0> sigma;                 // observation noise
 }
 
 model {
-  // Priors — all on the normalised [0,1] time scale.
-  // normal(0, 10) is weakly informative given that t is in [0,1].
-  alpha   ~ normal(0, 10);
-  beta1   ~ normal(0, 10);
-  beta2   ~ normal(0, 10);
-  cp_norm ~ uniform(0, 1);   // no prior preference for where the kink falls
-  sigma   ~ exponential(1);  // weakly informative, keeps sigma positive
+  // Priors — all on the normalised [-1, 1] time scale.
+  // normal(0, 10) is weakly informative given that t is in [-1, 1].
+  alpha ~ normal(0, 10);
+  beta1 ~ normal(0, 10);
+  beta2 ~ normal(0, 10);
+  sigma ~ exponential(1);  // weakly informative, keeps sigma positive
 
-  // Likelihood.
-  // Dates are fixed at their midpoints (computed in transformed data).
-  // fmax(0, t - cp_norm) is 0 when t < cp (first slope only) and equals
-  // t - cp when t > cp (activating the slope change).
-  for (n in 1:N) {
-    real t  = mid_norm[n];
-    real mu = alpha + beta1 * t + (beta2 - beta1) * fmax(0.0, t - cp_norm);
-    y[n] ~ normal(mu, sigma);
-  }
+  // Likelihood, vectorised. Dates are fixed at their midpoints (computed in
+  // transformed data). fmax(0, t - cp_norm) is 0 when t < cp (first slope
+  // only) and equals t - cp when t > cp (activating the slope change).
+  y ~ normal(alpha + beta1 * mid_norm
+             + (beta2 - beta1) * fmax(0, mid_norm - cp_norm), sigma);
 }
 
 generated quantities {
@@ -96,10 +90,11 @@ generated quantities {
   // Compare this model against the latent date model using loo_compare().
   // A better ELPD in the latent date model means date uncertainty matters.
   vector[N] log_lik;
-  for (n in 1:N) {
-    real t  = mid_norm[n];
-    real mu = alpha + beta1 * t + (beta2 - beta1) * fmax(0.0, t - cp_norm);
-    log_lik[n] = normal_lpdf(y[n] | mu, sigma);
+  {
+    vector[N] mu = alpha + beta1 * mid_norm
+                  + (beta2 - beta1) * fmax(0, mid_norm - cp_norm);
+    for (n in 1:N)
+      log_lik[n] = normal_lpdf(y[n] | mu[n], sigma);
   }
 
   // --- Posterior predictive quantities ---
@@ -107,31 +102,28 @@ generated quantities {
   // mu_pred: the expected value of the trend line at each prediction point.
   // No noise is added — this is the fitted curve itself, used for plotting
   // the mean trend.
-  array[N_pred] real mu_pred;
+  vector[N_pred] mu_pred = alpha + beta1 * x_pred_norm
+                           + (beta2 - beta1) * fmax(0, x_pred_norm - cp_norm);
 
   // y_rep: a simulated new observation at each prediction point, drawn from
   // Normal(mu_pred, sigma). Unlike mu_pred, this includes observation noise,
   // so it represents what a new data point would look like. Use this for
   // posterior predictive intervals (the wider band around the trend line).
-  array[N_pred] real y_rep;
-
-  for (p in 1:N_pred) {
-    real t     = x_pred_norm[p];
-    mu_pred[p] = alpha + beta1 * t + (beta2 - beta1) * fmax(0.0, t - cp_norm);
-    y_rep[p]   = normal_rng(mu_pred[p], sigma);
-  }
+  array[N_pred] real y_rep = normal_rng(mu_pred, sigma);
 
   // --- Back-transform parameters to original time scale ---
 
   // Changepoint in original time units (e.g. years CE)
-  real cp_actual = time_min + cp_norm * time_range;
+  real cp_actual = time_min + (cp_norm + 1) / 2 * time_range;
 
-  // Intercept at time_min — no rescaling needed because at t_norm = 0
-  // (i.e. t = time_min) the normalised and original intercepts coincide.
-  real baseline_original = alpha;
+  // Intercept at time_min (t_norm = -1): alpha is the value at t_norm = 0,
+  // so the value at t_norm = -1 on the first segment is alpha - beta1.
+  real baseline_original = alpha - beta1;
 
-  // Slopes: beta1/beta2 are Δy per unit of normalised time.
-  // Dividing by time_range converts to Δy per unit of original time.
-  real slope1_original = beta1 / time_range;
-  real slope2_original = beta2 / time_range;
+  // Slopes: beta1/beta2 are Δy per unit of normalised time, and the
+  // normalised time scale spans 2 units (-1 to 1) per time_range.
+  // Dividing by time_range/2 (i.e. multiplying by 2) converts to Δy per
+  // unit of original time.
+  real slope1_original = 2 * beta1 / time_range;
+  real slope2_original = 2 * beta2 / time_range;
 }

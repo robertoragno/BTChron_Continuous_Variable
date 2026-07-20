@@ -1,7 +1,8 @@
-#' Scenario study for the linear model: fixed cases (vs. 02's fully
-#' random draws), many repetitions each, to assess "when does EIV matter" for
-#' each case. Only within-phase deposition shape can bias the slope. Phase
-#' width and sampling only affect precision. See Notes/05_scenarios_notes.md.
+# Scenario study for the changepoint model: fixed archetype cases (vs. 02's
+# fully random draws), many reps each, so "when does EIV matter" has clean
+# numbers per case. Only within-phase deposition shape can bias the slopes
+# or changepoint; phase width and sampling only affect precision. See
+# Notes/05_scenarios_notes.md.
 
 library(here)
 library(cmdstanr)
@@ -10,12 +11,12 @@ library(dplyr)
 library(tidyr)
 library(parallel)
 
-source(here("Simulations", "Sim_Linear", "scripts", "simulate.R"))
+source(here("Simulations", "Sim_Changepoint", "scripts", "simulate.R"))
 
 set.seed(2026)
 
 output_csv <- Sys.getenv("SCENARIOS_OUT",
-                         here("Simulations", "Sim_Linear", "output", "scenarios.csv"))
+                         here("Simulations", "Sim_Changepoint", "output", "scenarios.csv"))
 n_rep      <- as.integer(Sys.getenv("SCENARIOS_REPS", "100"))
 n_workers  <- as.integer(Sys.getenv("SCENARIOS_WORKERS", "18"))
 iter_warmup   <- as.integer(Sys.getenv("SCENARIOS_WARMUP", "500"))
@@ -24,8 +25,8 @@ iter_sampling <- as.integer(Sys.getenv("SCENARIOS_SAMPLING", "500"))
 # fine/coarse: uniform dates (no skew), double as skew cases' reference.
 # diagnostic: uniform within-window, over-samples narrow phases.
 # *_mild/*_strong: skewed (Beta(skew_shape,1)), position_strength = 0.
-# coarse_strong_early/late: same, but position_strength > 0 (example
-# of width correlating with position - see notes).
+# coarse_strong_early/late: same, but position_strength > 0 (worked example
+# of width correlating with position -- see notes).
 scenarios <- tibble(
   case       = c("fine",   "coarse", "diagnostic",
                  "fine_mild", "fine_strong", "coarse_mild", "coarse_strong",
@@ -52,7 +53,8 @@ scenarios <- tibble(
 
 # Diagnostic sampling: over-samples narrow phases (prob ~ 1/width), uniform
 # within-window (see notes).
-simulate_diagnostic <- function(N, intercept, slope, sigma, K, alpha_conc, seed) {
+simulate_diagnostic <- function(N, baseline, slope_1, slope_2, cp, sigma,
+                                K, alpha_conc, seed) {
   set.seed(seed)
   weights <- rgamma(K, shape = alpha_conc, rate = 1)
   weights <- weights / sum(weights)
@@ -67,9 +69,10 @@ simulate_diagnostic <- function(N, intercept, slope, sigma, K, alpha_conc, seed)
   end       <- bounds[phase + 1]
   true_date <- round(runif(N, start, end))
 
+  mu <- changepoint_mean(true_date, baseline, slope_1, slope_2, cp)
   out <- data.frame(
     Start_date = start, End_date = end, True_date = true_date,
-    Value      = round(intercept + slope * true_date + rnorm(N, 0, sigma), 1))
+    Value      = round(mu + rnorm(N, 0, sigma), 1))
   phase_p <- width / (TMAX - TMIN)
   attr(out, "H") <- -sum(phase_p * log(phase_p))
   out
@@ -77,11 +80,11 @@ simulate_diagnostic <- function(N, intercept, slope, sigma, K, alpha_conc, seed)
 
 # Skewed deposition: fine/coarse widths and sampling, but true dates drawn
 # from Beta(skew_shape, 1) within each window instead of uniform, and
-# optionally (position_strength > 0) with wide phases bending toward one end
-# (coarse_early). 
-simulate_skewed <- function(N, intercept, slope, sigma, K, alpha_conc,
-                            skew_shape, seed, position_strength = 0,
-                            coarse_early = TRUE) {
+# optionally (position_strength > 0) with wide phases nudged toward one end
+# (coarse_early). See notes for why only the latter bends the slopes/cp.
+simulate_skewed <- function(N, baseline, slope_1, slope_2, cp, sigma,
+                            K, alpha_conc, skew_shape, seed,
+                            position_strength = 0, coarse_early = TRUE) {
   set.seed(seed)
   weights <- rgamma(K, shape = alpha_conc, rate = 1)
   weights <- weights / sum(weights)
@@ -104,20 +107,23 @@ simulate_skewed <- function(N, intercept, slope, sigma, K, alpha_conc,
   u         <- rbeta(N, skew_shape, 1)
   true_date <- round(start + u * (end - start))
 
+  mu <- changepoint_mean(true_date, baseline, slope_1, slope_2, cp)
   out <- data.frame(
     Start_date = start, End_date = end, True_date = true_date,
-    Value      = round(intercept + slope * true_date + rnorm(N, 0, sigma), 1))
+    Value      = round(mu + rnorm(N, 0, sigma), 1))
   attr(out, "H") <- -sum(phase_p * log(phase_p))
   out
 }
 
-# One dataset per case per replicate. Slope fixed (not drawn near zero like
-# 02) so slope_ratio stays meaningful - see notes.
+# One dataset per case per replicate. Slopes/cp fixed (not drawn near zero
+# like 02) so slope ratios stay meaningful -- see notes.
 datasets <- expand_grid(case = scenarios$case, rep = seq_len(n_rep)) %>%
   left_join(scenarios, by = "case") %>%
   mutate(dataset_id = row_number(),
-         intercept  = runif(n(), 2, 15),
-         slope      = 0.015,
+         baseline   = runif(n(), 2, 15),
+         slope_1    = 0.015,
+         slope_2    = -0.01,
+         cp         = 500,
          sigma      = runif(n(), 0.5, 4))
 
 jobs <- expand_grid(dataset_id = datasets$dataset_id,
@@ -125,10 +131,10 @@ jobs <- expand_grid(dataset_id = datasets$dataset_id,
   left_join(datasets, by = "dataset_id") %>%
   mutate(job_id = row_number())
 
-model_latent   <- cmdstan_model(here("Simulations", "Sim_Linear", "models",
-                                     "sim_linear.stan"))
-model_midpoint <- cmdstan_model(here("Simulations", "Sim_Linear", "models",
-                                     "sim_linear_midpoint.stan"))
+model_latent   <- cmdstan_model(here("Simulations", "Sim_Changepoint", "models",
+                                     "sim_changepoint.stan"))
+model_midpoint <- cmdstan_model(here("Simulations", "Sim_Changepoint", "models",
+                                     "sim_changepoint_midpoint.stan"))
 
 prediction_grid <- c(TMIN, TMAX)
 
@@ -148,17 +154,17 @@ summarise_parameter <- function(posterior_draws, true_value, name) {
 run_one_job <- function(job_index) {
   job <- jobs[job_index, ]
   one_dataset <- if (job$sampling == "diagnostic") {
-    simulate_diagnostic(job$N, job$intercept, job$slope, job$sigma,
-                        job$K, job$alpha_conc, seed = job$dataset_id)
+    simulate_diagnostic(job$N, job$baseline, job$slope_1, job$slope_2, job$cp,
+                        job$sigma, job$K, job$alpha_conc, seed = job$dataset_id)
   } else if (job$sampling == "skewed") {
-    simulate_skewed(job$N, job$intercept, job$slope, job$sigma,
-                    job$K, job$alpha_conc, job$skew_shape, seed = job$dataset_id,
-                    position_strength = job$position_strength,
+    simulate_skewed(job$N, job$baseline, job$slope_1, job$slope_2, job$cp,
+                    job$sigma, job$K, job$alpha_conc, job$skew_shape,
+                    seed = job$dataset_id, position_strength = job$position_strength,
                     coarse_early = job$coarse_early)
   } else {
-    simulate_linear(N = job$N, intercept = job$intercept, slope = job$slope,
-                    sigma = job$sigma, K = job$K, alpha_conc = job$alpha_conc,
-                    seed = job$dataset_id)
+    simulate_changepoint(N = job$N, baseline = job$baseline, slope_1 = job$slope_1,
+                         slope_2 = job$slope_2, cp = job$cp, sigma = job$sigma,
+                         K = job$K, alpha_conc = job$alpha_conc, seed = job$dataset_id)
   }
   entropy_H  <- attr(one_dataset, "H")
   mean_width <- mean(one_dataset$End_date - one_dataset$Start_date)
@@ -174,24 +180,28 @@ run_one_job <- function(job_index) {
     fit <- chosen_model$sample(
       data = stan_data, chains = 4, parallel_chains = 4,
       iter_warmup = iter_warmup, iter_sampling = iter_sampling,
-      adapt_delta = 0.95, max_treedepth = 10,
+      adapt_delta = 0.95, max_treedepth = 12,
       refresh = 0, show_messages = FALSE, show_exceptions = FALSE)
-    draws       <- fit$draws(variables = c("slope_original", "baseline_original",
-                                           "sigma"), format = "df")
+    draws       <- fit$draws(variables = c("baseline_original", "slope1_original",
+                                           "slope2_original", "cp_actual", "sigma"),
+                             format = "df")
     diagnostics <- fit$diagnostic_summary(quiet = TRUE)
-    rhats       <- fit$summary(c("slope_original", "baseline_original",
-                                 "sigma"))$rhat
+    rhats       <- fit$summary(c("baseline_original", "slope1_original",
+                                 "slope2_original", "cp_actual", "sigma"))$rhat
     bind_cols(
-      summarise_parameter(draws$baseline_original, job$intercept, "intercept"),
-      summarise_parameter(draws$slope_original,    job$slope,     "slope"),
-      summarise_parameter(draws$sigma,             job$sigma,     "sigma"),
+      summarise_parameter(draws$baseline_original, job$baseline, "baseline"),
+      summarise_parameter(draws$slope1_original,    job$slope_1,  "slope1"),
+      summarise_parameter(draws$slope2_original,    job$slope_2,  "slope2"),
+      summarise_parameter(draws$cp_actual,           job$cp,       "cp"),
+      summarise_parameter(draws$sigma,               job$sigma,    "sigma"),
       tibble(n_divergent = sum(diagnostics$num_divergent),
              max_rhat    = max(rhats, na.rm = TRUE), error = NA_character_))
   }, error = function(e) tibble(error = conditionMessage(e)))
 
   bind_cols(
-    job %>% select(dataset_id, case, model, true_intercept = intercept,
-                   true_slope = slope, true_sigma = sigma, K, alpha_conc, N),
+    job %>% select(dataset_id, case, model, true_baseline = baseline,
+                   true_slope_1 = slope_1, true_slope_2 = slope_2, true_cp = cp,
+                   true_sigma = sigma, K, alpha_conc, N),
     tibble(H = entropy_H, mean_width = mean_width),
     summary_row)
 }
@@ -218,10 +228,12 @@ if (file.exists(output_csv)) {
 # was skipped.
 library(ggplot2)
 
-example_intercept <- 5
-example_slope     <- 0.015
-example_sigma     <- 1.5
-example_seed      <- 1
+example_baseline <- 8
+example_slope_1  <- 0.015
+example_slope_2  <- -0.01
+example_cp       <- 500
+example_sigma    <- 1.5
+example_seed     <- 1
 
 # fine_mild left out of the gallery (redundant with fine_strong visually);
 # still fit/reported in scenario_skew_bias.png -- see notes.
@@ -234,15 +246,18 @@ case_labs <- c(fine = "Fine dating", coarse = "Coarse dating",
 examples <- bind_rows(lapply(which(scenarios$case %in% names(case_labs)), function(i) {
   sc <- scenarios[i, ]
   d <- if (sc$sampling == "diagnostic") {
-    simulate_diagnostic(sc$N, example_intercept, example_slope, example_sigma,
-                        sc$K, sc$alpha_conc, seed = example_seed)
+    simulate_diagnostic(sc$N, example_baseline, example_slope_1, example_slope_2,
+                        example_cp, example_sigma, sc$K, sc$alpha_conc,
+                        seed = example_seed)
   } else if (sc$sampling == "skewed") {
-    simulate_skewed(sc$N, example_intercept, example_slope, example_sigma,
-                    sc$K, sc$alpha_conc, sc$skew_shape, seed = example_seed)
+    simulate_skewed(sc$N, example_baseline, example_slope_1, example_slope_2,
+                    example_cp, example_sigma, sc$K, sc$alpha_conc, sc$skew_shape,
+                    seed = example_seed)
   } else {
-    simulate_linear(N = sc$N, intercept = example_intercept,
-                    slope = example_slope, sigma = example_sigma,
-                    K = sc$K, alpha_conc = sc$alpha_conc, seed = example_seed)
+    simulate_changepoint(N = sc$N, baseline = example_baseline,
+                         slope_1 = example_slope_1, slope_2 = example_slope_2,
+                         cp = example_cp, sigma = example_sigma,
+                         K = sc$K, alpha_conc = sc$alpha_conc, seed = example_seed)
   }
   d$case <- sc$case
   d
@@ -251,8 +266,9 @@ examples <- bind_rows(lapply(which(scenarios$case %in% names(case_labs)), functi
          Midpoint = (Start_date + End_date) / 2)
 
 truth_line <- data.frame(
-  Year  = c(TMIN, TMAX),
-  Value = example_intercept + example_slope * c(TMIN, TMAX))
+  Year  = c(TMIN, example_cp, TMAX),
+  Value = changepoint_mean(c(TMIN, example_cp, TMAX), example_baseline,
+                           example_slope_1, example_slope_2, example_cp))
 
 # True dates as dots vs. midpoint squares: shows the skew the windows alone
 # can't.
@@ -279,5 +295,5 @@ examples_plot <- ggplot(examples) +
         panel.spacing = unit(1.2, "lines"),
         legend.position = "bottom")
 
-ggsave(here("Simulations", "Sim_Linear", "figures", "scenario_examples.png"),
+ggsave(here("Simulations", "Sim_Changepoint", "figures", "scenario_examples.png"),
        examples_plot, width = 11, height = 6.5, dpi = 300, bg = "white")
