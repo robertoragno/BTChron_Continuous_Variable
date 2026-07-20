@@ -1,21 +1,14 @@
-# Why does the slope tie between EIV and midpoint (Recovery study, README)?
-# Phase-dating error is Berkson error, not classical measurement error, and
-# only classical error biases a linear fit. This script simulates both kinds
-# side by side to make that concrete: same amount of x-uncertainty in each
-# panel, opposite outcome on the fitted slope.
+# Why the slope ties between EIV and midpoint (see README): phase dating is
+# Berkson error, not classical measurement error, and only classical error
+# biases a linear fit. Classical: a true value blurred by independent noise
+# (a bad ruler). Berkson: a window is fixed first, true value uniform inside
+# it (a phase) -- what sim_linear.stan actually assumes. Same amount of
+# x-uncertainty in each panel below, opposite effect on the fitted slope.
 #
-# Classical: a known true value is blurred by independent noise (a bad
-# ruler). Berkson: a known window is fixed first, and the true value is
-# uniform inside it (a phase) -- the setup sim_linear.stan actually assumes.
-#
-# Each line is a plain best-fit straight line through one of the two point
-# clouds (true value vs what you'd actually work with). Rather than relying
-# on a legend to say which line is which, each line carries its own label on
-# a short leader pointing straight at it -- this has to work even in panel B,
-# where the two lines sit almost exactly on top of each other. Teal is used
-# deliberately instead of the repo's grey/red EIV-vs-Midpoint palette: this
-# is a general illustration of two named error types, not a comparison of
-# the two Stan models used elsewhere.
+# Each fit line is labelled directly via a leader (not a legend), since in
+# panel B the two lines nearly coincide. Teal instead of the repo's usual
+# EIV-red/Midpoint-grey, since this is about the two error types, not a
+# model comparison.
 #
 # Produces: figures/berkson_vs_classical.png
 
@@ -38,9 +31,7 @@ panel_theme <- theme_classic(base_size = 13) +
 figure_path <- function(name) here::here("Simulations", "Sim_Linear", "figures", name)
 
 # One panel: point cloud (true vs used, joined by thin segments) + two fit
-# lines, each labelled directly with a short leader pointing at the line
-# itself -- works even when the two lines coincide (panel B), which a
-# legend-only approach can't disambiguate on its own.
+# lines, each with its own leader label.
 make_panel <- function(x_true, x_used, y, used_label, xlab, title, subtitle,
                        slope_label, box_x, box_y, x_limits, vlines = NULL,
                        callout_x, label_nudge) {
@@ -56,9 +47,8 @@ make_panel <- function(x_true, x_used, y, used_label, xlab, title, subtitle,
   points <- rbind(data.frame(x = x_true, y = y, Type = "true"),
                   data.frame(x = x_used, y = y, Type = "used"))
 
-  # Leader-line callouts: find where each fit sits at callout_x, then offset
-  # the label text vertically (opposite directions) so the two never overlap,
-  # with a short segment from the label back to the actual point on its line.
+  # Label position: where each fit sits at callout_x, nudged apart vertically
+  # so the two labels never overlap.
   y_true_at <- predict(fit_true, data.frame(x_true = callout_x))
   y_used_at <- predict(fit_used, data.frame(x_used = callout_x))
   label_true_y <- y_true_at + label_nudge
@@ -76,7 +66,7 @@ make_panel <- function(x_true, x_used, y, used_label, xlab, title, subtitle,
     geom_line(data = line_true, aes(x, y), linewidth = 0.9, linetype = "dashed",
               colour = true_colour) +
     geom_line(data = line_used, aes(x, y), linewidth = 1, colour = used_colour) +
-    # leader segments from the label back to the line
+    # leader segments, label back to line
     annotate("segment", x = callout_x, xend = callout_x,
              y = y_true_at, yend = label_true_y - sign(label_nudge) * 0.6,
              colour = true_colour, linewidth = 0.4) +
@@ -97,8 +87,7 @@ make_panel <- function(x_true, x_used, y, used_label, xlab, title, subtitle,
   list(plot = p, slope_true = slope_true, slope_used = slope_used)
 }
 
-# Classical error: true x is fixed, the observed x is blurred by noise
-# unrelated to the true value.
+# Classical error: true x blurred by independent noise.
 x_true_c <- runif(N, 0, 12)
 y_c      <- 2 + 3 * x_true_c + rnorm(N, 0, 2)
 x_obs_c  <- x_true_c + rnorm(N, 0, 4)
@@ -110,8 +99,7 @@ res_a <- make_panel(
   box_x = -1.5, box_y = 44, x_limits = c(-2, 16),
   callout_x = 10.5, label_nudge = 7)
 
-# Berkson error: a window is fixed first (a phase), and the true x is drawn
-# uniformly inside it -- exactly what sim_linear.stan assumes for true_date.
+# Berkson error: a phase window is fixed first, true x uniform inside it.
 bounds <- seq(0, 30, by = 5)
 mid    <- (bounds[-length(bounds)] + bounds[-1]) / 2
 win    <- sample(seq_len(6), N, replace = TRUE)

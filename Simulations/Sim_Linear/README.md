@@ -4,7 +4,7 @@ A continuous measurement is assumed to follow a linear temporal trend
 $f(t) = \text{baseline} + \text{slope} \cdot t$, observed with Gaussian noise. Each observation is
 dated only to a phase with `[Start_date, End_date]` rather than to a known year. Does treating each date as a latent parameter within its phase recover the trend better than collapsing the phase to its midpoint?
 
-From these preliminary results, the EIV and midpoint models agree on the trend (Berkson-like error) when deposition is uniform within a phase. The EIV model's interval is narrower at the same coverage, and its noise estimate (sigma) is both closer to the truth and much better calibrated than the midpoint's.
+From these preliminary results, the EIV and midpoint models agree on the trend (Berkson-like error) when deposition is uniform within a phase. The EIV model's interval is narrower at the same accuracy, and its noise estimate (sigma) is both closer to the truth and much better calibrated than the midpoint's.
 
 If we skew deposition within a phase (with more dates towards one edge rather than evenly), the intercept slightly shifts rather than producing a biased trend. The trend only becomes biased when that skew is combined with phase width correlating with position on the timeline (wide, coarsely-dated phases clustered at one end rather than scattered randomly), and even then the EIV model is not reliably better at recovering the trend than the midpoint model. What is different is that the EIV model allows calibrated uncertainty and per-sample date posteriors, although it does not reliably correct a biased trend. One possible approach would be providing an informative within-phase prior derived from external knowledge (C14 dates, stratigraphy, etc).
 
@@ -111,12 +111,12 @@ The midpoint model fixes each date at the centre of its phase. Both models recov
 
 ## Recovery study
 
-The dataset above is just one example for the paper; the real study draws many datasets — each with
+The dataset above is just one example for the paper; the real study uses many datasets — each with
 its own intercept, slope, noise, sample size, and periodisation, deposition always uniform within a
 phase. Both models (EIV and midpoint) are fit to all of them, recording how often the 50% / 90%
 interval holds the truth (accuracy) and how wide the interval is (precision).
 
-The preliminary results show that both models recover the intercept and slope with about the right coverage (50%/90% tables below). For a straight line the
+The preliminary results show that both models recover the intercept and slope with about the right accuracy (50%/90% tables below). For a straight line the
 midpoint is the average of the possible dates within a symmetric phase, so it does not bias the
 trend — this is (I think?) Berkson error, which unlike classical ME does not bias a regression.
 
@@ -142,10 +142,10 @@ Median 90% interval width across all recovery-study datasets, per parameter (`ou
 | Slope | 0.0032 | 0.0037 | 12.2% |
 | Sigma | 0.56 | 0.53 | -5.1% (EIV wider) |
 
-The midpoint model throws away the within-phase spread instead of modelling it, so its slope and
-intercept intervals are wider; for sigma the pattern reverses.
+The midpoint model discards the within-phase spread instead of modelling it, so its slope and
+intercept intervals are wider; for sigma the pattern is the opposite (as this spread is kept).
 
-### Sigma
+### Sigma accuracy
 The midpoint reads the within-phase date spread as measurement noise and overestimates it, so its 90% interval holds the
 true sigma only about 45% of the time against about 90% for EIV (`recovery_table.csv`: EIV 89.8%,
 Midpoint 45.0%). This behaviour is expected since the midpoint can only place the date uncertainty in
@@ -158,10 +158,9 @@ the residuals. As phases coarsen (lower H), the midpoint gets worse.
 | Slope | 50% | 46.2% | 48.0% |
 | Slope | 90% | 90.5% | 91.2% |
 | Sigma | 50% | 47.8% | 21.8% |
-| Sigma | 90% | 89.8% | 45.0% |
+| Sigma | 90% | **89.8%** | **45.0%** |
 
-In brief, under uniform within-phase deposition, EIV and midpoint agree on the trend, as
-expected. EIV has a lower sigma. 
+Under uniform within-phase deposition, EIV and midpoint agree on the trend, but EIV has a lower sigma. 
 
 ### Accuracy and precision against dating resolution
 
@@ -187,26 +186,21 @@ as sample size increases, independent of the H-driven story above.
 
 ## Scenario study
 
-The recovery study draws fully random datasets, always under uniform deposition, and shows the
+The recovery study uses fully random datasets, always under uniform deposition, and shows the
 general relationship. The script in `05_scenarios.R` is complementary. For the paper it might be better to show some realistic case studies, also including a skewed deposition and a biased between-phase sampling.
 
-There are three separate things about the dating that could go wrong, and
-only one of them can bias the trend, and only under a further condition:
+There are three separate things that we can change about the dating although they do not seem to bias the trend (maybe the third a bit):
 
-- **Fine dating** / **Coarse dating**: how finely the timeline is periodised. This only changes how
-  uncertain each date is -- coarser phases give wider intervals, but under Berkson error a linear fit
-  is not biased by this alone.
-- **Diagnostic sampling**: which phases the samples come from -- narrow, well-dated phases
-  over-sampled, simulating a good typochronological phase. This affects precision: both
-  OLS and Bayesian regression are unbiased under an uneven mix of x-values.
+- **Fine dating** / **Coarse dating**: how finely the timeline is periodised. This changes how
+  uncertain each date is, coarser phases give wider intervals, but under Berkson error a linear fit is not biased by this alone.
+- **Diagnostic sampling**: simulating a very good typochronological phase, where phases that are well-dated are over-sampled (because more material can be more easily attributed to that phase). In this case, both OLS and Bayesian regression are unbiased under an uneven mix of x-values.
 - **Skewed deposition** (`fine_mild`/`fine_strong`/`coarse_mild`/`coarse_strong`): where within a
   phase the dates actually sit. For instance, a deposition concentrated toward one edge of a phase rather
   than spread evenly. This does not bias the slope reliably: it seems to depend on where the phase sits on the timeline. I have tried with wide coarse phases towards the end, and the slope seems to be slightly biased, but it would be hard to assume this a priori and the script would not be generalisable.
   
-What six of the seven general-purpose cases look like as datasets, one draw each with the
-worked-example parameters (`fine_mild` is left out of the gallery: on narrow phases even strong skew
+The figure below shows a gallery of examples of the implementation of six (out of seven) general-purpose cases, using the worked-example parameters (`fine_mild` is left out of the gallery: on narrow phases even strong skew
 barely moves a date off its midpoint, so it looks near-identical to `fine dating`/`fine, strong skew`
-and adds no visible information -- it is still fit and reported below; the two illustrative
+and adds no visible information -- it is still fit and reported below; the two
 `coarse_strong_early`/`coarse_strong_late` cases are discussed separately below). True dates
 are dots, midpoints squares:
 
@@ -233,7 +227,7 @@ and slope accuracy sit close to 90% for both models, because none of these three
 | diagnostic | EIV | 0.0035 | 92% |
 | diagnostic | Midpoint | 0.0035 | 92% |
 
-Under coarse dating the EIV slope interval is 2.8x narrower than the midpoint's while coverage is
+Under coarse dating the EIV slope interval is 2.8x narrower than the midpoint's while accuracy is
 comparable, and EIV's sigma interval holds the truth far more often.
 
 ### Skewed deposition: changing the precision and intercept slightly
@@ -263,7 +257,7 @@ they separate (EIV ~1.06, near unbiased; midpoint ~1.34, overshooting), so EIV s
 not reliably. Either way, the only way to fix this would be using an informative within-phase prior from external evidence, not just a free date parameter. 
 
 Re: Sigma, EIV is still better across the 7 cases (below). The two illustrative cases follow the same pattern in
-`scenario_table.csv` (sigma coverage EIV 43-73% vs Midpoint ~29%) but are left out of the figure.
+`scenario_table.csv` (sigma accuracy EIV 43-73% vs Midpoint ~29%) but are left out of the figure.
 
 <p align="center">
 <img src="figures/scenario_sigma.png" height="360" text-align="center"/>
