@@ -1,43 +1,7 @@
-# Scenario study for the linear model.
-#
-# The recovery study (02) draws fully random datasets and shows the general
-# relationship. This script does the complementary thing: it fixes archetype
-# cases and draws many datasets within each, so the "when does EIV matter"
-# question has clean, quotable numbers per case. Everything except the
-# case-defining factor stays random (intercept, slope, sigma).
-#
-# There are three separate things about the dating that could go wrong, and
-# only one of them can actually bias a linear slope:
-#
-#   How finely the timeline is periodised (phase width: K, alpha_conc) only
-#   changes how uncertain each date is -- coarser phases give wider credible
-#   intervals, but a linear fit under Berkson error is not biased by this.
-#   Cases: fine (many even phases, high H), coarse (few uneven phases, low H).
-#
-#   Which phases the samples come from -- e.g. narrow, well-dated phases
-#   being over-sampled because recognisable ceramics happen to date them --
-#   also only affects precision (both OLS and Bayesian regression are
-#   unbiased under an uneven mix of x-values). Case: diagnostic.
-#
-#   Where within a phase the true dates actually sit is the thing that can
-#   matter. If deposition leans toward one edge of a phase -- e.g. population
-#   growth concentrating activity late within it -- the midpoint mislabels
-#   that sample's date, but on its own this mostly shifts the intercept
-#   rather than bending the slope. Cases: fine/coarse crossed with
-#   mild/strong skew, via simulate_skewed()'s skew_shape. skew_shape = 1 (the
-#   fine/coarse cases above) is uniform deposition, i.e. no skew, so those
-#   cases double as the "no skew" reference points for the skew comparison.
-#
-#   The slope only bends when phase width also correlates with position on
-#   the timeline -- coarse phases clustering at one end. Whether that
-#   happens, and which end, is a property of a specific dataset's evidentiary
-#   record (which periods happen to be well-typologised), not something safe
-#   to assume in general, so it is kept out of the main case grid above and
-#   demonstrated separately, as a worked example, in the
-#   coarse_strong_early / coarse_strong_late cases further down.
-#
-# Both models are fit to every dataset and the 50% / 90% interval coverage
-# (accuracy), width (precision), and slope bias are recorded, as in 02.
+#' Scenario study for the linear model: fixed cases (vs. 02's fully
+#' random draws), many repetitions each, to assess "when does EIV matter" for
+#' each case. Only within-phase deposition shape can bias the slope. Phase
+#' width and sampling only affect precision. See Notes/05_scenarios_notes.md.
 
 library(here)
 library(cmdstanr)
@@ -57,18 +21,11 @@ n_workers  <- as.integer(Sys.getenv("SCENARIOS_WORKERS", "18"))
 iter_warmup   <- as.integer(Sys.getenv("SCENARIOS_WARMUP", "500"))
 iter_sampling <- as.integer(Sys.getenv("SCENARIOS_SAMPLING", "500"))
 
-# fine and coarse draw dates uniformly over the timeline as before
-# (simulate_linear, via partition_timeline) and double as the "no skew"
-# reference for the skew cases below. diagnostic keeps uniform dates within
-# each window but over-samples the narrow phases. The four *_mild / *_strong
-# cases reuse the fine/coarse phase widths but draw true dates from a
-# within-phase Beta(skew_shape, 1) instead of uniform, via simulate_skewed(),
-# with position_strength = 0 -- phase width uncorrelated with position, the
-# general-purpose default with no assumption about which periods are better
-# dated. coarse_strong_early / coarse_strong_late are not part of that
-# general story: they turn position_strength on in each direction, purely as
-# a worked example of what happens if width does correlate with position in
-# a real dataset -- see simulate_skewed()'s comment below.
+# fine/coarse: uniform dates (no skew), double as skew cases' reference.
+# diagnostic: uniform within-window, over-samples narrow phases.
+# *_mild/*_strong: skewed (Beta(skew_shape,1)), position_strength = 0.
+# coarse_strong_early/late: same, but position_strength > 0 (example
+# of width correlating with position - see notes).
 scenarios <- tibble(
   case       = c("fine",   "coarse", "diagnostic",
                  "fine_mild", "fine_strong", "coarse_mild", "coarse_strong",
@@ -93,11 +50,8 @@ scenarios <- tibble(
                    TRUE,TRUE,TRUE,TRUE,
                    TRUE,FALSE))
 
-# Diagnostic sampling: same Dirichlet broken-stick boundaries as
-# partition_timeline, but observations are drawn towards the NARROW phases
-# (probability proportional to 1 / phase width) and placed uniformly inside the
-# window. Keeps the phase within-window date uniform, so the Stan prior still
-# holds; only the sampling intensity across phases changes.
+# Diagnostic sampling: over-samples narrow phases (prob ~ 1/width), uniform
+# within-window (see notes).
 simulate_diagnostic <- function(N, intercept, slope, sigma, K, alpha_conc, seed) {
   set.seed(seed)
   weights <- rgamma(K, shape = alpha_conc, rate = 1)
@@ -121,36 +75,10 @@ simulate_diagnostic <- function(N, intercept, slope, sigma, K, alpha_conc, seed)
   out
 }
 
-# Skewed deposition: same Dirichlet broken-stick widths and between-phase
-# sampling (prob proportional to width) as the fine/coarse cases. Two things
-# can change relative to those cases.
-#
-# First, where inside a phase the true date falls: instead of uniform, it is
-# drawn from Beta(skew_shape, 1) scaled onto [start, end]. skew_shape = 1 is
-# uniform (no skew); > 1 concentrates true dates toward the late edge of each
-# phase, whatever the reason (activity intensity, taphonomy, deposition
-# practice -- the mechanism doesn't matter here, only the resulting shape).
-# This alone mostly shifts the intercept, not the slope.
-#
-# Second, and off by default (position_strength = 0), WHICH phase gets which
-# width can be tied to position on the timeline: with position_strength > 0,
-# wide phases are nudged toward one end (coarse_early = TRUE puts them early,
-# FALSE puts them late) rather than placed at a random position. This is NOT
-# a general archaeological rule -- whether coarse phases cluster early, late,
-# or nowhere in particular is a property of a specific dataset's evidentiary
-# record (which periods happen to have well-studied typologies, coinage,
-# etc.), and can run in either direction depending on the case. It is used
-# here only in the coarse_strong_early / coarse_strong_late cases, as a
-# worked example of what happens if that correlation exists in a dataset --
-# not as an assumption baked into the general-purpose cases above. The nudge
-# is soft, not a rigid sort (position_strength blends a width-sorted order
-# with a random one), so any one dataset can still come out as something
-# other than a clean early-to-late staircase. What matters for the slope is
-# the correlation between width and position averaged over many datasets, not
-# the exact order in any single one: only when phase width is tied to
-# position does that correlation appear and the skew bend the slope; with no
-# such correlation, skew still shows up in sigma and the intercept, just not
-# in the trend -- which is why the general-purpose cases leave it off.
+# Skewed deposition: fine/coarse widths and sampling, but true dates drawn
+# from Beta(skew_shape, 1) within each window instead of uniform, and
+# optionally (position_strength > 0) with wide phases bending toward one end
+# (coarse_early). 
 simulate_skewed <- function(N, intercept, slope, sigma, K, alpha_conc,
                             skew_shape, seed, position_strength = 0,
                             coarse_early = TRUE) {
@@ -183,14 +111,8 @@ simulate_skewed <- function(N, intercept, slope, sigma, K, alpha_conc,
   out
 }
 
-# One dataset per case per replicate; intercept and sigma are random nuisance
-# parameters, everything else set by the case. Unlike the recovery study,
-# slope is fixed rather than drawn near zero: the scenario table reports
-# slope_ratio (estimate / true slope) as its bias measure, and dividing by a
-# true slope close to zero makes that ratio blow up or flip sign for reasons
-# that have nothing to do with which model is better. A fixed, moderate,
-# single-sign slope (the same value as the worked example in 01_example.R)
-# keeps that ratio meaningful.
+# One dataset per case per replicate. Slope fixed (not drawn near zero like
+# 02) so slope_ratio stays meaningful - see notes.
 datasets <- expand_grid(case = scenarios$case, rep = seq_len(n_rep)) %>%
   left_join(scenarios, by = "case") %>%
   mutate(dataset_id = row_number(),
@@ -291,12 +213,9 @@ if (file.exists(output_csv)) {
     cat(sprintf("WARNING: %d/%d fits with errors\n", n_errored, nrow(results)))
 }
 
-# One example dataset per case, with the nuisance parameters fixed at the
-# worked-example values, so the four scenarios can be seen as datasets before
-# any model touches them. Same look as the values-across-time panel of the
-# exploratory figure: one line per sample at its value spanning its phase
-# window, midpoint marked, true trend dashed. Runs whether or not the study
-# above was skipped.
+# One example dataset per case (fixed nuisance params) so scenarios can be
+# seen before any model touches them. Runs whether or not the study above
+# was skipped.
 library(ggplot2)
 
 example_intercept <- 5
@@ -304,11 +223,8 @@ example_slope     <- 0.015
 example_sigma     <- 1.5
 example_seed      <- 1
 
-# fine_mild is left out of the gallery: on narrow phases even strong skew
-# barely moves a date off its midpoint (see fine_strong), so the mild version
-# adds no visible information and only breaks the grid's symmetry. It is
-# still fit and reported in scenario_skew_bias.png, which needs all four
-# skew cells for the width x strength design.
+# fine_mild left out of the gallery (redundant with fine_strong visually);
+# still fit/reported in scenario_skew_bias.png -- see notes.
 case_labs <- c(fine = "Fine dating", coarse = "Coarse dating",
                diagnostic = "Diagnostic sampling",
                fine_strong = "Fine, strong skew",
@@ -338,9 +254,8 @@ truth_line <- data.frame(
   Year  = c(TMIN, TMAX),
   Value = example_intercept + example_slope * c(TMIN, TMAX))
 
-# True dates shown as dots: in the skewed case they pile toward the early edge
-# of the wide late phase while the midpoints stay at its centre, which is the
-# feature that defines the case and the windows alone cannot show.
+# True dates as dots vs. midpoint squares: shows the skew the windows alone
+# can't.
 examples_plot <- ggplot(examples) +
   geom_linerange(aes(y = Value, xmin = Start_date, xmax = End_date),
                  linewidth = 0.15, colour = "grey60", alpha = 0.5) +

@@ -46,18 +46,26 @@ partition_timeline <- function(
   windows
 }
 
-# One dataset from a two-slope trend that bends at cp (continuous at the join):
+# Two-slope trend that bends at cp (continuous at the join):
 #   f(t) = baseline + slope_1 * (t - TMIN)                        for t <= cp
 #   f(t) = baseline + slope_1 * (cp - TMIN) + slope_2 * (t - cp)  for t >  cp
-# Dates placed by the broken stick above; carries H as an attribute.
+# Shared by simulate_changepoint() and the scenario study's diagnostic/skewed
+# DGPs, which need the same mean function under different date-sampling
+# schemes.
+changepoint_mean <- function(true_date, baseline, slope_1, slope_2, cp) {
+  ifelse(true_date <= cp,
+         baseline + slope_1 * (true_date - TMIN),
+         baseline + slope_1 * (cp - TMIN) + slope_2 * (true_date - cp))
+}
+
+# One dataset from changepoint_mean(), dates placed by the broken stick
+# above; carries H as an attribute.
 simulate_changepoint <- function(N, baseline, slope_1, slope_2, cp, sigma,
                                  K, alpha_conc, seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
   windows   <- partition_timeline(N, K, alpha_conc)
   true_date <- windows$True_date
-  mu <- ifelse(true_date <= cp,
-               baseline + slope_1 * (true_date - TMIN),
-               baseline + slope_1 * (cp - TMIN) + slope_2 * (true_date - cp))
+  mu <- changepoint_mean(true_date, baseline, slope_1, slope_2, cp)
   out <- data.frame(
     Start_date = windows$Start_date,
     End_date   = windows$End_date,

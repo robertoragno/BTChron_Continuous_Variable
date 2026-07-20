@@ -32,24 +32,68 @@ simulation (`Sim_Linear/00_periodisation_check.R`).
 
 ## Scripts
 
-`simulate.R` holds the shared generating process (the `simulate_changepoint()`
-function, the `partition_timeline()` periodisation helper, and constants); it is
-sourced by both the worked example and the study, so the two provably use the same
-process. The pipeline is then:
+`simulate.R` holds the shared generating process (`simulate_changepoint()`,
+its `changepoint_mean()` helper, the `partition_timeline()` periodisation
+helper, and constants); it is sourced by the worked example, the recovery
+study, and the scenario study, so all three provably use the same process.
+The pipeline is then:
 
 | Script | Purpose | Output |
 |---|---|---|
 | `01_example.R` | draw ONE dataset, show it, fit both models, compare | `figures/exploratory_panel.png`, `model_comparison_single_fit.png`, `individual_date_posteriors.png` |
-| `02_recovery_study.R` | draw MANY random plausible datasets (each with its own baseline, two slopes, changepoint, noise, sample size, and periodisation), fit both models, record whether each interval contains the truth and how wide it is | `output/recovery_results.csv` |
-| `03_recovery_plots.R` | the study figures | `figures/recovery.png`, `accuracy.png`, `accuracy_precision_composite.png`, `precision_vs_entropy.png`, `sigma_vs_entropy.png`, `accuracy_vs_entropy.png`, `precision_boxplots.png`, `precision_vs_n.png` |
+| `02_recovery_study.R` | draw MANY random plausible datasets (each with its own baseline, two slopes, changepoint, noise, sample size, and periodisation), fit both models, record whether each interval contains the truth and how wide it is. Continuous sweep, not specific cases -- that's `06` below. | `output/recovery_results.csv` |
+| `03_recovery_plots.R` | accuracy and precision against dating resolution (H) and against sample size (N) | `figures/accuracy_precision_composite.png`, `precision_vs_n.png`, `output/recovery_table.csv`, `recovery_width_summary.csv` |
 | `04_convergence_diagnostic.R` | inspect which datasets fail to converge, contrasting periodisation resolution with changepoint detectability | `figures/convergence_diagnostic.png` |
-| `05_marginal_rescue_check.R` | experimental: refit the marginalized EIV model (below) on exactly the datasets the ordinary EIV model failed to converge on, and report the rescue rate | `output/marginal_rescue_check.csv` |
+| `05_scenarios.R` | nine fixed cases -- seven general-purpose (fine dating, coarse dating, diagnostic sampling, fine/coarse crossed with mild/strong within-phase deposition skew, phase width uncorrelated with position) plus two illustrative-only cases (strong skew with phase width forced early or late) -- many datasets each, both models fit; also draws one example dataset per general-purpose case | `output/scenarios.csv`, `figures/scenario_examples.png` |
+| `06_scenario_plots.R` | the scenario figures | `figures/scenario_accuracy_precision.png`, `scenario_skew_bias.png`, `position_bias_example.png`, `scenario_sigma.png`, `output/scenario_table.csv` |
 
-The example (`01`) fits in seconds; the study (`02`) is ~800 fits over a few
-minutes, so plotting (`03`) is separate. Sample size is swept across
-$N \in \{50, 100, 200, 400\}$. To keep every changepoint genuine, the slopes are drawn
-as $\text{slope}_1 \sim \mathcal{U}(-0.03, 0.03)$ and $\text{slope}_2 = \text{slope}_1 \pm \mathcal{U}(0.01, 0.05)$ — the slope
+The example (`01`) fits in seconds; the recovery study (`02`) is 800 fits
+(~6 minutes on this machine); the scenario study (`06`) is 1800 fits (~14
+minutes), so plotting is kept separate in both cases. Sample size is swept
+across $N \in \{50, 100, 200, 400\}$. To keep every changepoint genuine, the
+recovery study draws slopes as $\text{slope}_1 \sim \mathcal{U}(-0.03, 0.03)$
+and $\text{slope}_2 = \text{slope}_1 \pm \mathcal{U}(0.01, 0.05)$ -- the slope
 change is random but never negligible, so the changepoint stays identifiable.
+The scenario study instead fixes both slopes and the changepoint at the
+worked-example values (0.015, -0.01, 500), since its bias metric is a ratio
+of estimate to true value and a true slope near zero would make that ratio
+meaningless.
+
+`02`/`03` and `06`/`07` are two different studies, not a duplicate: `02` draws
+fully random datasets and shows the *continuous* relationship (as dating
+resolution H or sample size N varies, how do accuracy and precision move);
+`06` fixes specific, realistic cases -- including skewed deposition and
+biased sampling, neither of which are included in `02`. `03`'s composite
+figure anchors the `fine`/`coarse`/`diagnostic` cases from `06` as vertical
+reference lines on the continuous H axis, linking the two.
+
+Six further cuts of the same H-resolved recovery relationship (`recovery.png`,
+`accuracy.png`, `precision_vs_entropy.png`, `sigma_vs_entropy.png`,
+`accuracy_vs_entropy.png`, `precision_boxplots.png`) were dropped from `03` as
+redundant with `accuracy_precision_composite.png` and archived, code and
+figures both, in
+`archive/recovery_figures_trim_20260716/recovery_supplementary_figures.R`.
+
+## Stan model: normalised time scale
+
+Dates are mapped to $[-1, 1]$ (centred), rather than $[0, 1]$, before fitting.
+Centring the covariate keeps the intercept and the two slopes from being
+strongly correlated in the posterior -- the same change made to the linear
+model. Re-running the recovery study after this change (same seed, so the
+800 simulated datasets are identical; only the Stan model differs) shows a
+clear improvement, most visibly for `slope_2`, the segment after the kink:
+
+| | Old ($[0,1]$ scale) | New ($[-1,1]$ scale) |
+|---|---|---|
+| Slope 2, 90% coverage (EIV) | 72.5% | 90.8% |
+| Slope 2, 90% coverage (midpoint) | 58.0% | 83.3% |
+| Divergent transitions, EIV (total across 400 fits) | 3300 | 869 |
+| High-Rhat fits, midpoint (max Rhat > 1.05) | 17.0% | 6.0% |
+
+Slope 2 was the worst-calibrated parameter under the old parameterisation --
+badly under-covering for both models -- and now sits almost exactly at the
+90% nominal rate. Divergences for the EIV model dropped roughly 4x. All
+numbers quoted in the rest of this README are from the new parameterisation.
 
 ## Exploratory panel
 <p align="center">
@@ -73,8 +117,8 @@ where $t_n$ is the latent true date of observation $n$.
 Before the changepoint the last term is zero and the mean is $\alpha + \beta_1 t$;
 after it the slope becomes $\beta_2$, the segments meeting continuously, so
 $\beta_2 - \beta_1$ is the change in slope. The changepoint is a free parameter with a
-uniform prior, fit jointly; its true value (500 CE) is only used afterwards to
-check recovery.
+flat prior over the normalised time range, fit jointly; its true value (500 CE) is
+only used afterwards to check recovery.
 
 Left panels: the recovered trend with a sample's phase (shaded) and value
 (dashed). Right panels: each date's posterior, with the phase boundaries (dashed)
@@ -89,7 +133,10 @@ the model does not invent precision it lacks.
 
 The midpoint model fixes each date at the centre of its phase. On a single
 dataset both recover the trend, but the midpoint returns a larger sigma: the
-within-phase date spread it ignores ends up in the residual.
+within-phase date spread it ignores ends up in the residual. Near the
+changepoint the midpoint's trend also lags and smooths through the kink,
+since the midpoints of phases straddling the kink stay fixed at their centres
+regardless of which side of the changepoint the true dates actually fall on.
 
 <p align="center">
 <img src="figures/model_comparison_single_fit.png" height="800" text-align="center"/>
@@ -102,128 +149,212 @@ its own baseline, two slopes, changepoint, noise, sample size, and periodisation
 Both models are fit to all of them, recording how often the 50% / 90% interval
 holds the truth (accuracy) and how wide it is (precision). The changepoint
 posterior is harder to sample than the linear one, so about a fifth of fits are
-dropped for non-convergence (max Rhat > 1.05 or divergences). The accuracy rates
-are essentially unchanged with or without this filter.
+dropped for non-convergence (max Rhat > 1.05 or divergences; EIV 20.8%, midpoint
+17.0% -- see `04_convergence_diagnostic.R` below). The accuracy rates are
+essentially unchanged with or without this filter.
 
-`04_convergence_diagnostic.R` asks whether the dropped fits are weak-signal cases
-or just hard geometries. Detectability is a kink/noise ratio: the slope change
-times the distance from the changepoint to the nearer data edge, over sigma (a
-sharp bend away from the edges is easy to see; wide scatter hides it).
-Non-convergence tracks the periodisation resolution — coarse periodisations (low
-H, one long phase) converge less often — far more than it tracks a weak kink, so
-the dropped fits are not simply the weakest changepoints.
+| Parameter | Interval | EIV | Midpoint |
+|---|---|---|---|
+| Baseline | 50% | 48.3% | 59.0% |
+| Baseline | 90% | 91.2% | 95.8% |
+| Slope 1 | 50% | 48.3% | 54.2% |
+| Slope 1 | 90% | 89.9% | 94.0% |
+| Slope 2 | 50% | 45.7% | 44.9% |
+| Slope 2 | 90% | 90.2% | 82.8% |
+| Changepoint | 50% | 48.9% | 56.3% |
+| Changepoint | 90% | 89.9% | 89.8% |
+| Sigma | 50% | 49.8% | 9.6% |
+| Sigma | 90% | 90.2% | 26.8% |
 
-*Preliminary results*. Both recover the baseline, first slope, and changepoint location at
-near-nominal accuracy, at any resolution. They diverge mainly in three places. 
+Both models recover the baseline, first slope, and changepoint location at
+near-nominal accuracy. They diverge in two places:
 
-1. Precision: the EIV intervals for the structural parameters are tighter, roughly
-35–70% narrower for the baseline, both slopes, and the changepoint, since the
-midpoint throws away the within-phase spread that constrains the trend (I think?). 
+1. **Precision.** Comparing median interval widths paired by dataset
+   (`recovery_width_summary.csv`), EIV's interval is 34-44% narrower for the
+   baseline and both slopes, and 36% narrower for the changepoint, since the
+   midpoint throws away the within-phase spread that constrains the trend.
+   For sigma the two are about the same width -- EIV's is 0.2% *wider* --
+   which only matters together with the next point.
+2. **Sigma.** The midpoint reads the within-phase date spread as noise and
+   overestimates it, so its 90% interval holds the true sigma only 26.8% of
+   the time against 90.2% for EIV -- similar widths, wildly different
+   accuracy, because the midpoint's sigma estimates are simply biased high
+   rather than merely uncertain.
 
-2. Sigma: the midpoint reads the within-phase date spread as noise and overestimates it, so
-its 90% interval contains the true sigma only ~31% of the time against ~90% for EIV,
-and worse as phases coarsen. 
-
-3. `slope_2`: the post-changepoint segment is
-under-covered by both models. In the EIV model accuracy is ~76% at 90%; in the midpoint model is slightly worse (~64% at 90% interval). 
-
-Precision improves with sample size for both models, as expected.
-
-<p align="center">
-<img src="figures/recovery.png" height="320" text-align="center"/>
-</p>
-
-<p align="center">
-<img src="figures/accuracy.png" height="340" text-align="center"/>
-</p>
-
-Overall calibration. For each parameter, the share of datasets whose 50% and 90%
-interval actually held the true value. The dashed line shows the nominal rates; the whiskers are 95% Jeffreys intervals.
+Slope 2 (the post-changepoint segment) now sits at nominal coverage for EIV
+(90.2%) and close to it for the midpoint (82.8%) -- the main effect of the
+$[-1,1]$ rewrite above. Precision improves with sample size for both models,
+as expected.
 
 ### Accuracy and precision against dating resolution
 
-These plots show if an interval is accurate (does the 90% interval hold the truth?) and
-precise (width of the 90% interval). Panel A shows the accuracy and panel B shows the
-precision, both across the entropy range.
+Does the 90% interval hold the truth (panel A) and, if so, how wide is it
+(panel B), as the periodisation changes from coarse (low H) to fine (high
+H)? The dotted vertical lines mark where the `fine`, `coarse`, and
+`diagnostic` cases from the scenario study (below) sit on this same
+spectrum.
 
 <p align="center">
 <img src="figures/accuracy_precision_composite.png" height="560" text-align="center"/>
 </p>
 
-Unlike the linear case, the trend here bends at the changepoint, meaning that the midpoint is no
-longer the average of the possible dates. The two models diverge on the parameters near the kink: for Slope 2, the changepoint, and sigma the midpoint misses the truth more
-often than EIV and is also wider. For coarser phases, sigma is more accurate in the EIV model:
-
-<p align="center">
-<img src="figures/precision_boxplots.png" height="340" text-align="center"/>
-<img src="figures/sigma_vs_entropy.png" height="340" text-align="center"/>
-</p>
-
+Baseline and Slope 1 sit close to nominal across the entropy range for both
+models. Slope 2 and the changepoint are noisier at low H (few datasets there
+converge at all -- see below) but recover the same near-nominal accuracy by
+mid-to-high H. Sigma is where the two models separate cleanly: EIV holds
+close to 90% throughout, while the midpoint's accuracy degrades sharply
+toward low H, exactly where the within-phase spread it ignores is largest.
 
 ### Further checks #1: Sample size
 
-We also check how sample size affects the precision: both models show a steady improvement
-in precision as sample size increases.
+Both models show a steady improvement in precision as sample size increases.
 
 <p align="center">
 <img src="figures/precision_vs_n.png" height="320" text-align="center"/>
 </p>
 
-
 ### Further checks #2: Convergence
 
-The changepoint posterior is harder to sample. Since some fits did not converge, we tried to also check which fits in particular were failing (see the preliminary results above and `04_convergence_diagnostic.R`).
+The changepoint posterior is harder to sample than the linear one. Since some
+fits do not converge, `04_convergence_diagnostic.R` checks whether the
+dropped fits are weak-signal cases or just hard geometries: detectability is
+a kink/noise ratio (the slope change times the distance from the changepoint
+to the nearer data edge, over sigma -- a sharp bend away from the edges is
+easy to see; wide scatter hides it). Non-convergence tracks the
+periodisation resolution -- coarse periodisations (low H, one long phase)
+converge far less often (57% in the lowest-H quartile, rising to 95% in the
+highest) -- much more strongly than it tracks a weak kink (roughly 72-90%
+for EIV and 77-92% for the midpoint across the detectability range, with no
+clear trend). So the fits dropped by the convergence filter above are not
+simply a biased sample of the weakest changepoints.
 
 <p align="center">
 <img src="figures/convergence_diagnostic.png" height="400" text-align="center"/>
 </p>
 
-## Marginalized latent dates (experimental)
+## Scenario study
 
-The ordinary EIV model gives every observation its own free date parameter,
-sampled uniformly within its window. For a bone whose window straddles the
-changepoint that parameter effectively has to pick a side (before or after
-the kink), and different MCMC chains can settle on different sides — a
-multimodality that shows up as high Rhat, divergences, and dropped fits (the
-~20% non-convergence rate above). `models/sim_changepoint_marginal.stan`
-removes the per-observation date parameters entirely: instead of sampling a
-date, each observation's likelihood integrates the date out over a 40-point
-grid spanning its window (the same uniform-within-window assumption, just
-computed by quadrature instead of by MCMC). No date parameter means no
-per-observation mode for chains to disagree about. Per-object date posteriors
-are not lost — `generated quantities` reconstructs one posterior draw of each
-bone's date per iteration by sampling from the same grid weights used in the
-likelihood, so the existing plotting code applies unchanged.
+The recovery study draws fully random datasets and shows the general
+relationship; `05_scenarios.R` fixes nine archetype cases instead, so the
+"when does EIV matter" question has clean, quotable numbers per case.
+Baseline and sigma stay random nuisance draws in every case; the two slopes
+and the changepoint are fixed at the worked-example values (0.015, -0.01,
+500) so the ratio-based bias metrics below stay meaningful.
 
-`05_marginal_rescue_check.R` refits the marginal model on exactly the 90
-datasets the ordinary EIV model failed to converge on in the recovery study
-above (same seeds, same true parameters) and checks whether the marginal
-model converges where the latent one didn't.
+There are three separate things about the dating that could go wrong:
 
-**Result: 50 of 90 (56%) are fully rescued** (Rhat ≤ 1.05, zero divergences),
-and the ones that aren't get much closer — median max Rhat drops from 1.20 to
-1.02 across all 90. On the single worst case in the set (Rhat 2.22, ESS in
-the single digits — a genuinely broken fit) the marginal model reached Rhat
-1.06 with ESS in the hundreds. This matches the multimodality explanation:
-removing the per-observation parameters removes most of what was breaking
-the sampler.
+- **Fine dating** / **Coarse dating**: how finely the timeline is
+  periodised. In the linear model this only changes precision, not bias.
+  In the changepoint model it turns out to also matter for accuracy near the
+  kink (see below) -- coarse phases straddling the changepoint make it
+  genuinely harder to tell which side of the kink an observation belongs to.
+- **Diagnostic sampling**: which phases the samples come from -- narrow,
+  well-dated phases over-sampled, simulating a good typochronological phase.
+- **Skewed deposition** (`fine_mild`/`fine_strong`/`coarse_mild`/`coarse_strong`):
+  where within a phase the dates actually sit.
 
-Two things keep this at "experimental" rather than a replacement for the main
-pipeline:
+As in the recovery study, `06_scenario_plots.R` filters to converged fits
+(max Rhat ≤ 1.05, no divergences) before computing every number below. This
+filter bites hardest on the coarse cases -- `n_fit` in `scenario_table.csv`
+is only 34-46/100 for `coarse`, `coarse_mild`, `coarse_strong` (EIV) and
+27-35/100 (midpoint), against ~90-100/100 for the fine and diagnostic cases
+-- so coarse-case numbers describe the subset of datasets whose posterior
+happened to converge, not all 100 replicates. Where this matters for a
+specific claim below (the coarse Slope 1 ratio), it has been checked against
+the full unfiltered set and found to hold; it has not been re-checked for
+every number in this section.
 
-- **The rescue rate isn't uniform, and part of the pattern is unexplained.**
-  It's strongest at low-to-moderate entropy (67% and 60% rescued in the
-  bottom two H terciles) but weakest at the *highest* entropy (40% in the top
-  tercile) — the opposite of what "coarse dating causes multimodality" alone
-  predicts. The likely explanation is that the still-failing high-H datasets
-  are failing for a different reason (weak kink, high sigma) that
-  marginalization doesn't address, but this hasn't been confirmed. Small
-  samples (N=50) also rescue worst (42%), possibly because the 40-point grid
-  is comparatively coarse when there is little data to pin the trend down —
-  untested.
-- **It is much slower.** Even after vectorizing the quadrature (grid
-  operations as vector ops rather than a scalar loop), a marginal fit takes
-  roughly 6–8x longer than the equivalent latent-model fit, because cost
-  scales with N × 40 grid evaluations rather than N. A full recovery-study
-  rerun with this model would take hours rather than minutes, so for now it
-  is used only as a targeted rescue check, not folded into `02`/`03`.
+Six of the seven general-purpose cases as datasets, one draw each with the
+worked-example parameters (`fine_mild` is left out of the gallery for the
+same reason as in the linear study -- it looks near-identical to `fine
+dating`/`fine, strong skew` and adds no visible information, though it is
+still fit and reported below). True dates are dots, midpoints squares:
+
+<p align="center">
+<img src="figures/scenario_examples.png" height="560" text-align="center"/>
+</p>
+
+### Fine, coarse, diagnostic
+
+<p align="center">
+<img src="figures/scenario_accuracy_precision.png" height="700" text-align="center"/>
+</p>
+
+Unlike the linear case, coarse dating alone is not bias-neutral here: even
+with no deposition skew, the `coarse` case's Slope 1 ratio (posterior median
+/ true slope) is 0.66 for EIV against 0.97 under `fine` -- a real flattening
+toward zero, not just wider uncertainty. Coverage does not reveal this on
+its own (both models still hold 90-93% of their 90% intervals over the
+truth, because the intervals widen enough to keep catching it), which is
+why the ratio, not the coverage rate, is the number to read here. This
+ratio is essentially unchanged (0.58 for EIV) if computed on all 100 raw
+replicates from `scenarios.csv` instead of only the ones that converged
+(see the convergence caveat above), so the effect is not an artifact of
+which fits survived the convergence filter. Precision costs are
+also steep under coarse dating: Slope 1's interval is about 23% narrower for
+EIV than midpoint (0.026 vs 0.034) and the changepoint's is about 8%
+narrower (504 vs 550 years). Sigma repeats the recovery-study pattern at
+case level: EIV's 90% interval holds the true sigma 95.7% of the time under
+coarse dating against 42.9% for the midpoint (`scenario_table.csv`).
+
+### Skewed deposition
+
+<p align="center">
+<img src="figures/scenario_skew_bias.png" height="700" text-align="center"/>
+</p>
+
+Panel A: the slope ratio (posterior median / true slope), faceted by phase
+width, for the four general-purpose skew cases (phase width uncorrelated
+with timeline position). On fine phases both slope ratios stay pinned near
+1 regardless of skew strength, matching the linear result. On coarse phases
+the ratios are already well below 1 with no skew at all (`coarse`'s own
+Slope 1 ratio is 0.66, EIV) and stay depressed and noisy as skew increases --
+consistent with the coarse-dating effect noted above rather than skew being
+the driver. Panel B: the changepoint's own bias, in years rather than a
+ratio (a location near 500 has no natural "unbiased ratio"). It stays small
+and centred near zero on fine phases and grows noisier, but not
+systematically signed, on coarse ones.
+
+### Worked example: phase width correlated with position
+
+<p align="center">
+<img src="figures/position_bias_example.png" height="450" text-align="center"/>
+</p>
+
+As in the linear study, this is not a general claim -- whether coarse phases
+cluster early or late on a real timeline depends on which periods happen to
+be well-typologised. With wide phases forced early, both slopes are pulled
+toward zero or past it for both models (Slope 1 ratio EIV -0.38, midpoint
+-0.47) and the changepoint is pulled substantially earlier (EIV -52 years,
+midpoint -15). With wide phases forced late, the picture flips in direction
+but not in the general lesson: EIV stays closer to unbiased on Slope 1
+(0.56 vs midpoint's 1.07, an overshoot past the truth) while both push the
+changepoint later than true (EIV -83, midpoint -62 years -- both still
+negative here because the changepoint estimate lags behind where the
+worked-example kink actually sits once phase width correlates with
+position). Neither model is reliably better at defending against this
+correlation; it is a property of the periodisation, not something a free
+date parameter alone can fix.
+
+<p align="center">
+<img src="figures/scenario_sigma.png" height="360" text-align="center"/>
+</p>
+
+Sigma keeps the same pattern as the recovery study across every case: EIV's
+interval holds the truth far more often than the midpoint's, and the gap
+widens as phases coarsen.
+
+### Final thoughts
+
+The $[-1,1]$ rewrite fixed the worst calibration problem in the old model
+(Slope 2 coverage) without changing the qualitative story: EIV is
+consistently more precise and much better calibrated on sigma, and neither
+model is immune to bias from coarse, position-correlated periodisations.
+What is new relative to the linear simulation is that coarse dating alone --
+without any deposition skew -- already costs the changepoint model some
+slope accuracy and precision near the kink, because widely-dated
+observations straddling the changepoint are genuinely hard to assign to one
+side or the other. Before trusting a changepoint estimate on a real
+periodisation, both the general recovery-study caveats (coarser dating
+lowers accuracy near the kink) and the linear study's caveat (check whether
+phase width correlates with phase position) apply.

@@ -243,7 +243,7 @@ make_date_panel <- function(sample_index) {
     labs(title = paste0(sample_label, " — trend vs observed value"),
          x = "Date (CE)", y = "Value") + panel_theme
 
-  estimated_dates <- latent_draws[[paste0("true_date_actual[", sample_index, "]")]]
+  estimated_dates <- latent_draws[[paste0("date_actual[", sample_index, "]")]]
   date_density <- ggplot(tibble(estimated_date = estimated_dates),
                          aes(estimated_date)) +
     geom_density(fill = "grey60", colour = "black", linewidth = 0.4, alpha = 0.5) +
