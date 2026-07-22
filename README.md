@@ -16,15 +16,8 @@ BTChron_Paper_1/
 │   ├── archive/Sim_GP/    # Gaussian Process (bell-curve trend), on hold
 │   └── (each contains: data/ figures/ scripts/ models/ output/)
 ├── Real_Data/
-│   ├── data/
-│   │   ├── dataset_1/
-│   │   ├── dataset_2/
-│   │   └── dataset_3/
-│   ├── models/            # Stan models (real data)
-│   ├── scripts/           # R scripts (real data)
-│   ├── output/
-│   │   ├── dataset_1/
-│   │   ├── dataset_2/
-│   │   └── dataset_3/
-│   └── figures/
+│   ├── dataset_1/          # Linear case study (GINI database)
+│   ├── dataset_2/          # not yet started
+│   ├── dataset_3/          # not yet started
+│   └── (each contains: data/ figures/ scripts/ models/ output/ archive/)
 ```
