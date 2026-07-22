@@ -9,9 +9,9 @@ library(tidyverse)
 library(posterior)
 library(patchwork)
 
-clean_path <- here("Real_Data", "data", "dataset_1", "gini_gb_filtered.csv")
-output_dir <- here("Real_Data", "output", "dataset_1")
-figure_path <- function(name) here("Real_Data", "figures", name)
+clean_path <- here("Real_Data", "dataset_1", "data", "gini_gb_filtered.csv")
+output_dir <- here("Real_Data", "dataset_1", "output")
+figure_path <- function(name) here("Real_Data", "dataset_1", "figures", name)
 
 panel_theme <- theme_classic(base_size = 11) +
   theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),

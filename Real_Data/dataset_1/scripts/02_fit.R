@@ -10,8 +10,8 @@ library(tidyverse)
 library(cmdstanr)
 library(posterior)
 
-clean_path <- here("Real_Data", "data", "dataset_1", "gini_gb_filtered.csv")
-output_dir <- here("Real_Data", "output", "dataset_1")
+clean_path <- here("Real_Data", "dataset_1", "data", "gini_gb_filtered.csv")
+output_dir <- here("Real_Data", "dataset_1", "output")
 
 gb_data <- read_csv(clean_path, show_col_types = FALSE)
 n_observations <- nrow(gb_data)
@@ -27,11 +27,11 @@ fit_args <- list(data = stan_data, chains = 4, parallel_chains = 4,
 
 cat("Fitting latent-date model (N =", n_observations, ")\n")
 fit_latent <- do.call(
-  cmdstan_model(here("Real_Data", "models", "linear_latent.stan"))$sample, fit_args)
+  cmdstan_model(here("Real_Data", "dataset_1", "models", "linear_latent.stan"))$sample, fit_args)
 
 cat("Fitting midpoint model\n")
 fit_midpoint <- do.call(
-  cmdstan_model(here("Real_Data", "models", "linear_midpoint.stan"))$sample, fit_args)
+  cmdstan_model(here("Real_Data", "dataset_1", "models", "linear_midpoint.stan"))$sample, fit_args)
 
 fit_latent$save_object(file.path(output_dir, "fit_latent.rds"))
 fit_midpoint$save_object(file.path(output_dir, "fit_midpoint.rds"))
