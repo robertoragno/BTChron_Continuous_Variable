@@ -275,7 +275,7 @@ sigma_plot <- ggplot(sigma_error, aes(case, sigma_err, fill = model)) +
 ggsave(figure_path("scenario_sigma.png"), sigma_plot,
        width = 11, height = 4.5, dpi = 300, bg = "white")
 
-# scenario_table.csv : the quotable per-case numbers.
+# scenario_table.csv : per-case numbers.
 scenario_table <- results %>%
   group_by(case, model) %>%
   summarise(H = round(mean(H), 2), sampled_width = round(mean(mean_width)),

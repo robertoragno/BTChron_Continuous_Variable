@@ -1,11 +1,11 @@
-# Recovery study for the linear model.
-#
-# Many random plausible datasets are simulated: each draws its own intercept,
-# slope, noise sigma, sample size, and periodisation (a Dirichlet broken stick
-# of K phases with concentration alpha_conc). Each dataset's dating resolution
-# is summarised by the Shannon entropy H of its phase weights. Both the
-# latent-date and midpoint models are fit to each, and we record whether each
-# 50% / 90% credible interval contains the true value (accuracy) and how wide it
+#' Recovery study for the linear model.
+#'
+#' Many random plausible datasets are simulated: each draws its own intercept,
+#' slope, noise sigma, sample size, and periodisation (a Dirichlet broken stick
+#' of K phases with concentration alpha_conc). Each dataset's dating resolution
+#' is summarised by the Shannon entropy H of its phase weights. Both the
+#' latent-date and midpoint models are fit to each, and we record whether each
+#' 50% / 90% credible interval contains the true value (accuracy) and how wide it
 # is (precision). Nothing is held fixed except the structure of the question.
 
 # Libraries
@@ -41,7 +41,8 @@ datasets <- tibble(
   sigma      = runif(n_datasets, 0.5, 4),       # low to high scatter
   K          = sample(3:10, n_datasets, replace = TRUE),          # number of phases
   #' Alpha still leans towards coarse phases, but by exponentiating 10 to a Beta, 
-  #' we get a spread over [0.1, 10] rather than the conventional (Beta) boundaries between 0 and 1.
+  #' we get a spread over [0.1, 10] rather than the conventional (Beta) boundaries 
+  #' between 0 and 1.
   alpha_conc = 10^(-1 + 2 * rbeta(n_datasets, 2, 3.5)),           
   N          = rep(c(50, 100, 200, 400), length.out = n_datasets) # swept sample size
 )
@@ -124,7 +125,7 @@ run_one_job <- function(job_index) {
 if (file.exists(output_csv)) {
   cat("recovery_results.csv already exists; do not re run.\n")
 } else {
-  cat(sprintf("Running %d fits (%d datasets x 2 models) on %d workers...\n",
+  cat(sprintf("Running %d fits (%d datasets x 2 models) on %d workers.\n",
               nrow(jobs), n_datasets, n_workers))
   start_time <- Sys.time()
   results <- bind_rows(mclapply(seq_len(nrow(jobs)), run_one_job,

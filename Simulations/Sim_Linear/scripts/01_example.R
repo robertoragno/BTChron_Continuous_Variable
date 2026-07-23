@@ -1,11 +1,11 @@
-# Worked example: ONE dataset drawn from the shared generating process
-# (simulate.R), shown and fitted, purely to illustrate what a single dataset and
-# fit look like. The systematic analysis is in 02_recovery_study.R, which draws
-# many datasets from the same generator.
-#
-# Produces: exploratory_panel.png, model_comparison_single_fit.png,
+#' Paper example: ONE dataset drawn from simulate.R, fitted to 
+#' show what a single dataset and fit look like. The systematic 
+#' analysis is in 02_recovery_study.R, which draws many datasets 
+#' from the same generator.
+#'
+#' Figures: exploratory_panel.png, model_comparison_single_fit.png,
 #           individual_date_posteriors.png
-# Fits are kept in memory (fast for one dataset), not cached to disk.
+# Fits are kept in memory (since it is a single dataset).
 
 library(here)
 library(tidyverse)
@@ -21,7 +21,7 @@ panel_theme <- theme_classic(base_size = 11) +
   theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
         plot.margin = margin(5, 10, 2, 10))
 
-# 1. One illustrative dataset --------------------------------------------------
+# 1. Illustrative dataset for the paper -----------------------------------
 
 intercept <- 5
 slope <- 0.015
@@ -41,11 +41,11 @@ sim_data <- sim_raw %>%
                             n_observations, replace = TRUE)) %>%
   select(ID, Site_name, Start_date, End_date, True_date, Value)
 
-ground_truth <- tibble(Year = seq(TMIN, TMAX),
-                       True_value = intercept + slope * seq(TMIN, TMAX))
+reference_curve <- tibble(Year = seq(TMIN, TMAX),
+                       reference_value = intercept + slope * seq(TMIN, TMAX))
 
 write_csv(sim_data, here("Simulations", "Sim_Linear", "data", "simulated_data.csv"))
-write_csv(ground_truth, here("Simulations", "Sim_Linear", "data", "ground_truth.csv"))
+write_csv(reference_curve, here("Simulations", "Sim_Linear", "data", "reference_curve.csv"))
 write_csv(tibble(parameter = c("baseline", "slope", "sigma_noise",
                                "n_phases", "alpha_conc", "shannon_H"),
                  value = c(intercept, slope, sigma,
@@ -77,7 +77,7 @@ values_over_time <- ggplot(exploratory, aes(Midpoint, Value)) +
   geom_linerange(aes(xmin = Start_date, xmax = End_date), linewidth = 0.15,
                  colour = "grey60", alpha = 0.5) +
   geom_point(shape = 15, size = 0.6, colour = "black", alpha = 0.7) +
-  geom_line(data = ground_truth, aes(Year, True_value), linewidth = 0.7,
+  geom_line(data = reference_curve, aes(Year, reference_value), linewidth = 0.7,
             colour = "black", linetype = "dashed") +
   scale_x_continuous(breaks = seq(100, 900, 100), expand = c(0.01, 0)) +
   labs(title = expression(bold("C.") ~ "Values across time"), x = "Year CE",
@@ -146,7 +146,7 @@ make_trend_panel <- function(fit, title_label) {
     geom_ribbon(aes(Year, ymin = lower_90, ymax = upper_90), fill = "grey80") +
     geom_ribbon(aes(Year, ymin = lower_50, ymax = upper_50), fill = "grey60") +
     geom_line(aes(Year, median), linewidth = 0.6, colour = "black") +
-    geom_line(data = ground_truth, aes(Year, True_value), linewidth = 0.7,
+    geom_line(data = reference_curve, aes(Year, reference_value), linewidth = 0.7,
               colour = "black", linetype = "dashed") +
     scale_x_continuous(breaks = seq(100, 900, 200), expand = c(0.01, 0),
                        limits = range(prediction_grid)) +

@@ -230,12 +230,12 @@ write_csv(accuracy_table,
 
 print(as.data.frame(accuracy_table), row.names = FALSE)
 
-# recovery_width_summary.csv : how much narrower EIV's interval is, per
-# parameter. Paired by dataset_id (both models fit the same simulated data)
-# and summarised by MEDIAN, not mean: width90 is heavy-tailed (a handful of
-# datasets have a much wider-than-typical interval for one model), so a mean
-# ratio is pulled around by those few datasets and overstates the typical
-# gap. This is the number to quote in the README instead of a hand-typed one.
+#' recovery_width_summary.csv : how much narrower EIV's interval is, per
+#' parameter. Paired by dataset_id (both models fit the same simulated data)
+#' and summarised by median, not mean, because width90 is heavy-tailed 
+#' (some datasets have a very wide interval for one model), so a mean
+#' ratio is pulled around by those few datasets. 
+#' We can use this number in the README.
 
 width_pairs <- recovery_results %>%
   filter(max_rhat <= 1.05, n_divergent == 0) %>%
