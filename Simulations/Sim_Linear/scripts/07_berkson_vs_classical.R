@@ -19,7 +19,7 @@ set.seed(42)
 N <- 90
 
 true_colour <- "black"
-used_colour <- "#1B7A8C"   # teal -- deliberately not the repo's EIV red / Midpoint grey
+used_colour <- "#1B7A8C"   
 
 panel_theme <- theme_classic(base_size = 13) +
   theme(plot.title = element_text(size = 14, face = "bold", hjust = 0),
@@ -119,8 +119,3 @@ final <- res_a$plot | res_b$plot
 
 ggsave(figure_path("berkson_vs_classical.png"), final,
        width = 12.5, height = 5.8, dpi = 300, bg = "white")
-
-cat(sprintf("Classical: true-date slope %.2f, observed slope %.2f (%.0f%% of true)\n",
-            res_a$slope_true, res_a$slope_used, 100 * res_a$slope_used / res_a$slope_true))
-cat(sprintf("Berkson:   true-date slope %.2f, midpoint slope %.2f (%.0f%% of true)\n",
-            res_b$slope_true, res_b$slope_used, 100 * res_b$slope_used / res_b$slope_true))

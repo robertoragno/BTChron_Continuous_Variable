@@ -51,10 +51,10 @@ f_cp <- function(t) {
          baseline + slope_1 * (cp - TMIN) + slope_2 * (t - cp))
 }
 
-ground_truth <- tibble(Year = seq(TMIN, TMAX), True_value = f_cp(seq(TMIN, TMAX)))
+reference_curve <- tibble(Year = seq(TMIN, TMAX), reference_value = f_cp(seq(TMIN, TMAX)))
 
 write_csv(sim_data, here("Simulations", "Sim_Changepoint", "data", "simulated_data.csv"))
-write_csv(ground_truth, here("Simulations", "Sim_Changepoint", "data", "ground_truth.csv"))
+write_csv(reference_curve, here("Simulations", "Sim_Changepoint", "data", "reference_curve.csv"))
 write_csv(
   tibble(parameter = c("baseline", "slope_1", "slope_2", "changepoint",
                        "sigma_noise", "n_phases", "alpha_conc", "shannon_H"),
@@ -88,7 +88,7 @@ values_over_time <- ggplot(exploratory, aes(Midpoint, Value)) +
   geom_linerange(aes(xmin = Start_date, xmax = End_date), linewidth = 0.15,
                  colour = "grey60", alpha = 0.5) +
   geom_point(shape = 15, size = 0.6, colour = "black", alpha = 0.7) +
-  geom_line(data = ground_truth, aes(Year, True_value), linewidth = 0.7,
+  geom_line(data = reference_curve, aes(Year, reference_value), linewidth = 0.7,
             colour = "black", linetype = "dashed") +
   geom_vline(xintercept = cp, linetype = "dotted", colour = "grey30",
              linewidth = 0.5) +
@@ -159,7 +159,7 @@ make_trend_panel <- function(fit, title_label) {
     geom_ribbon(aes(Year, ymin = lower_90, ymax = upper_90), fill = "grey80") +
     geom_ribbon(aes(Year, ymin = lower_50, ymax = upper_50), fill = "grey60") +
     geom_line(aes(Year, median), linewidth = 0.6, colour = "black") +
-    geom_line(data = ground_truth, aes(Year, True_value), linewidth = 0.7,
+    geom_line(data = reference_curve, aes(Year, reference_value), linewidth = 0.7,
               colour = "black", linetype = "dashed") +
     geom_vline(xintercept = cp, linetype = "dotted", colour = "grey30",
                linewidth = 0.5) +

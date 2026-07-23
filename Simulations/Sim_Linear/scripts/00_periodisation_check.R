@@ -1,7 +1,7 @@
-#' Prior predictive check. Draws generating parameters from the same priors as the
-#' recovery study, simulates datasets, and shows what the priors imply: the spread
-#' of dating resolution (H), example phases within a timeline, and example datasets 
-#' together with the predictive distribution of observed values.
+#' Prior predictive check. This script draws generating parameters from the same priors
+#' as the recovery study, simulates possible datasets, and shows what changes by changing
+#' the priors: the spread of dating resolution (H), example phases within a timeline, 
+#' and example datasets together with the predictive distribution of observed values.
 
 # Libraries
 library(here)

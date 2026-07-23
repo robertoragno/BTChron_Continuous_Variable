@@ -14,8 +14,8 @@ library(ggplot2)
 library(patchwork)
 library(here)
 
-results <- read.csv(file.path("Simulations", "Sim_Changepoint", "output",
-                              "recovery_results.csv"))
+results <- read.csv(here("Simulations", "Sim_Changepoint", "output",
+                         "recovery_results.csv"))
 results <- results[is.na(results$error), ]
 
 # A fit counts as converged if Rhat is small and no divergent transitions occurred.
@@ -128,8 +128,8 @@ diagnostic_plot <- wrap_plots(entropy_panel, detect_panel, nrow = 1, guides = "c
   ) &
   theme(plot.tag = element_text(size = 12, face = "bold"))
 
-ggsave(file.path("Simulations", "Sim_Changepoint", "figures",
-                 "convergence_diagnostic.png"),
+ggsave(here("Simulations", "Sim_Changepoint", "figures",
+           "convergence_diagnostic.png"),
        diagnostic_plot, width = 9, height = 4.5, dpi = 300, bg = "white")
 
 # Console summary for the manuscript footnote.
