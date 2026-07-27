@@ -5,7 +5,7 @@ straight segments meeting at a single changepoint, continuous at the join:
 
 $$
 f(t) =
-\left\{
+\left\lbrace
 \begin{array}{ll}
 \text{baseline} + \text{slope}_1 (t - t_{\min}) & t \le \text{changepoint} \\
 \text{baseline} + \text{slope}_1 (\text{changepoint} - t_{\min}) + \text{slope}_2 (t - \text{changepoint}) & t > \text{changepoint}
