@@ -267,7 +267,7 @@ examples_plot <- ggplot(examples) +
             colour = "black", linetype = "dashed") +
   facet_wrap(~ case, nrow = 2) +
   scale_colour_manual(NULL, values = c("Midpoint date" = "grey45",
-                                       "True date" = "black")) +
+                                       "True date" = "#780000")) +
   scale_x_continuous(breaks = seq(100, 900, 200), expand = c(0.01, 0)) +
   guides(colour = guide_legend(override.aes = list(size = 2))) +
   labs(title = "One simulated dataset per scenario",

@@ -198,10 +198,10 @@ There are three separate things that we can change about the dating although the
   phase the dates actually sit. For instance, a deposition concentrated toward one edge of a phase rather
   than spread evenly. This does not bias the slope reliably: it seems to depend on where the phase sits on the timeline. I have tried with wide coarse phases towards the end, and the slope seems to be slightly biased, but it would be hard to assume this a priori and the script would not be generalisable.
   
-The figure below shows a gallery of examples of the implementation of six (out of seven) general-purpose cases, using the worked-example parameters (`fine_mild` is left out of the gallery: on narrow phases even strong skew
+The figure below shows a gallery of examples of the implementation of six (out of seven) general-purpose cases, using the paper-example parameters (`fine_mild` is left out of the gallery: on narrow phases even strong skew
 barely moves a date off its midpoint, so it looks near-identical to `fine dating`/`fine, strong skew`
-and adds no visible information -- it is still fit and reported below; the two
-`coarse_strong_early`/`coarse_strong_late` cases are discussed separately below). True dates
+and adds no visible information - it is still fit and reported below; the two
+`coarse_strong_early`/`coarse_strong_late` cases are discussed separately below). Each scenario is fit 100 times. True (simulated) dates
 are dots, midpoints squares:
 
 <p align="center">
@@ -210,13 +210,14 @@ are dots, midpoints squares:
 
 ### Fine, coarse, diagnostic: how they change the precision
 
+The figure below shows the accuracy (panel A; the percentage of times that the 90% interval contains the true value) and precision (panel B; the width of the 90% Cred. Int.). The accuracy of the intercept and slope is close to 90% for both models. 
+
 <p align="center">
 <img src="figures/scenario_accuracy_precision.png" height="620" text-align="center"/>
 </p>
 
-The figure reads top over bottom: accuracy (does the 90% interval hold the truth) above precision
-(how wide it is), so the two must be read together. Across all three cases, intercept
-and slope accuracy sit close to 90% for both models, because none of these three cases touch within-phase deposition. Again, sigma is where they separate (`output/scenario_table.csv`):
+Sigma is where the two models differ. Specifically, in the coarse dating scenario, the EIV slope interval is 2.8x narrower than the midpoint's while accuracy is
+comparable, and EIV's sigma interval holds the truth more often (`output/scenario_table.csv`):
 
 | Case | Model | Slope width90 | Sigma cov90 |
 |---|---|---|---|
@@ -227,8 +228,7 @@ and slope accuracy sit close to 90% for both models, because none of these three
 | diagnostic | EIV | 0.0035 | 92% |
 | diagnostic | Midpoint | 0.0035 | 92% |
 
-Under coarse dating the EIV slope interval is 2.8x narrower than the midpoint's while accuracy is
-comparable, and EIV's sigma interval holds the truth far more often.
+
 
 ### Skewed deposition: changing the precision and intercept slightly
 
@@ -236,7 +236,9 @@ comparable, and EIV's sigma interval holds the truth far more often.
 <img src="figures/scenario_skew_bias.png" height="420" text-align="center"/>
 </p>
 
-The slope ratio (posterior median/true slope) is plotted against skew strength, faceted by phase width, for the four general-purpose skew cases — phase width is uncorrelated with timeline position (default). On fine phases, the ratio remains constant at 1, regardless of the skew strength: narrow phases do not allow for a date to be moved far from its midpoint. On coarse phases, the ratio fluctuates around 1 with much wider intervals as the skew strengthens. However, it does not move in a consistent direction. In these cases, the randomness of the wide phase and its position means that any one dataset's skew-driven error can land early or late on the timeline by chance, and the bias mostly cancels out over many datasets. Skew itself, without any reason for it to align with the coarseness of the dating, is a cost in terms of precision and an intercept shift, rather than a bias in the slope.
+The slope ratio (posterior median/true slope) is plotted against within-phase deposition skew (none, mild, strong), faceted by phase width (fine/coarse). Phase width is uncorrelated with timeline position (default). "None" is the fine/coarse baseline itself (uniform deposition), while mild and strong are the four skew-specific cases (fine_mild, fine_strong, coarse_mild, coarse_strong).
+
+For fine phases, the ratio remains constant at 1, regardless of the strength of the skew: narrow phases do not permit a date to be moved far from its midpoint. In coarse phases, however, the ratio fluctuates around 1 with much wider intervals as the skew strengthens. However, it does not move consistently in one direction or the other. In these cases, the randomness of the wide phase and its position mean that the skew-driven error of any one dataset can land early or late on the timeline by chance, and the bias mostly cancels out over many datasets. Skew itself, when not aligned with the coarseness of the dating, incurs a cost in terms of precision and an intercept shift rather than a bias in the slope.
 
 ### Worked example of a change in the slope
 
