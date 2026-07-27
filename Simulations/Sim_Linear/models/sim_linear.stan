@@ -1,13 +1,12 @@
 // =============================================================================
-// Simple Linear Regression with Latent Date Inference
+// Linear Regression with Latent Date Inference
 // =============================================================================
 //
 //   trend(x) = alpha + beta * x
 //   y_n ~ Normal(trend(date_n), sigma)
 //
 // Latent dates are inferred uniformly within each [start, end] window.
-// All dates are mapped to [-1, 1] internally: centring the covariate keeps
-// alpha and beta from being strongly correlated in the posterior.
+// All dates are mapped to [-1, 1] internally (cf. transformed data).
 // =============================================================================
 
 data {
@@ -25,6 +24,8 @@ transformed data {
   real time_max   = max(end_date);
   real time_range = time_max - time_min;
 
+  // Centring the covariate between -1 and 1 reduces the correlation of
+  // alpha and beta in the posterior dist. Works with BCE dates too
   vector[N] start_norm = 2 * (start_date - time_min) / time_range - 1;
   vector[N] end_norm   = 2 * (end_date   - time_min) / time_range - 1;
   vector[N_pred] x_pred_norm = 2 * (x_pred - time_min) / time_range - 1;
@@ -40,6 +41,7 @@ parameters {
 
 transformed parameters {
   vector[N] date_norm = start_norm + date_raw .* (end_norm - start_norm);
+  // .* is elementwise matrix multiplication in Stan
 }
 
 model {
@@ -61,7 +63,8 @@ generated quantities {
 
   // Expected trend on prediction grid (noise-free)
   vector[N_pred] mu_pred = alpha + beta * x_pred_norm;
-  // Posterior predictive draws (includes observation noise)
+  // Posterior predictive draws (including observation noise)
+  // if we need to do PPCs on real data
   array[N_pred] real y_rep = normal_rng(mu_pred, sigma);
 
   // Back-transform latent dates to original scale

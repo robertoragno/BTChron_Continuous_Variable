@@ -153,11 +153,11 @@ the residuals. As phases coarsen (lower H), the midpoint gets worse.
 
 | Parameter | Interval | EIV | Midpoint |
 |---|---|---|---|
-| Intercept | 50% | 51.0% | 50.2% |
-| Intercept | 90% | 91.0% | 92.8% |
-| Slope | 50% | 46.2% | 48.0% |
-| Slope | 90% | 90.5% | 91.2% |
-| Sigma | 50% | 47.8% | 21.8% |
+| Intercept | 50% | 50.9% | 50.2% |
+| Intercept | 90% | 90.8% | 92.8% |
+| Slope | 50% | 46.3% | 48.0% |
+| Slope | 90% | 90.3% | 91.2% |
+| Sigma | 50% | 47.6% | 21.8% |
 | Sigma | 90% | **89.8%** | **45.0%** |
 
 Under uniform within-phase deposition, EIV and midpoint agree on the trend, but EIV has a lower sigma. 
@@ -187,7 +187,7 @@ as sample size increases, independent of the H-driven story above.
 ## Scenario study
 
 The recovery study uses fully random datasets, always under uniform deposition, and shows the
-general relationship. The script in `05_scenarios.R` is complementary. For the paper it might be better to show some realistic case studies, also including a skewed deposition and a biased between-phase sampling.
+general relationship. The script in `05_scenarios.R` is complementary, to include some realistic case studies and test conditions such as a skewed deposition and a biased between-phase sampling.
 
 There are three separate things that we can change about the dating although they do not seem to bias the trend (maybe the third a bit):
 

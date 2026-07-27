@@ -23,7 +23,7 @@ library(patchwork)
 recovery_results <- read_csv(
   here("Simulations", "Sim_Linear", "output", "recovery_results.csv"),
   show_col_types = FALSE
-) %>% filter(is.na(error))
+) %>% filter(is.na(error), max_rhat <= 1.05, n_divergent == 0)
 
 figure_path <- function(name) here("Simulations", "Sim_Linear", "figures", name)
 
@@ -238,7 +238,6 @@ print(as.data.frame(accuracy_table), row.names = FALSE)
 #' We can use this number in the README.
 
 width_pairs <- recovery_results %>%
-  filter(max_rhat <= 1.05, n_divergent == 0) %>%
   select(dataset_id, model, intercept_width90, slope_width90, sigma_width90) %>%
   pivot_longer(c(intercept_width90, slope_width90, sigma_width90),
                names_to = "parameter", names_pattern = "(.*)_width90",
