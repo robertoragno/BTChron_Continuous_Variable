@@ -262,18 +262,34 @@ position_levels <- c("coarse_strong", "coarse_strong_early", "coarse_strong_late
 position_labs   <- c("No width~position\ncorrelation", "Wide phases\nearly",
                      "Wide phases\nlate")
 
-position_bias <- results %>%
+position_data <- results %>%
   filter(case %in% position_levels) %>%
   mutate(model = label_model(model),
          position = factor(case, position_levels, position_labs),
-         slope_ratio = slope_med / true_slope) %>%
+         slope_ratio     = slope_med / true_slope,
+         intercept_error = intercept_med - true_intercept,
+         sigma_error     = sigma_med - true_sigma)
+
+position_slope <- position_data %>%
   group_by(position, model) %>%
   summarise(median_ratio = median(slope_ratio),
             lower = quantile(slope_ratio, 0.25),
             upper = quantile(slope_ratio, 0.75), .groups = "drop")
 
-position_bias_plot <- ggplot(position_bias, aes(position, median_ratio,
-                                                colour = model, shape = model)) +
+position_intercept <- position_data %>%
+  group_by(position, model) %>%
+  summarise(median_error = median(intercept_error),
+            lower = quantile(intercept_error, 0.25),
+            upper = quantile(intercept_error, 0.75), .groups = "drop")
+
+position_sigma <- position_data %>%
+  group_by(position, model) %>%
+  summarise(median_error = median(sigma_error),
+            lower = quantile(sigma_error, 0.25),
+            upper = quantile(sigma_error, 0.75), .groups = "drop")
+
+position_slope_plot <- ggplot(position_slope, aes(position, median_ratio,
+                                                   colour = model, shape = model)) +
   geom_hline(aes(yintercept = 1, linetype = "Unbiased"), colour = "grey40") +
   geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(0.4),
                 width = 0.15, linewidth = 0.5) +
@@ -281,13 +297,44 @@ position_bias_plot <- ggplot(position_bias, aes(position, median_ratio,
   scale_colour_manual(values = model_colours, name = NULL) +
   scale_shape_manual(values = model_shapes, name = NULL) +
   scale_linetype_manual(values = "dashed", name = NULL) +
-  labs(x = NULL, y = "Slope ratio\n(estimate / true)",
-       title = "Worked example: slope bias when phase width correlates with position",
-       subtitle = "Illustrative only -- direction depends on the dataset, not assumed here") +
+  labs(x = NULL, y = "Slope ratio\n(estimate / true)") +
+  panel_theme + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+position_intercept_plot <- ggplot(position_intercept, aes(position, median_error,
+                                                          colour = model, shape = model)) +
+  geom_hline(aes(yintercept = 0, linetype = "Unbiased"), colour = "grey40") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(0.4),
+                width = 0.15, linewidth = 0.5) +
+  geom_point(position = position_dodge(0.4), size = 2.4) +
+  scale_colour_manual(values = model_colours, name = NULL) +
+  scale_shape_manual(values = model_shapes, name = NULL) +
+  scale_linetype_manual(values = "dashed", name = NULL) +
+  labs(x = NULL, y = "Intercept error\n(estimate - true)") +
+  panel_theme + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+position_sigma_plot <- ggplot(position_sigma, aes(position, median_error,
+                                                  colour = model, shape = model)) +
+  geom_hline(aes(yintercept = 0, linetype = "Unbiased"), colour = "grey40") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(0.4),
+                width = 0.15, linewidth = 0.5) +
+  geom_point(position = position_dodge(0.4), size = 2.4) +
+  scale_colour_manual(values = model_colours, name = NULL) +
+  scale_shape_manual(values = model_shapes, name = NULL) +
+  scale_linetype_manual(values = "dashed", name = NULL) +
+  labs(x = NULL, y = "Sigma error\n(estimate - true)") +
   panel_theme
 
+position_bias_plot <- (position_slope_plot / position_intercept_plot / position_sigma_plot) +
+  plot_layout(guides = "collect", axes = "collect_x") +
+  plot_annotation(tag_levels = "A",
+                  title = "Correlation between phase width and phase position") &
+  theme(legend.position = "top",
+        plot.title = element_text(size = 11, face = "bold"),
+        plot.tag = element_text(size = 15, face = "bold"),
+        plot.tag.location = "margin")
+
 ggsave(figure_path("position_bias_example.png"), position_bias_plot,
-       width = 7, height = 4.5, dpi = 300, bg = "white")
+       width = 7, height = 8.5, dpi = 300, bg = "white")
 
 # scenario_sigma.png : sigma error, general-purpose cases only (excludes the
 # two illustrative position cases). The midpoint reads within-phase date
