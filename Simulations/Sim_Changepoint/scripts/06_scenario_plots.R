@@ -185,6 +185,9 @@ ggsave(figure_path("scenario_accuracy_precision.png"), composite,
 #' linear scenario study; the changepoint has no natural "ratio" (its true
 #' value is a location, not a rate near zero), so cp bias is shown as the
 #' signed error in years instead, in its own panel below the slope ratios.
+#' Baseline bias (panel C) also uses raw error rather than a ratio, since
+#' true_baseline is drawn from U(2, 15), well away from zero -- same
+#' convention as the intercept panel in the linear scenario study.
 skew_bias <- results %>%
   filter(case %in% c("fine", "coarse", "fine_mild", "fine_strong",
                      "coarse_mild", "coarse_strong")) %>%
@@ -213,9 +216,8 @@ skew_bias_plot <- ggplot(skew_bias, aes(skew, median_ratio, colour = model,
   scale_colour_manual(values = model_colours, name = NULL) +
   scale_shape_manual(values = model_shapes, name = NULL) +
   scale_linetype_manual(values = "dashed", name = NULL) +
-  labs(x = "Within-phase deposition skew", y = "Slope ratio\n(estimate / true)",
-       title = "Slope bias under skewed within-phase deposition") +
-  panel_theme
+  labs(x = NULL, y = "Slope ratio\n(estimate / true)") +
+  panel_theme + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 
 cp_bias <- results %>%
   filter(case %in% c("fine", "coarse", "fine_mild", "fine_strong",
@@ -240,19 +242,46 @@ cp_bias_plot <- ggplot(cp_bias, aes(skew, median_err, colour = model,
   scale_colour_manual(values = model_colours, name = NULL) +
   scale_shape_manual(values = model_shapes, name = NULL) +
   scale_linetype_manual(values = "dashed", name = NULL) +
-  labs(x = "Within-phase deposition skew", y = "Changepoint error\n(years, estimate - true)",
-       title = "Changepoint bias under skewed within-phase deposition") +
-  panel_theme
+  labs(x = NULL, y = "Changepoint error\n(years, estimate - true)") +
+  panel_theme + theme(strip.text = element_blank())
 
-skew_bias_composite <- (skew_bias_plot / cp_bias_plot) +
-  plot_layout(guides = "collect") +
-  plot_annotation(tag_levels = "A") &
+baseline_bias <- results %>%
+  filter(case %in% c("fine", "coarse", "fine_mild", "fine_strong",
+                     "coarse_mild", "coarse_strong")) %>%
+  mutate(model = label_model(model),
+         width = label_skew_width(case),
+         skew  = label_skew_level(case),
+         baseline_error = baseline_med - true_baseline) %>%
+  group_by(width, skew, model) %>%
+  summarise(median_err = median(baseline_error),
+            lower = quantile(baseline_error, 0.25),
+            upper = quantile(baseline_error, 0.75), .groups = "drop")
+
+baseline_bias_plot <- ggplot(baseline_bias, aes(skew, median_err, colour = model,
+                                                shape = model, group = model)) +
+  geom_hline(aes(yintercept = 0, linetype = "Unbiased"), colour = "grey40") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(0.3),
+                width = 0.15, linewidth = 0.5) +
+  geom_line(position = position_dodge(0.3), linewidth = 0.4, alpha = 0.6) +
+  geom_point(position = position_dodge(0.3), size = 2.4) +
+  facet_wrap(~ width) +
+  scale_colour_manual(values = model_colours, name = NULL) +
+  scale_shape_manual(values = model_shapes, name = NULL) +
+  scale_linetype_manual(values = "dashed", name = NULL) +
+  labs(x = "Within-phase deposition skew", y = "Baseline error\n(estimate - true)") +
+  panel_theme + theme(strip.text = element_blank())
+
+skew_bias_composite <- (skew_bias_plot / cp_bias_plot / baseline_bias_plot) +
+  plot_layout(guides = "collect", axes = "collect_x") +
+  plot_annotation(tag_levels = "A",
+                  title = "Bias under skewed within-phase deposition") &
   theme(legend.position = "top",
+        plot.title = element_text(size = 11, face = "bold"),
         plot.tag = element_text(size = 15, face = "bold"),
         plot.tag.location = "margin")
 
 ggsave(figure_path("scenario_skew_bias.png"), skew_bias_composite,
-       width = 8, height = 8, dpi = 300, bg = "white")
+       width = 8, height = 10.5, dpi = 300, bg = "white")
 
 # position_bias_example.png : a worked example, not a general-purpose result.
 # coarse_strong has phase width uncorrelated with position on the timeline
