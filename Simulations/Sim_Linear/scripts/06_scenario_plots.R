@@ -182,21 +182,33 @@ ggsave(figure_path("scenario_accuracy_precision.png"), composite,
 #' (median over reps, with the 25/75% quantile band) rather than raw error,
 #' because true slopes are drawn near zero and a signed error is not
 #' comparable across datasets with different true slope magnitudes; a ratio of
-#' 1 is unbiased, below 1 is a slope flattened toward zero.
-skew_bias <- results %>%
+#' 1 is unbiased, below 1 is a slope flattened toward zero. Intercept bias
+#' (panel B) uses raw error instead of a ratio, since true_intercept is drawn
+#' from U(2, 15), well away from zero, so a signed error is comparable across
+#' datasets.
+skew_bias_data <- results %>%
   filter(case %in% c("fine", "coarse", "fine_mild", "fine_strong",
                      "coarse_mild", "coarse_strong")) %>%
   mutate(model = label_model(model),
          width = label_skew_width(case),
          skew  = label_skew_level(case),
-         slope_ratio = slope_med / true_slope) %>%
+         slope_ratio = slope_med / true_slope,
+         intercept_error = intercept_med - true_intercept)
+
+skew_bias_slope <- skew_bias_data %>%
   group_by(width, skew, model) %>%
   summarise(median_ratio = median(slope_ratio),
             lower = quantile(slope_ratio, 0.25),
             upper = quantile(slope_ratio, 0.75), .groups = "drop")
 
-skew_bias_plot <- ggplot(skew_bias, aes(skew, median_ratio, colour = model,
-                                        shape = model, group = model)) +
+skew_bias_intercept <- skew_bias_data %>%
+  group_by(width, skew, model) %>%
+  summarise(median_error = median(intercept_error),
+            lower = quantile(intercept_error, 0.25),
+            upper = quantile(intercept_error, 0.75), .groups = "drop")
+
+skew_slope_plot <- ggplot(skew_bias_slope, aes(skew, median_ratio, colour = model,
+                                               shape = model, group = model)) +
   geom_hline(aes(yintercept = 1, linetype = "Unbiased"), colour = "grey40") +
   geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(0.3),
                 width = 0.15, linewidth = 0.5) +
@@ -206,12 +218,34 @@ skew_bias_plot <- ggplot(skew_bias, aes(skew, median_ratio, colour = model,
   scale_colour_manual(values = model_colours, name = NULL) +
   scale_shape_manual(values = model_shapes, name = NULL) +
   scale_linetype_manual(values = "dashed", name = NULL) +
-  labs(x = "Within-phase deposition skew", y = "Slope ratio\n(estimate / true)",
-       title = "Slope bias under skewed within-phase deposition") +
-  panel_theme
+  labs(x = NULL, y = "Slope ratio\n(estimate / true)") +
+  panel_theme + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+skew_intercept_plot <- ggplot(skew_bias_intercept, aes(skew, median_error, colour = model,
+                                                       shape = model, group = model)) +
+  geom_hline(aes(yintercept = 0, linetype = "Unbiased"), colour = "grey40") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(0.3),
+                width = 0.15, linewidth = 0.5) +
+  geom_line(position = position_dodge(0.3), linewidth = 0.4, alpha = 0.6) +
+  geom_point(position = position_dodge(0.3), size = 2.4) +
+  facet_wrap(~ width) +
+  scale_colour_manual(values = model_colours, name = NULL) +
+  scale_shape_manual(values = model_shapes, name = NULL) +
+  scale_linetype_manual(values = "dashed", name = NULL) +
+  labs(x = "Within-phase deposition skew", y = "Intercept error\n(estimate - true)") +
+  panel_theme + theme(strip.text = element_blank())
+
+skew_bias_plot <- (skew_slope_plot / skew_intercept_plot) +
+  plot_layout(guides = "collect", axes = "collect_x") +
+  plot_annotation(tag_levels = "A",
+                  title = "Bias under skewed within-phase deposition") &
+  theme(legend.position = "top",
+        plot.title = element_text(size = 11, face = "bold"),
+        plot.tag = element_text(size = 15, face = "bold"),
+        plot.tag.location = "margin")
 
 ggsave(figure_path("scenario_skew_bias.png"), skew_bias_plot,
-       width = 8, height = 4.5, dpi = 300, bg = "white")
+       width = 8, height = 7.5, dpi = 300, bg = "white")
 
 # position_bias_example.png : a worked example, not a general-purpose result.
 # coarse_strong has phase width uncorrelated with position on the timeline
