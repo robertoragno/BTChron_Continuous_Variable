@@ -9,6 +9,7 @@ library(posterior)
 library(dplyr)
 library(tidyr)
 library(parallel)
+library(patchwork)
 
 source(here("Simulations", "Sim_Linear", "scripts", "simulate.R"))
 
@@ -25,7 +26,7 @@ iter_sampling <- as.integer(Sys.getenv("SCENARIOS_SAMPLING", "500"))
 # diagnostic: uniform within-window, over-samples narrow phases.
 # *_mild/*_strong: skewed (Beta(skew_shape,1)), position_strength = 0.
 # coarse_strong_early/late: same, but position_strength > 0 (example
-# of width correlating with position - see notes).
+# of width correlating with position).
 scenarios <- tibble(
   case       = c("fine",   "coarse", "diagnostic",
                  "fine_mild", "fine_strong", "coarse_mild", "coarse_strong",
@@ -254,30 +255,65 @@ truth_line <- data.frame(
   Year  = c(TMIN, TMAX),
   Value = example_intercept + example_slope * c(TMIN, TMAX))
 
+# Periodisation phases per case, for the top strip in each panel (same idea
+# as phase_strip() in 01_example.R). Alternating grey just separates
+# neighbouring phases visually.
+phase_bounds <- examples %>%
+  distinct(case, Start_date, End_date) %>%
+  arrange(case, Start_date) %>%
+  group_by(case) %>%
+  mutate(shade = factor(row_number() %% 2)) %>%
+  ungroup()
+
+phase_strip <- function(dat, title_label) {
+  ggplot(dat) +
+    geom_rect(aes(xmin = Start_date, xmax = End_date, ymin = 0, ymax = 1,
+                  fill = shade), colour = "white", linewidth = 0.3) +
+    scale_fill_manual(values = c("0" = "grey85", "1" = "grey65"), guide = "none") +
+    scale_x_continuous(limits = c(TMIN, TMAX), expand = c(0.01, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    labs(title = title_label) +
+    theme_void(base_size = 11) +
+    theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+          plot.margin = margin(2, 5, 0, 5))
+}
+
 # True dates as dots vs. midpoint squares: shows the skew the windows alone
-# can't.
-examples_plot <- ggplot(examples) +
-  geom_linerange(aes(y = Value, xmin = Start_date, xmax = End_date),
-                 linewidth = 0.15, colour = "grey60", alpha = 0.5) +
-  geom_point(aes(Midpoint, Value, colour = "Midpoint date"), shape = 15,
-             size = 0.6) +
-  geom_point(aes(True_date, Value, colour = "True date"), shape = 16,
-             size = 0.5) +
-  geom_line(data = truth_line, aes(Year, Value), linewidth = 0.6,
-            colour = "black", linetype = "dashed") +
-  facet_wrap(~ case, nrow = 2) +
-  scale_colour_manual(NULL, values = c("Midpoint date" = "grey45",
-                                       "True date" = "#780000")) +
-  scale_x_continuous(breaks = seq(100, 900, 200), expand = c(0.01, 0)) +
-  guides(colour = guide_legend(override.aes = list(size = 2))) +
-  labs(title = "One simulated dataset per scenario",
-       x = "Year (CE)", y = "Value") +
-  theme_classic(base_size = 11) +
-  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
-        strip.background = element_blank(),
-        strip.text = element_text(face = "bold"),
-        panel.spacing = unit(1.2, "lines"),
-        legend.position = "bottom")
+# can't. One case per panel (rather than facet_wrap) so each can carry its
+# own phase strip on top.
+case_panel <- function(case_label) {
+  dat <- examples %>% filter(case == case_label)
+
+  main <- ggplot(dat) +
+    geom_linerange(aes(y = Value, xmin = Start_date, xmax = End_date),
+                   linewidth = 0.15, colour = "grey60", alpha = 0.5) +
+    geom_point(aes(Midpoint, Value, colour = "Midpoint date"), shape = 15,
+               size = 0.6) +
+    geom_point(aes(True_date, Value, colour = "True date"), shape = 16,
+               size = 0.5) +
+    geom_line(data = truth_line, aes(Year, Value), linewidth = 0.6,
+              colour = "black", linetype = "dashed") +
+    scale_colour_manual(NULL, values = c("Midpoint date" = "grey45",
+                                         "True date" = "#780000")) +
+    scale_x_continuous(breaks = seq(100, 900, 200), limits = c(TMIN, TMAX),
+                       expand = c(0.01, 0)) +
+    guides(colour = guide_legend(override.aes = list(size = 2))) +
+    labs(x = "Year (CE)", y = "Value") +
+    theme_classic(base_size = 11) +
+    theme(legend.position = "bottom")
+
+  strip <- phase_strip(filter(phase_bounds, case == case_label), case_label)
+  strip / main + plot_layout(heights = c(0.08, 1))
+}
+
+examples_plot <-
+  (wrap_plots(lapply(levels(examples$case), case_panel), ncol = 3) +
+     plot_layout(guides = "collect")) &
+  theme(legend.position = "bottom")
+
+examples_plot <- examples_plot +
+  plot_annotation(title = "One simulated dataset per scenario",
+                  theme = theme(plot.title = element_text(size = 13, face = "bold")))
 
 ggsave(here("Simulations", "Sim_Linear", "figures", "scenario_examples.png"),
-       examples_plot, width = 11, height = 6.5, dpi = 300, bg = "white")
+       examples_plot, width = 11, height = 7, dpi = 300, bg = "white")
