@@ -1,7 +1,0 @@
-parameter,value
-baseline,5
-slope,0.015
-sigma_noise,1.5
-n_phases,3
-alpha_conc,0.3
-shannon_H,0.9720501084278688
