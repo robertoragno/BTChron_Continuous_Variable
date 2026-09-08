@@ -130,17 +130,14 @@ One dataset says nothing about bias — that is the recovery study's job, run by
 
 ## Recovery study results
 
-> **Superseded — refit running as of 2026-09-08.** The numbers below come from the
-> 1400-dataset design, generated with the lab error alone and uniform deposition
-> throughout. They are kept for comparison and live in
-> `output/superseded_uniform_nocurve/`. Both changes move absolute coverage, so treat every
-> figure in this section as provisional until the refit lands.
+4800 fits (1600 datasets x 3 models), run 2026-09-08 on the corrected generator: the
+curve error folded into the draw, deposition swept, slope prior `beta ~ normal(0, 40)`.
+The previous run is kept in `output/superseded_uniform_nocurve/`, and the one before it,
+under the tighter prior, in `output/superseded_prior_normal10/`.
 
-4200 fits (1400 datasets x 3 models), run 2026-09-07 with the widened slope prior
-`beta ~ normal(0, 40)` (plan section 9). The earlier run under `normal(0, 10)` is kept
-in `output/superseded_prior_normal10/`; the tighter prior was pulling every model's slope
-toward the truth and flattering the point summaries, so the contrast below is sharper than
-before.
+The headline table holds the deposition sweep out, so it is the reference condition
+(uniform deposition) and stays comparable with the earlier runs. Growth appears only in
+its own figures.
 
 Attenuation is the slope of `estimate ~ truth`: 1 is faithful, below 1 flattens, above 1
 exaggerates. Sigma error is the signed bias in the noise term (target 0).
@@ -149,39 +146,69 @@ exaggerates. Sigma error is the signed bias in the noise term (target 0).
 
 | model | attenuation | slope coverage (90%) | sigma error |
 |---|---|---|---|
-| Midpoint (envelope) | 1.17 | 0.77 | +0.31 |
-| Median (calibrated) | 0.86 | 0.77 | +0.28 |
-| Date-marginalised | 0.98 | 0.86 | -0.05 |
+| Midpoint (envelope) | 1.11 | 0.83 | +0.28 |
+| Median (calibrated) | 0.82 | 0.73 | +0.26 |
+| Date-marginalised | 0.96 | 0.84 | -0.03 |
 
-The three separate as intended. The date-marginalised model recovers the slope and the
-noise term; the envelope midpoint over-estimates the slope by ~17%; the calibrated median
-under-estimates it by ~14%. Its coverage (0.86) is the best of the three but still short of
-nominal 0.90.
+**Control window (1600-1200 BCE), 300 fits per model:**
 
-Attenuation on the plateau by lab error (N = 200):
-
-| lab error | Midpoint | Median | Date-marginalised |
+| model | attenuation | slope coverage (90%) | sigma error |
 |---|---|---|---|
-| 15 | 1.04 | 0.95 | 0.98 |
-| 30 | 1.05 | 0.88 | 0.94 |
-| 50 | 0.84 | 0.73 | 0.80 |
+| Midpoint (envelope) | 0.80 | 0.43 | +0.14 |
+| Median (calibrated) | 0.82 | 0.47 | +0.14 |
+| Date-marginalised | 0.83 | 0.49 | +0.01 |
 
-**Control window (1600-1200 BCE), 300 fits per model:** attenuation 0.82 / 0.84 / 0.85 and
-coverage ~0.50 for all three. Here the calibrated posteriors are narrow and single-humped,
-so the models cannot differ on the *shape* of the date, yet every one of them flattens the
-slope by about a sixth. That is the no-window-prior effect: the model spreads each date's
-mass over the whole padded grid and is never told the samples share a 400-year period, so at
-moderate lab error the slope attenuates for everyone. `05_attenuation_diagnostic.R` isolates
-it - an oracle fitted on the true dates recovers attenuation 1.0, and clipping each row to
-the study window also recovers 1.0, while folding the calibration curve's own error into the
-generator does not. So this is a property of the deliberate design decision in
-`weight_rows.R` (the study window is not used as prior information), reported as a
-limitation rather than fixed. (The diagnostic was last run under `normal(0, 10)`; the
-oracle-recovers-1.0 conclusion does not depend on the slope prior, but the exact numbers
-predate the widening.)
+The three separate on the plateau as intended, and the ordering is unchanged from the
+earlier runs: the date-marginalised model recovers the slope and the noise term, the
+envelope midpoint over-estimates the slope, the calibrated median under-estimates it.
+Sigma is where the gap is widest and least ambiguous — -0.03 against +0.26 and +0.28.
+Coverage is short of nominal 0.90 for every model, including the date-marginalised one.
+
+### What the curve-error fix changed
+
+Same cells, same prior; only the generator differs.
+
+| | attenuation | coverage | sigma error |
+|---|---|---|---|
+| Date-marginalised, plateau | 0.983 → 0.961 | 0.859 → 0.842 | -0.048 → -0.029 |
+| Median, plateau | 0.863 → 0.822 | 0.774 → 0.726 | +0.275 → +0.258 |
+| Midpoint, plateau | 1.172 → 1.113 | 0.772 → 0.828 | +0.309 → +0.283 |
+| all three, control | ~0.84 → ~0.82 | ~0.51 → ~0.46 | little change |
+
+Coverage falls almost everywhere, which is the flattering being removed: posteriors are no
+longer wider than the noise warrants. The exception is the envelope midpoint on the
+plateau, whose coverage *improves* because its slope inflation drops from 17% to 11% —
+over-wide posteriors were producing over-wide envelopes whose midpoints spread further
+apart than the truth, exaggerating the slope. So the old generator was overstating the
+midpoint model's plateau failure. The contrast is a little weaker than previously reported
+and it is the honest one.
+
+### Deposition: underpowered, nothing resolved
+
+Uniform against `growth_ratio = 4`, 100 datasets per cell, both windows. **Every
+comparison overlaps** — no effect is resolved at this replication, in either window, on
+any model.
+
+The one near-miss is the cell where an effect was expected, the date-marginalised model on
+the plateau: attenuation 0.986 [0.958, 1.015] uniform against 0.936 [0.912, 0.961] under
+growth, intervals overlapping by 0.003. Directionally growth pulls it away from 1, which is
+what oversampling the late edge of a plateau should do, but at n = 100 that cannot be
+claimed.
+
+This is the same wall Case 2's skew cells hit, and the same fix applies: `N_REP` for the
+deposition block should go to 300, as `N_REP_SKEW` did. That is +400 datasets, roughly
+45 minutes. Reported as a null in the meantime, not as evidence of no effect.
+
+### Convergence
+
+4800 fits, none errored, **no divergent transitions at all**, worst Rhat 1.0141 with 34
+fits above 1.01 and none above 1.05. The `deposition` block is the cleanest of the three
+(worst Rhat 1.010), so the growth geometry costs nothing in sampling. `04_` reprints this
+on every run.
 
 `04_` also reports that the 95% HPD envelope retains 97.5% of the calibrated mass on
-average - the share the envelope-midpoint model keeps and the rest of the curve it discards.
+average, and a false-positive rate on the zero-slope cells of 0.115 / 0.130 / 0.140 for
+midpoint / median / date-marginalised against a nominal 0.10.
 
 ## Running the study
 

@@ -19,7 +19,13 @@ r <- read_recovery(results_csv)
 r$window <- factor(unname(c(plateau = "plateau", steep = "control")[r$window]),
                    levels = c("plateau", "control"))
 
-by_model <- summarise_models(r, c("model", "window"))
+# The headline is the reference condition, so the deposition sweep is held out
+# of it: growth appears in its own figures below and nowhere else. Without this
+# the headline silently averages 100 growth datasets per window into the totals
+# and stops being comparable with earlier runs.
+reference <- r[r$growth_ratio == 1, ]
+
+by_model <- summarise_models(reference, c("model", "window"))
 write.csv(by_model, file.path(out_dir, "recovery_table.csv"), row.names = FALSE)
 print(by_model, row.names = FALSE)
 
@@ -28,7 +34,8 @@ p1 <- plot_metrics(metric_long(by_model, c("model", "window")), facet_row = "win
 ggsave(file.path(fig_dir, "recovery_summary.png"), p1, width = 8,
        height = 2.2 + 1.6 * length(unique(by_model$window)), dpi = 300, bg = "white")
 
-core <- r[r$sweep == "core" & r$slope_condition == "random", ]
+core <- reference[reference$sweep == "core" &
+                  reference$slope_condition == "random", ]
 if (nrow(core) > 0)
   ggsave(file.path(fig_dir, "recovery_by_n.png"),
          plot_by_n(core, "Case 1: more data does not fix a biased estimator"),
@@ -36,7 +43,7 @@ if (nrow(core) > 0)
 
 # Lab error is Case 1's other factor: wider calibrated posteriors should deepen
 # attenuation in the point-date models and leave the marginal model alone.
-sweep_figure(r[r$sweep == "factor", ], "lab_error", "lab_error",
+sweep_figure(reference[reference$sweep == "factor", ], "lab_error", "lab_error",
              "Case 1: effect of lab error", out_dir, fig_dir)
 
 # Deposition: uniform against fourfold growth in find density across the window.
@@ -67,7 +74,7 @@ print(round(tapply(r$max_rhat, list(r$sweep, r$model), max, na.rm = TRUE), 3))
 cat("\n% of fits with any divergence, by sweep and model:\n")
 print(round(tapply(r$n_divergent > 0, list(r$sweep, r$model), mean) * 100, 1))
 
-fp <- false_positive_rate(r)
+fp <- false_positive_rate(reference)
 if (!is.null(fp)) {
   cat("\nfalse-positive rate (zero-slope cells, 90% interval excludes 0):\n")
   print(fp)
