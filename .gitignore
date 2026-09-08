@@ -7,8 +7,19 @@
 **/output/
 **/archive/
 
+# Run helpers and their logs — machine-specific, not part of the paper
+*.sh
+Simulations/logs/
+
+# Compiled Stan binaries sit next to their .stan source; machine-specific, rebuilt on run
+Simulations/**/models/*
+!Simulations/**/models/*.stan
+
 # Manuscript draft and LaTeX build artefacts — never committed
 Manuscript.*
 Notes/
 skew_correction_plan.md
 Simulations/LEARN.md
+
+# Planning notes, not part of the paper
+docs/IMPLEMENTATION_PLAN.md
