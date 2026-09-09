@@ -256,6 +256,45 @@ accounts for the gap, but whether it can be estimated rather than supplied.
 Two of the 720 fits errored, both in `window_prior` at lab error 50, where clipping empties
 a row whose date lies wholly outside the period. That guard firing is correct behaviour.
 
+### The period can be estimated rather than supplied
+
+`06_period_prior_check.R`, 2026-09-09: 480 fits, 120 replicates per cell, control window,
+`baseline` and `period` paired on identical seeds so the difference between them is the
+prior and nothing else. `oracle` and `window_prior` are carried over from the diagnostic
+above for comparison.
+
+| condition | lab error | c [95% CI] | coverage | sigma error | recovered period sd |
+|---|---|---|---|---|---|
+| oracle — fitted on true dates | 15 | 1.014 [0.996, 1.032] | 0.875 | +0.007 | — |
+| oracle | 50 | 1.005 [0.990, 1.021] | 0.917 | −0.019 | — |
+| baseline — no period | 15 | 0.935 [0.917, 0.952] | 0.733 | +0.007 | — |
+| baseline | 50 | 0.729 [0.716, 0.741] | 0.225 | +0.029 | — |
+| window_prior — period supplied | 15 | 1.016 [0.997, 1.034] | 0.875 | +0.003 | — |
+| window_prior | 50 | 1.010 [0.993, 1.028] | 0.898 | −0.030 | — |
+| **period — period estimated** | 15 | **1.020** [1.000, 1.039] | **0.858** | +0.000 | **115.9** ± 4.9 |
+| **period** | 50 | **1.013** [0.995, 1.032] | **0.917** | −0.042 | **116.7** ± 7.0 |
+
+Estimating the period recovers what supplying it recovers. The two conditions agree on
+attenuation to within 0.005, their intervals overlap throughout, and both sit level with the
+oracle — a model fitted on the true dates with no dating error at all. Coverage at ±50 comes
+back to 0.917, from 0.225.
+
+The period itself is recovered to within 1%: sd 115.9 and 116.7 against a true 115.5 for a
+400-yr uniform window, centre −1402 and −1404 against a true −1400. A normal prior is the
+wrong shape for a uniform truth, and it recovers the variance anyway, which is what the
+mechanism said would matter. No fits errored.
+
+On over-correction: c sits a little above 1 in both period cells, 1.013 and 1.020. The
+oracle does the same, 1.005 and 1.014, and it has no dating error to over-correct for, so
+the excess is a property of the estimator or the beta prior rather than of the period term.
+All three conditions overlap.
+
+**Not yet checked.** This diagnostic draws slopes from a continuous range and has no
+zero-slope cells, so it cannot report a false-positive rate — the check that would catch an
+over-tight period inflating slopes that are really zero. That requires the period model to
+be run against the full design, which does have those cells. It has also only been tested on
+the control window; the plateau, where the models actually separate, is untested.
+
 ### What the curve-error fix changed
 
 Same cells, same prior; only the generator differs.
