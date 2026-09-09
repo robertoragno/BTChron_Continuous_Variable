@@ -221,6 +221,41 @@ envelope midpoint over-estimates the slope, the calibrated median under-estimate
 Sigma is where the gap is widest and least ambiguous — -0.03 against +0.26 and +0.28.
 Coverage is short of nominal 0.90 for every model, including the date-marginalised one.
 
+### The control window is not irreducible
+
+`05_attenuation_diagnostic.R`, rerun 2026-09-09 on the corrected generator: 720 fits,
+120 replicates per cell, control window, `beta ~ normal(0, 40)`.
+
+| condition | lab error | c [95% CI] | coverage | sigma error |
+|---|---|---|---|---|
+| oracle | 15 | 1.014 [0.996, 1.032] | 0.875 | +0.007 |
+| oracle | 50 | 1.005 [0.990, 1.021] | 0.917 | −0.019 |
+| baseline | 15 | 0.935 [0.917, 0.952] | 0.733 | +0.007 |
+| baseline | 50 | **0.729** [0.716, 0.741] | **0.225** | +0.029 |
+| window_prior | 15 | 1.016 [0.997, 1.034] | 0.875 | +0.003 |
+| window_prior | 50 | 1.010 [0.993, 1.028] | 0.898 | −0.030 |
+
+Three things follow.
+
+The oracle recovers c = 1 and near-nominal coverage, so nothing in the fitting or scoring
+code attenuates on its own and every other row means what it says.
+
+The baseline scales sharply with lab error — c falls from 0.935 to 0.729 and coverage from
+0.733 to 0.225 — which is what the mechanism predicts. Wider calibrated posteriors leak
+more mass past the edges of the true period, inflating `var(x)` further, and a slope of
+roughly `cov(x, y) / var(x)` flattens accordingly. The earlier run reported a flat c ≈ 0.84
+across lab errors; separating the two levels shows the dependence.
+
+Supplying the period restores both: c = 1.01 and coverage 0.875 / 0.898, back at oracle
+level. So the control-window result is **not** an irreducible property of the method. It is
+the cost of withholding one specific piece of information, and it is recoverable in full.
+That reframes the limitation as a modelling choice rather than a boundary, and it is the
+reason `06_period_prior_check.R` exists: the question is no longer whether the period
+accounts for the gap, but whether it can be estimated rather than supplied.
+
+Two of the 720 fits errored, both in `window_prior` at lab error 50, where clipping empties
+a row whose date lies wholly outside the period. That guard firing is correct behaviour.
+
 ### What the curve-error fix changed
 
 Same cells, same prior; only the generator differs.
