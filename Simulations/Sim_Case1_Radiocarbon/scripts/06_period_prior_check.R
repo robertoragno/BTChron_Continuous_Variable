@@ -56,9 +56,12 @@ CONDITIONS <- c("baseline", "period")
 # Condition names read for the report; these are the models behind them.
 CONDITION_MODEL <- c(baseline = "marginal", period = "period")
 
-# True dates are uniform over the window, so the period a correctly behaving
-# model should recover has this standard deviation.
+# True dates are uniform over the window. The model fits a normal, whose tau is
+# a standard deviation, not a width - a uniform of width W has sd W / sqrt(12).
+# Both are reported below, because a recovered sd of 115 against a 400-yr window
+# looks wrong until the sqrt(12) is spelled out.
 TRUE_PERIOD_SD <- diff(WINDOW) / sqrt(12)
+sd_to_width <- function(sd) sd * sqrt(12)
 
 d1  <- read.csv(here("Simulations", "Sim_Case1_Radiocarbon", "data", "design.csv"))
 d1  <- d1[d1$window == "steep", ][1, ]
@@ -123,16 +126,17 @@ failed <- sum(!is.na(res$error))
 if (failed > 0) cat(sprintf("WARNING: %d/%d fits errored\n", failed, nrow(res)))
 
 ok <- res[is.na(res$error), ]
-cat(sprintf("\ntrue period sd over a %d-yr uniform window: %.1f yr\n",
+cat(sprintf("\ntrue period: %d yr wide, sd %.1f yr (width / sqrt(12))\n",
             diff(WINDOW), TRUE_PERIOD_SD))
-cat("\ncondition   lab_err     n      c  [95% CI]        accuracy  sigma_err  period_sd\n")
+cat("\ncondition   lab_err     n      c  [95% CI]        accuracy  sigma_err  period_sd  as width\n")
 for (cond in CONDITIONS) for (le in LAB_ERRORS) {
   s <- ok[ok$condition == cond & ok$lab_error == le, ]
   if (nrow(s) < 3) next
   a  <- attenuation(s)
   sd <- if ("period_sd_original" %in% names(s)) mean(s$period_sd_original, na.rm = TRUE) else NA
-  cat(sprintf("%-11s %4d %6d  %.3f  [%.3f, %.3f]     %.3f     %+.3f    %s\n",
+  cat(sprintf("%-11s %4d %6d  %.3f  [%.3f, %.3f]     %.3f     %+.3f    %-9s %s\n",
               cond, le, nrow(s), a["mean"], a["lo"], a["hi"],
               mean(s$slope_cov90), mean(s$sigma_err),
-              if (is.na(sd)) "-" else sprintf("%.1f", sd)))
+              if (is.na(sd)) "-" else sprintf("%.1f", sd),
+              if (is.na(sd)) "-" else sprintf("%.0f yr", sd_to_width(sd))))
 }
