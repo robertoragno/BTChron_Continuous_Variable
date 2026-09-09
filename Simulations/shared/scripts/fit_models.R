@@ -51,6 +51,8 @@ model_stan_data <- function(model, dates, y, time_ref_min, time_ref_range,
   switch(model,
     midpoint = c(common, list(start_date = dates$start, end_date = dates$end)),
     median   = c(common, list(start_date = dates$median, end_date = dates$median)),
+    # period takes exactly the same data as marginal; the prior is internal.
+    period   = ,
     marginal = c(common, list(n_years = length(dates$grid),
                               grid_year = dates$grid,
                               n_weights = dates$weights$n_weights,
@@ -60,8 +62,13 @@ model_stan_data <- function(model, dates, y, time_ref_min, time_ref_range,
     stop("unknown model: ", model))
 }
 
+# "period" is marginal_date.stan plus an estimated study-period prior. It is
+# not in MODELS and so takes no part in the recovery studies; its one caller is
+# 06_period_prior_check.R, which is testing whether the missing study period is
+# what attenuates the control window.
 MODEL_FILE <- c(midpoint = "midpoint.stan", median = "midpoint.stan",
-                marginal = "marginal_date.stan")
+                marginal = "marginal_date.stan",
+                period = "marginal_date_period.stan")
 
 #' Compile the models once, before forking. cmdstanr compiles to a binary beside
 #' the .stan file, so letting workers do it races them onto the same path.
@@ -78,8 +85,13 @@ compile_models <- function(model_dir, models = MODELS) {
 #' Failures are captured rather than thrown: one pathological dataset should not
 #' take down a run of several thousand fits. The error text is kept so a run can
 #' be audited afterwards instead of quietly returning fewer rows.
+#'
+#' extra_pars names further parameters to record the posterior mean of, one
+#' column each, for a model that has some. Everything reported by the paper
+#' needs only the three below.
 fit_model <- function(model, compiled, stan_data, truth,
-                      iter_warmup = 500, iter_sampling = 500) {
+                      iter_warmup = 500, iter_sampling = 500,
+                      extra_pars = NULL) {
   tryCatch({
     fit <- compiled[[MODEL_FILE[model]]]$sample(
       data = stan_data, chains = 4, parallel_chains = 1,
@@ -91,7 +103,14 @@ fit_model <- function(model, compiled, stan_data, truth,
     draws <- fit$draws(variables = pars, format = "draws_matrix")
     diag  <- fit$diagnostic_summary(quiet = TRUE)
 
-    data.frame(c(
+    extra <- list()
+    if (!is.null(extra_pars)) {
+      e <- fit$draws(variables = extra_pars, format = "draws_matrix")
+      extra <- as.list(colMeans(e))
+      names(extra) <- extra_pars
+    }
+
+    data.frame(c(extra,
       summarise_parameter(draws[, "baseline_original"], truth$intercept, "intercept"),
       summarise_parameter(draws[, "slope_original"],    truth$slope,     "slope"),
       summarise_parameter(draws[, "sigma"],             truth$sigma,     "sigma"),
