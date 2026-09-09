@@ -50,11 +50,68 @@ with every true date pinned to a window edge.
 
 `rcarbon` calibrates against a uniform prior over calendar years, so the row it returns is
 proportional to the likelihood of the determination. **That is the intended behaviour and
-the prior wanted here**, confirmed with the supervisor. Note in the methods that the prior
+the prior wanted here.** Note in the methods that the prior
 is uniform over the whole calibration range, not over the study window: the model does not
 use the window as evidence about where a date can fall, which matches what an analyst
 actually knows. It is also why the grid is padded rather than clipped — clipping would
 impose a window prior by the back door.
+
+## Three things called "window"
+
+Kept apart because only the third is at issue, and conflating them makes the control-window
+result look like a bug rather than a consequence.
+
+| | what it is | which model uses it |
+|---|---|---|
+| per-date support | the span holding 99.99% of one date's calibrated mass, trimmed in `calibrated_rows()` | date-marginalised, in full |
+| HPD envelope | that support collapsed to a single interval, shape and gaps discarded | midpoint, via `start` / `end` |
+| study period | the fact that every find came from one 400-yr span | neither |
+
+The midpoint model uses only `(start + end) / 2`; the width never enters `midpoint.stan`, so
+the magnitude of the dating uncertainty is discarded outright. The date-marginalised model
+receives the whole per-year distribution, gaps included, so multimodality survives — the
+97.5% mass figure in the results is what the envelope throws away and the weight row keeps.
+
+The study period is used by neither, and that is where the control-window attenuation comes
+from. Each date's support leaks past the edges of the true period, nothing ties the dates to
+each other, and the fitted spread of dates comes out wider than the real one. A slope is
+roughly `cov(x, y) / var(x)`, so an inflated `var(x)` flattens it. The asymmetry is worth
+stating plainly in the paper: the date-marginalised model is exposed to this precisely
+because it models the date as uncertain. A model that plugs in a fixed number has no prior
+over dates to misspecify, and pays elsewhere instead — in sigma, and in slope inflation on
+the plateau.
+
+## A study-period prior, and why the diagnostic condition is not one
+
+`05_attenuation_diagnostic.R` includes a `window_prior` condition that clips each weight row
+to the true study period and renormalises. It recovers attenuation near 1, which identifies
+the mechanism — but it is a diagnostic upper bound, not a candidate method. The number it
+clips to comes from the generator, and no analyst knows the period to the year.
+
+The distinction that matters is where the boundary comes from, not whether one exists:
+
+- **clipping to the true window** — the boundary is supplied by the simulator. Establishes
+  how much of the attenuation the missing period accounts for, and nothing else.
+- **a generously bounded plausible period** — defensible, since samples are usually selected
+  because they belong to a period, but it introduces a tuning choice that has to be
+  justified and cannot be calibrated from inside a simulation.
+- **estimating the period from the dates** — a hierarchical prior on the latent dates, with
+  the period learned from the same data being fitted. No external number enters, so there is
+  nothing to tune and nothing to defend. This is also standard practice in Bayesian
+  chronological modelling, where phase boundaries are estimated rather than assumed.
+
+The third is the option worth pursuing. Two forms, with a trade-off:
+
+- `date ~ uniform(A, B)` with `A`, `B` estimated matches the archaeological idiom and the
+  true generating process, but uniform boundaries are awkward to fit: the density is
+  discontinuous at the edges, endpoint estimates are biased inward, and an over-tight
+  period would over-correct and inflate the slope instead.
+- `date ~ normal(mu, tau)` with `mu`, `tau` estimated is misspecified in shape but samples
+  cleanly, and attenuation is driven by `var(x)` rather than by the shape of the date
+  distribution. Recovering the variance is likely enough to close most of the gap.
+
+Either way it needs its own validation before it becomes the headline model, and the
+zero-slope cells are the check that it has not over-corrected.
 
 ## Lab error and curve error
 

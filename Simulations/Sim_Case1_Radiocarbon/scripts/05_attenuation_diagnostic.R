@@ -16,19 +16,17 @@
 #                fitting or scoring code and none of the other three mean
 #                anything.
 #   baseline     the study as it stands. Expect c ~ 0.84.
-#   matched_dgp  the determination is drawn with the curve's own error folded
-#                in, so the generator matches what calibrate() assumes.
-#                simulate.R notes that the study ignores this. If c moves to 1
-#                here, the attenuation is a simulator artefact and is fixed by
-#                changing the generator.
 #   window_prior the weight rows are cut to the true study window and
 #                renormalised, telling the model what it is otherwise never
 #                told. If c moves to 1 here, the attenuation comes from the
 #                model spreading dates over the whole padded grid, and is a
 #                real property of the method rather than a bug.
 #
-# The two hypotheses are not exclusive and the conditions are not nested, so
-# both can move. What matters is which one moves c further.
+# A fourth condition, matched_dgp, used to sit here: the determination drawn
+# with the curve's own error folded in, testing whether the attenuation was a
+# generator artefact. It answered no, and the generator now folds that error in
+# by default (simulate.R), so the condition became a duplicate of baseline and
+# was removed. Its question is settled and its answer is the baseline row.
 #
 #   ATTEN_REPS=20 Rscript .../05_attenuation_diagnostic.R
 
@@ -56,7 +54,7 @@ WINDOW     <- c(-1600, -1200)
 LAB_ERRORS <- c(15, 50)
 N          <- 200
 GRID_STEP  <- 5
-CONDITIONS <- c("oracle", "baseline", "matched_dgp", "window_prior")
+CONDITIONS <- c("oracle", "baseline", "window_prior")
 
 # Same padding as the design, so the baseline condition here and the steep cells
 # in 03_ see an identical grid.
@@ -75,20 +73,6 @@ truth_key$intercept <- runif(nrow(truth_key), 2, 15)
 truth_key$sigma     <- runif(nrow(truth_key), 0.5, 4)
 truth_key$slope     <- runif(nrow(truth_key), -0.03, 0.03)
 design <- merge(design, truth_key, by = c("rep", "lab_error"))
-
-#' As simulate_c14(), but the determination carries the calibration curve's own
-#' error as well as the lab's. rcarbon calibrates against
-#' sd = sqrt(lab^2 + curve^2); drawing with only the lab error makes the
-#' calibrated posterior wider than the truth warrants.
-simulate_c14_matched <- function(N, intercept, slope, sigma, window, lab_error,
-                                 seed = NULL) {
-  if (!is.null(seed)) set.seed(seed)
-  true_date <- round(runif(N, window[1], window[2]))
-  cc  <- rcarbon::uncalibrate(1950 - true_date, verbose = FALSE)
-  cra <- round(rnorm(N, cc$ccCRA, sqrt(lab_error^2 + cc$ccError^2)))
-  data.frame(CRA = cra, Error = lab_error, True_date = true_date,
-             Value = round(intercept + slope * true_date + rnorm(N, 0, sigma), 1))
-}
 
 #' Cut each weight row to the study window and renormalise: the model is told
 #' the dates came from a known 400-yr period, which is the one thing the study
@@ -125,13 +109,8 @@ run_one <- function(i) {
   keep <- c("rep", "lab_error", "condition")
 
   out <- tryCatch({
-    sim <- if (d$condition == "matched_dgp") {
-      simulate_c14_matched(N, d$intercept, d$slope, d$sigma, WINDOW,
-                           d$lab_error, seed = d$seed)
-    } else {
-      simulate_c14(N, d$intercept, d$slope, d$sigma, WINDOW, d$lab_error,
-                   seed = d$seed)
-    }
+    sim <- simulate_c14(N, d$intercept, d$slope, d$sigma, WINDOW, d$lab_error,
+                        seed = d$seed)
 
     truth <- list(intercept = d$intercept, slope = d$slope, sigma = d$sigma)
     x_pred <- WINDOW
