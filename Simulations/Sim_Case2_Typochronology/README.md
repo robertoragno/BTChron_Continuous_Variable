@@ -115,6 +115,28 @@ about 10% of datasets, as expected for a 90% interval.
 
 ![One dataset fitted by both models](figures/single_fit_comparison.png)
 
+### Two groups of widths or a continuous spread?
+
+The design has two groups of finds (well dated or coarsely dated). Real datasets
+have a range of widths, so `scripts/checks/01_check_continuous_widths.R` repeats
+the 200 reference datasets with the same true dates and values, but gives each
+find a width drawn uniformly between 6.25% and 28.2% of the period. The upper
+limit keeps the mean squared width the same as in the two-group design (0.034),
+which is what sets how much the midpoint flattens the slope. 800 fits, no
+divergences, R-hat below 1.02.
+
+| Widths | Model | Calibration slope [95% CI] | Slope coverage | Slope RMSE (10⁻³) | σ bias | σ coverage |
+|---|---|---|---|---|---|---|
+| two groups | Midpoint | 0.962 [0.957, 0.967] | 0.73 | 0.98 | +0.16 | 0.52 |
+| continuous | Midpoint | 0.961 [0.956, 0.967] | 0.73 | 1.00 | +0.16 | 0.48 |
+| two groups | Full distribution | 0.969 [0.964, 0.974] | 0.78 | 0.89 | +0.00 | 0.89 |
+| continuous | Full distribution | 0.966 [0.960, 0.971] | 0.75 | 0.94 | +0.01 | 0.89 |
+
+The two versions give the same calibration slope and σ recovery for both models.
+Slope coverage and RMSE of the full-distribution model are slightly worse with
+continuous widths (0.75 against 0.78), within the Jeffreys intervals of each
+other. The two-group structure does not drive the results.
+
 ## Figures
 
 | File | Shows |
@@ -139,6 +161,7 @@ Run in order: `01` → `03` → `04`, then `05`. No `02_` in this case.
 | `scripts/05_single_fit.R` | `single_fit_comparison.png` |
 | `scripts/checks/00_check.R` | generator check figure, and `dataset_anatomy.png` |
 | `scripts/checks/00_check_median_identity.R` | median equals midpoint for a flat window, so median is not fitted |
+| `scripts/checks/01_check_continuous_widths.R` | two groups of widths against a continuous spread; writes `output/check_continuous_widths*.csv` |
 
 The previous design (grid-snapped windows, fine/coarse mix, skew, overhang and
 position sweeps) and its results are in `archive/superseded_run_20260916/`.

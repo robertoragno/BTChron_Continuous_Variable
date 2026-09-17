@@ -77,7 +77,10 @@ model reaches 0.90 coverage.
 Accuracy and precision of the point estimates (posterior medians), from
 `output/recovery_table.csv`. Slope values are in units of 10⁻³ per year. True
 slopes are drawn uniformly between -30 and +30 in these units, or set to 0 in the
-zero-slope datasets. Bias is ± 1 Monte Carlo SE.
+zero-slope datasets. Bias is ± 1 Monte Carlo SE. RMSE is the typical distance from
+the truth; empirical SE is the scatter of the error across datasets. RMSE larger
+than empirical SE means part of the error is bias (see `shared/README.md`,
+Metrics).
 
 | Window | Model | Slope bias | Slope RMSE | Slope empirical SE | 90% interval width | σ bias | σ RMSE | σ empirical SE |
 |---|---|---|---|---|---|---|---|---|
@@ -119,14 +122,17 @@ expected.
 
 ![Recovery by lab error](figures/recovery_by_lab_error.png)
 
-![One dataset fitted by both models](figures/single_fit_comparison.png)
+![One dataset on the plateau, fitted by each model](figures/single_fit_comparison.png)
+
+![One dataset on the steep section, fitted by each model](figures/single_fit_comparison_steep.png)
 
 ## Figures
 
 | File | Shows |
 |---|---|
 | `figures/dataset_anatomy.png` | one dataset per window, before any fitting |
-| `figures/single_fit_comparison.png` | one dataset, midpoint vs full distribution |
+| `figures/single_fit_comparison.png` | one dataset on the plateau, fitted by the midpoint, calibrated-median and full-distribution models; each panel shows that model's input |
+| `figures/single_fit_comparison_steep.png` | the same for the steep section |
 | `figures/recovery_summary.png` | headline result across all datasets |
 | `figures/recovery_by_lab_error.png` | recovery by lab error and window |
 | `figures/checks/` | calibrated dates overview, dataset size, deposition |
@@ -142,7 +148,7 @@ Run in order: `01` → `03` → `04`, then `02` and `05`.
 | `scripts/02_figures.R` | `dataset_anatomy.png` and `checks/overview.png` |
 | `scripts/03_recovery_study.R` | calibrates each dataset and fits every model; about 3 h on 24 workers |
 | `scripts/04_recovery_plots.R` | tables (`output/`) and figures |
-| `scripts/05_single_fit.R` | `single_fit_comparison.png` |
+| `scripts/05_single_fit.R` | `single_fit_comparison.png` and `single_fit_comparison_steep.png` |
 | `scripts/checks/00_check_rows.R` | calibrated weight rows give the same medians as `rcarbon` |
 | `scripts/checks/00_check_fit.R` | simulate, calibrate and fit one dataset |
 | `scripts/diagnostics/` | why the steep section flattens the slope (`05_`), estimating the study window (`06_`, `07_`) |
