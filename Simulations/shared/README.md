@@ -54,7 +54,7 @@ shared/
              fit_models.R           Stan data per model, one fit to one dataset
              run_recovery.R         fits every model to every dataset, in parallel
              recovery_summary.R     metrics, tables and figures for every 04_
-             single_fit_figure.R    one dataset, two models, for every 05_
+             single_fit_figure.R    one dataset, two or three models, for every 05_
              case_dating_figures.R  figures/caseN_dating.png: how each case dates finds
   checks/    00_check_marginal.R    full-distribution vs latent model
 ```
@@ -91,6 +91,28 @@ RECOVERY_LIMIT=20 RECOVERY_WORKERS=8 RECOVERY_WARMUP=300 RECOVERY_SAMPLING=300 \
 | calibration slope | slope of estimated slopes regressed on true slopes | 1 |
 | coverage | proportion of 90% equal-tailed credible intervals that contain the true value | 0.90 |
 | interval width | mean width of the 90% credible interval | narrower, once coverage is on target |
+
+**Coverage.** Each fit returns a 90% credible interval for the parameter. In a
+simulation the true value is known, so each interval either contains it or not.
+Coverage is the share of datasets where it does. A model whose uncertainty is
+honest has coverage close to 0.90. Below 0.90 its intervals are too narrow
+(overconfident), or they are centred in the wrong place because the estimate is
+biased. Above 0.90 they are wider than they need to be.
+
+**RMSE and empirical SE.** Both are computed from the error of each dataset,
+posterior median minus true value, and are in the units of the parameter.
+
+- RMSE = sqrt(mean(error²)): how far the estimate typically lands from the truth,
+  whatever the reason.
+- Empirical SE = SD(error): how much the error changes from one dataset to the
+  next, ignoring any constant shift.
+
+They are linked by RMSE² ≈ bias² + empirical SE². When RMSE and empirical SE are
+nearly equal, the error is scatter with no systematic shift. When RMSE is clearly
+larger, part of the error is bias. For σ in Case 1 on the plateau, the midpoint
+model has RMSE 0.54 and empirical SE 0.46: the remaining gap is its bias of +0.28
+(0.46² + 0.28² ≈ 0.54²). The full-distribution model has 0.22 and 0.21, with bias
+close to zero.
 
 The calibration slope is reported because bias cannot show attenuation: true slopes
 are drawn around zero, so flattening positive and negative slopes cancels out in the

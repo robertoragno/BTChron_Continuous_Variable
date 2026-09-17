@@ -31,10 +31,13 @@ fits <- fit_single_example(dates, sim$Value, PERIOD_START - pad,
                            (PERIOD_END + pad) - (PERIOD_START - pad),
                            x_pred, seed = 7)
 
-obs <- data.frame(x = (sim$Start_date + sim$End_date) / 2, y = sim$Value)
+# What each model reads: the midpoint of each dating range, and the range itself
+obs    <- data.frame(x = (sim$Start_date + sim$End_date) / 2, y = sim$Value)
+ranges <- data.frame(xmin = sim$Start_date, xmax = sim$End_date, y = sim$Value)
 out <- here("Simulations", "Sim_Case2_Typochronology", "figures",
            "single_fit_comparison.png")
 single_fit_comparison_figure(
   fits, x_pred, truth, out,
-  title = "Case 2: one dataset, midpoint vs full distribution", obs = obs)
+  title = "Case 2: one dataset, half of the finds coarsely dated - midpoint vs full distribution",
+  obs = obs, ranges = ranges)
 cat("wrote", out, "\n")

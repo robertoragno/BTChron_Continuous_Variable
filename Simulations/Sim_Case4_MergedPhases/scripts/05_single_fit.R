@@ -31,8 +31,12 @@ fits <- fit_single_example(dates, sim$Value, PERIOD_START - pad,
                            (PERIOD_END + pad) - (PERIOD_START - pad),
                            x_pred, seed = 4)
 
-obs <- data.frame(x = (sim$Start_date + sim$End_date) / 2, y = sim$Value)
+# What each model reads: the midpoint of each dating range, and the range itself
+obs    <- data.frame(x = (sim$Start_date + sim$End_date) / 2, y = sim$Value)
+ranges <- data.frame(xmin = sim$Start_date, xmax = sim$End_date, y = sim$Value)
 out <- here("Simulations", "Sim_Case4_MergedPhases", "figures", "single_fit_comparison.png")
-single_fit_comparison_figure(fits, x_pred, truth, out,
-                             title = "Case 4: one dataset, broad periods up to 3 phases", obs = obs)
+single_fit_comparison_figure(
+  fits, x_pred, truth, out,
+  title = "Case 4: one dataset, broad periods of up to 3 phases - midpoint vs full distribution",
+  obs = obs, ranges = ranges)
 cat("wrote", out, "\n")

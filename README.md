@@ -72,7 +72,7 @@ Sim_CaseN_<name>/
 │   └── checks/              # tests that the generator does what it claims
 └── figures/
     ├── dataset_anatomy.png          # what the data looks like before fitting
-    ├── single_fit_comparison.png    # one fit, midpoint vs full distribution
+    ├── single_fit_comparison.png    # one dataset, fitted by each model
     ├── recovery_summary.png         # the headline result
     ├── recovery_by_<factor>.png     # the result as dating gets coarser
     └── checks/                      # secondary sweeps and generator checks

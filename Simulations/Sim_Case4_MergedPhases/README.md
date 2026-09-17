@@ -54,7 +54,7 @@ The median is not fitted: for a flat window it equals the midpoint.
 Both models recover the slope (slope ratio 1.01-1.04, coverage 0.87-0.93).
 
 The midpoint model overestimates sigma, more so as broad periods get wider
-(sigma error 0.60, 0.72 and 1.09 at merge_max 2, 3 and 4). Its 90% interval
+(σ bias 0.60, 0.72 and 1.09 at merge_max 2, 3 and 4). Its 90% interval
 contains the true sigma in about a third of datasets. The full-distribution
 model recovers sigma (coverage 0.88-0.93).
 
