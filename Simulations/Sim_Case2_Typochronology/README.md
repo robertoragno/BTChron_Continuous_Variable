@@ -82,6 +82,18 @@ In this case it should not be a huge issue since the deposition is uniform, but 
 > [!CAUTION]
 > This section needs to be written.
 
+Before fitting, plain least squares on 200,000 finds gives the midpoint slope
+ratio expected from the design. It follows `1 / (1 + mean(width^2) / period^2)`:
+
+| Coarse window | Coarsely dated | Midpoint slope ratio |
+|---|---|---|
+| 10% of period | 50% | 0.993 |
+| 10% of period | 100% | 0.990 |
+| 25% of period | 50% | 0.968 |
+| 25% of period | 100% | 0.940 |
+| 45% of period | 50% | 0.906 |
+| 45% of period | 100% | 0.830 |
+
 The full-distribution model recovers sigma in every setting. The midpoint model
 overestimates it: once half or more of the finds are coarsely dated, its 90%
 interval contains the true sigma in only 50-57% of datasets, and in 37% when
@@ -130,5 +142,3 @@ Run in order: `01` → `03` → `04`, then `05`. No `02_` in this case.
 
 The previous design (grid-snapped windows, fine/coarse mix, skew, overhang and
 position sweeps) and its results are in `archive/superseded_run_20260916/`.
-
-Detailed findings so far: `findings.md`.

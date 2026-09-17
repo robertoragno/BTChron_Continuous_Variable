@@ -1,63 +1,62 @@
-// =============================================================================
-// Linear Regression with Marginalised Latent Dates
-// =============================================================================
+// Linear regression with the dates integrated out
 //
 //   trend(t) = alpha + beta * t
 //   y_n ~ Normal(trend(theta_n), sigma),  theta_n unknown
 //
-// Each observation carries a probability for every year it could belong to,
-// instead of a single [start, end] window, and those years are averaged over
-// rather than sampled:
+// Each observation has a probability for every year it could date to. The model
+// averages over those years instead of sampling a date:
 //
-//   p(y_n | alpha, beta, sigma) = SUM over years t of prob[n, t] * Normal(y_n | trend(t), sigma)
+//   p(y_n | alpha, beta, sigma) = SUM over years t of
+//   prob[n, t] * Normal(y_n | trend(t), sigma)
 //
-// evaluated as log_sum_exp(log prob[n, .] + log-density). No date parameter is
-// introduced, so the posterior stays at three parameters whatever N is, and the
-// same file serves every dating case - only the probabilities change:
+// computed as log_sum_exp(log prob[n, .] + log density). There is no date
+// parameter, so the model has three parameters whatever N is. The same file is
+// used by every case, only the probabilities change:
 //
-//   Case 1  calibrated radiocarbon posterior on the annual grid (rcarbon calMatrix)
-//   Case 2  uniform over the sample's typochronological window
-//   Case 3  uniform over the assigned phase's window
-//   Case 4  uniform over the union of the merged phases' windows
+//   Case 1  calibrated radiocarbon date on the grid (rcarbon calMatrix)
+//   Case 2  flat over the sample's typochronological window
+//   Case 3  flat over the assigned phase's window
+//   Case 4  flat over the merged phases' window
 //
-// The probabilities sit on a SHARED annual grid, so they are supplied ragged:
-// one flat vector, plus each row's first grid index and its length. Rows are
-// trimmed to their support (a 100-yr window out of a 1500-yr axis is 93% zeros)
-// and renormalised in R before being passed in.
+// All finds share one grid of candidate years, but each find only covers some
+// of them, so rows have different lengths (ragged).
+// They are passed as one long vector with rows placed end to end, plus where
+// each row starts on the grid and how long it is.
+// Rows are trimmed to the years they cover (a 100-yr window out of
+// a 1500-yr axis is 93% zeros) and renormalised in R before being passed in.
 //
-// Calendar years are mapped to [-1, 1] using reference constants passed as data,
-// not derived from the realised dates, so the prior on beta is the same prior on
-// the calendar-scale slope in every dataset and every model.
-// =============================================================================
+// Calendar years are rescaled to [-1, 1] with time_ref_min (start of the axis)
+// and time_ref_range (its length), set in each case's 01_design.R. They are
+// the same for every dataset in a case, not taken from each dataset's dates,
+// so the prior on beta means the same slope in years in every dataset and model.
 
 data {
   int<lower=1> N;
   vector[N] y;
 
-  // Shared candidate-year grid. grid_year[i] is the calendar year of grid
-  // position i; this is what turns a row index into a date.
+  // Grid of candidate years. grid_year[i] is the calendar year at position i.
   int<lower=1> n_years;
   vector[n_years] grid_year;
 
-  // Ragged probability rows, already normalised so each row sums to 1.
+  // Probability rows, already normalised so each row sums to 1.
   //
-  // Stan has no ragged array type and every observation covers a different
-  // number of years, so the rows are glued end to end into one flat vector and
-  // two index arrays say where each row lives inside it:
+  // Every observation covers a different number of years and Stan has no array
+  // for rows of different lengths, so the rows are placed end to end in one
+  // vector and two index arrays say where each row sits inside it:
   //
   //   obs 1: 3 years   obs 2: 4 years   obs 3: 2 years
   //   packed = [ . . . | . . . . | . . ]
   //   position   1 2 3   4 5 6 7   8 9
-  //   row_first_year and row_offset point at 1, 4, 8; row_n_years is 3, 4, 2
+  //   row_offset is 1, 4, 8; row_n_years is 3, 4, 2
   //
-  // Nothing here is ever modified - this is the data block. The model reads one
-  // observation's slice with segment() and calls it candidate_log_prob.
+  // row_first_year is where each row starts on the grid of years, not in the
+  // packed (ragged) vector. The model reads one observation's row with segment().
   int<lower=1> n_weights;                  // total stored probabilities
-  vector[n_weights] log_year_prob_packed;  // log probabilities, rows concatenated
+  vector[n_weights] log_year_prob_packed;  // log probabilities, rows end to end
   array[N] int<lower=1, upper=n_years> row_first_year;  // grid position each row starts at
   array[N] int<lower=1> row_n_years;                    // years covered by each row
 
-  // Calendar axis reference, shared across datasets and models.
+  // Calendar axis, the same for every dataset and model
   real time_ref_min;
   real<lower=0> time_ref_range;
 
@@ -70,9 +69,12 @@ transformed data {
     2 * (grid_year - time_ref_min) / time_ref_range - 1;
   vector[N_pred] x_pred_norm = 2 * (x_pred - time_ref_min) / time_ref_range - 1;
 
-  real neg_log_sqrt_2pi = -0.9189385332046727;  // -0.5 * log(2 * pi())
+  // Constant term of the normal log density, which the model writes out by hand
+  // because it needs one density per candidate year. It does not change the
+  // fit, but keeps log_lik comparable with midpoint.stan (e.g. for LOO).
+  real neg_log_sqrt_2pi = -0.5 * log(2 * pi());
 
-  // Where each row begins inside the flat log_year_prob_packed vector.
+  // Where each row starts inside log_year_prob_packed
   array[N] int row_offset;
   {
     int pos = 1;
@@ -85,12 +87,9 @@ transformed data {
              " but log_year_prob_packed has length ", n_weights);
   }
 
-  // Rows must be proper distributions over the grid. Note what this does and
-  // does not buy: scaling a row by a constant adds a constant to the log
-  // target, so it does NOT bias alpha, beta or sigma. It does shift that row's
-  // log_lik by log(c), which would corrupt any ELPD comparison against another
-  // model, and an off row sum is the symptom of a real construction bug - a
-  // mis-trimmed or truncated support - which is what this check is really for.
+  // Each row must sum to 1 and stay on the grid. A row that does not sum to 1
+  // would not change alpha, beta or sigma, but it shifts that row's log_lik and
+  // usually means the row was cut or trimmed wrongly in R.
   for (n in 1:N) {
     real row_sum =
       exp(log_sum_exp(segment(log_year_prob_packed, row_offset[n],
@@ -101,7 +100,7 @@ transformed data {
       reject("probability row ", n, " runs past the end of the grid");
   }
 
-  // Half a grid step, in normalised units, for jittering sampled dates.
+  // Half a grid step on the [-1, 1] scale, to spread sampled dates within a cell
   real half_step_norm = n_years > 1
     ? (grid_year_norm[2] - grid_year_norm[1]) / 2
     : 1.0 / time_ref_range;
@@ -115,30 +114,29 @@ parameters {
 
 model {
   alpha ~ normal(0, 10);
-  // beta is on the [-1, 1] axis: beta = slope_original * time_ref_range / 2.
-  // Over a ~1600-yr span the design's steepest slopes (+/- 0.03 y/yr) reach
-  // |beta| ~ 24, and normal(0, 10) shrank those toward zero, manufacturing slope
-  // attenuation that has nothing to do with dating. normal(0, 40) covers the
-  // design range for every case.
+  // Time runs from -1 to 1, but beta can take any value: it is the change in y
+  // per unit of rescaled time, beta = slope_original * time_ref_range / 2.
+  // Over a ~1600-yr axis the steepest slopes in the design (+/- 0.03 per yr)
+  // give |beta| ~ 24. normal(0, 10) pulled those towards zero and flattened the
+  // slope for reasons unrelated to dating. normal(0, 40) covers every case.
   beta  ~ normal(0, 40);
   sigma ~ exponential(1);
 
-  // For each observation, ask how well the current line explains it at every
-  // year it could belong to, then average those answers weighted by how likely
-  // each year is. Vectorised over a row's years rather than looped: the scalar
-  // version costs one autodiff node per year per leapfrog step.
+  // For each observation, how well the line fits it at each year it could date
+  // to, averaged with each year's probability as weight. Written over the whole
+  // row at once rather than year by year, which is much faster in Stan.
   for (n in 1:N) {
-    // the years this observation could belong to, and their probabilities
+    // candidate years for this observation and their log probabilities
     vector[row_n_years[n]] candidate_year =
       segment(grid_year_norm, row_first_year[n], row_n_years[n]);
     vector[row_n_years[n]] candidate_log_prob =
       segment(log_year_prob_packed, row_offset[n], row_n_years[n]);
 
-    // how far y sits from the line at each of those years, in units of sigma
+    // distance of y from the line at each candidate year, in units of sigma
     vector[row_n_years[n]] resid_scaled =
       (y[n] - alpha - beta * candidate_year) / sigma;
 
-    // log(probability of the year) + log(normal density of that miss),
+    // log(probability of the year) + log(normal density of the distance),
     // summed over years on the probability scale
     target += log_sum_exp(candidate_log_prob + neg_log_sqrt_2pi - log(sigma)
                           - 0.5 * square(resid_scaled));
@@ -146,10 +144,10 @@ model {
 }
 
 generated quantities {
-  // Marginal, not conditional on a latent date, unlike latent_date.stan
+  // log likelihood with the date averaged out (latent_date.stan keeps the date)
   vector[N] log_lik;
-  // One posterior draw of each date, stacking across iterations into the same
-  // density the latent model's date_actual gives
+  // One date per observation per draw. Over all draws these give the same
+  // distribution as date_actual in latent_date.stan.
   vector[N] date_actual;
 
   for (n in 1:N) {
@@ -160,21 +158,20 @@ generated quantities {
     vector[row_n_years[n]] resid_scaled =
       (y[n] - alpha - beta * candidate_year) / sigma;
 
-    // How well each candidate year accounts for this observation, on the log
-    // scale: its own probability times the density of the miss it implies.
+    // How well each candidate year fits this observation, on the log scale:
+    // the year's probability times the normal density of the distance.
     vector[row_n_years[n]] log_year_fit = candidate_log_prob + neg_log_sqrt_2pi
                                           - log(sigma) - 0.5 * square(resid_scaled);
 
     log_lik[n] = log_sum_exp(log_year_fit);
 
-    // Pick a candidate year weighted by how well it fits, then jitter within
-    // the cell so stacked draws read as a density rather than as spikes.
+    // Draw a year weighted by how well it fits, then a uniform position within
+    // its grid cell, so the dates form a smooth distribution instead of spikes.
     //
-    // A calibrated row trimmed to one contiguous span can hold exact zeros in
-    // its interior - the near-empty gaps between the humps of a plateau date -
-    // and log(0) is -inf, which log_sum_exp accepts but categorical_logit_rng
-    // rejects. Floor the weights 700 log-units below the row maximum: that is
-    // a probability around 1e-304, so the year is still never drawn.
+    // A calibrated row can contain exact zeros (the gaps between the peaks of a
+    // plateau date). log(0) is -inf, which categorical_logit_rng does not
+    // accept, so weights are floored 700 log units below the row maximum. That
+    // is a probability of about 1e-304, so those years are still never drawn.
     vector[row_n_years[n]] log_year_fit_safe =
       fmax(log_year_fit, max(log_year_fit) - 700);
 
