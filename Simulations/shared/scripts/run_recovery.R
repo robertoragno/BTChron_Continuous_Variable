@@ -1,26 +1,18 @@
-# One recovery study: every model fitted to every dataset in a design.
+# The recovery study loop shared by every case: fit every model to every dataset
+# in parallel and write one row per fit. Each case supplies prepare_dataset().
 #
-# Cases 1, 2 and 4 differ in exactly one thing - how a design row becomes a
-# dataset the models can see. That part is the case's own prepare_dataset();
-# the job list, the workers, the error handling and the results file are the
-# same for all three, so they live here and are written once.
-#
-# Reduce the work with env vars while developing:
+# For a quick test run:
 #   RECOVERY_LIMIT=20 RECOVERY_WORKERS=8 Rscript .../03_recovery_study.R
 
 #' Fit every model to every dataset and write one row per fit.
 #'
 #' @param design      the design grid, already read from data/design.csv
-#' @param prepare_dataset  function(d) for one design row, returning
-#'                    list(sim = , dates = ) and optionally extra = , a named
-#'                    list of per-dataset values to record alongside the fit
-#'                    (Case 1 uses it for mass_kept; the others have none)
-#' @param keep        design columns carried into the results file. Every column
-#'                    a figure groups by has to be in here - see the note in
-#'                    Case 2's 03_ script for what happens when one is missing.
+#' @param prepare_dataset  function(d) turning one design row into
+#'                    list(sim, dates) and optionally extra (values to record)
+#' @param keep        design columns copied into the results; figures can only
+#'                    group by columns listed here
 #' @param models      which of MODELS to fit
-#' @param output_csv  written only if absent, so a re-run after a crash resumes
-#'                    rather than discarding hours of fits. Delete it to refit.
+#' @param output_csv  if it already exists nothing is fitted; delete it to refit
 run_recovery <- function(design, prepare_dataset, keep, models, output_csv,
                          x_pred_cols,
                          model_dir = here::here("Simulations", "shared", "models"),
@@ -36,8 +28,7 @@ run_recovery <- function(design, prepare_dataset, keep, models, output_csv,
 
   jobs <- expand.grid(row = seq_len(nrow(design)), model = models,
                       stringsAsFactors = FALSE)
-  # Shuffled so prescheduled workers get a similar mix of cheap and expensive
-  # jobs; the design is ordered by N, so contiguous blocks would be very uneven.
+  # Shuffle so each worker gets a mix of small and large datasets
   set.seed(1); jobs <- jobs[sample(nrow(jobs)), ]
 
   compiled <- compile_models(model_dir, models)
@@ -46,8 +37,7 @@ run_recovery <- function(design, prepare_dataset, keep, models, output_csv,
     job <- jobs[i, ]  # jobs is shuffled; i indexes rows, not design order
     d   <- design[job$row, ]
 
-    # Failures are captured, not thrown: one pathological dataset should not
-    # take down a run of several thousand fits.
+    # Record a failure instead of stopping the run
     prepared <- tryCatch(prepare_dataset(d), error = function(e) e)
     if (inherits(prepared, "error"))
       return(cbind(d[, keep], data.frame(model = job$model,
@@ -70,12 +60,8 @@ run_recovery <- function(design, prepare_dataset, keep, models, output_csv,
   cat(sprintf("%d fits (%d datasets x %d models) on %d workers\n",
               nrow(jobs), nrow(design), length(models), n_workers))
   t0 <- Sys.time()
-  # mc.preschedule = TRUE forks n_workers processes once and splits the jobs
-  # between them. The FALSE variant forks a fresh process per job - thousands of
-  # them - and on this machine that was killed outright the moment mclapply
-  # started, reproducibly, at job counts above roughly fifty while small runs
-  # completed fine. Prescheduling loses some load balancing across uneven job
-  # costs, which matters little here because the jobs are shuffled above.
+  # mc.preschedule = TRUE: one process per worker. FALSE (one process per job)
+  # was killed on this server for runs of more than about fifty jobs.
   results <- bind_rows_padded(parallel::mclapply(seq_len(nrow(jobs)), run_one_job,
                                                  mc.cores = n_workers,
                                                  mc.preschedule = TRUE))

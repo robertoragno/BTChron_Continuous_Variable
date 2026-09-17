@@ -1,48 +1,31 @@
-# The comparison models, and the code that fits one of them to one dataset.
+# Fitting one model to one dataset. Every case hands over the same `dates` list:
 #
-# Dispatch is on MODEL, never on case. A case reaches this file as a `dates`
-# frame with the same columns whatever produced it, so nothing here knows
-# whether it is looking at radiocarbon or pottery:
-#
-#   start, end   the interval the midpoint model uses
-#   median       the date column the median model uses
-#   weights      ragged rows from weight_rows.R, for the marginalised model
-#
-# Anything case-specific that appears below is a design smell.
+#   start, end   the range the midpoint model uses
+#   median       the date the median model uses
+#   weights      weight rows from weight_rows.R, for the full-distribution model
 
-# The models the paper reports.
-#
-# "latent" is deliberately not among them. It samples a date per observation
-# inside one [start, end], which for a calibrated posterior means first
-# flattening a multimodal curve into a single interval - a reduction nobody
-# performs in practice, so reporting it would be arguing with a straw man. And
-# for a flat window it is provably the same estimator as "marginal", which
-# 00_check_marginal.R demonstrates to five decimal places, so it would add a
-# redundant column in Cases 2-4.
-#
-# latent_date.stan stays in models/ regardless: that equivalence is what proves
-# the marginal model correct, and the check needs something to check against.
+# The models the paper reports. latent_date.stan is not among them: for a flat
+# window it gives the same answer as "marginal", and checks/00_check_marginal.R
+# uses it to prove exactly that.
 MODELS <- c("midpoint", "median", "marginal")
 
-#' Posterior summary for one parameter, in the vocabulary the earlier studies
-#' used: ACCURACY is whether the interval contained the truth, PRECISION is how
-#' wide it was. Recorded per fit; averaged in recovery_summary.R.
+#' Posterior summary for one parameter: median, error, and for the 50/80/90/95%
+#' intervals whether each contains the true value (accuracy) and its width
+#' (precision). Averaged across datasets in recovery_summary.R.
 summarise_parameter <- function(draws, true_value, name) {
-  q <- quantile(draws, c(0.05, 0.25, 0.5, 0.75, 0.95), names = FALSE)
-  out <- list(q[3],
-              true_value >= q[2] && true_value <= q[4],
-              true_value >= q[1] && true_value <= q[5],
-              q[5] - q[1],
-              q[3] - true_value)
-  names(out) <- paste0(name, c("_med", "_cov50", "_cov90", "_width90", "_err"))
+  med <- median(draws)
+  out <- list(med, med - true_value)
+  names(out) <- paste0(name, c("_med", "_err"))
+  for (level in c(50, 80, 90, 95)) {
+    q <- quantile(draws, c(1 - level / 100, 1 + level / 100) / 2, names = FALSE)
+    out[[paste0(name, "_cov", level)]]   <- true_value >= q[1] && true_value <= q[2]
+    out[[paste0(name, "_width", level)]] <- q[2] - q[1]
+  }
   out
 }
 
-#' Stan data for one model.
-#'
-#' Median reuses midpoint.stan with start = end = median: the file takes
-#' (start + end) / 2, which is then the median itself. One Stan file, two
-#' point-date models, no duplicated code.
+#' Stan data for one model. The median model reuses midpoint.stan with
+#' start = end = median, so (start + end) / 2 is the median.
 model_stan_data <- function(model, dates, y, time_ref_min, time_ref_range,
                             x_pred) {
   common <- list(N = length(y), y = y,
@@ -62,16 +45,13 @@ model_stan_data <- function(model, dates, y, time_ref_min, time_ref_range,
     stop("unknown model: ", model))
 }
 
-# "period" is marginal_date.stan plus an estimated study-period prior. It is
-# not in MODELS and so takes no part in the recovery studies; its one caller is
-# 06_period_prior_check.R, which is testing whether the missing study period is
-# what attenuates the control window.
+# "period" (marginal_date_period.stan) estimates the study period too. It is a
+# prototype used only by Case 1's diagnostics/06_period_prior_check.R.
 MODEL_FILE <- c(midpoint = "midpoint.stan", median = "midpoint.stan",
                 marginal = "marginal_date.stan",
                 period = "marginal_date_period.stan")
 
-#' Compile the models once, before forking. cmdstanr compiles to a binary beside
-#' the .stan file, so letting workers do it races them onto the same path.
+#' Compile the models once, before the parallel workers start.
 compile_models <- function(model_dir, models = MODELS) {
   files  <- unique(MODEL_FILE[models])
   models <- lapply(files, function(f)
@@ -80,15 +60,10 @@ compile_models <- function(model_dir, models = MODELS) {
   models
 }
 
-#' Fit one model to one dataset, and return a one-row data.frame.
+#' Fit one model to one dataset and return one row of results.
 #'
-#' Failures are captured rather than thrown: one pathological dataset should not
-#' take down a run of several thousand fits. The error text is kept so a run can
-#' be audited afterwards instead of quietly returning fewer rows.
-#'
-#' extra_pars names further parameters to record the posterior mean of, one
-#' column each, for a model that has some. Everything reported by the paper
-#' needs only the three below.
+#' An error is recorded in the `error` column instead of stopping the whole run.
+#' extra_pars: other parameters to record the posterior mean of (diagnostics only).
 fit_model <- function(model, compiled, stan_data, truth,
                       iter_warmup = 500, iter_sampling = 500,
                       extra_pars = NULL) {
@@ -120,8 +95,7 @@ fit_model <- function(model, compiled, stan_data, truth,
   }, error = function(e) data.frame(error = conditionMessage(e)))
 }
 
-#' Stack one-row results whose columns may differ, because failed fits return
-#' only an error column. rbind() would refuse; this pads instead.
+#' rbind() for results with different columns (a failed fit has only `error`)
 bind_rows_padded <- function(rows) {
   cols <- unique(unlist(lapply(rows, names)))
   do.call(rbind, lapply(rows, function(r) {

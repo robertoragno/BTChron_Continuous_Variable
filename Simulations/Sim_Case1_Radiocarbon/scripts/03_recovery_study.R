@@ -1,10 +1,6 @@
 # Case 1 recovery study: every model fitted to every dataset in the design.
-#
-# Reads data/design.csv and re-declares nothing. The study itself is
-# run_recovery() in shared/scripts; all that is case-specific is below, namely
-# how a design row becomes a set of calibrated dates. One row per fit goes to
-# output/recovery_results.csv; 04_recovery_plots.R turns that into the tables
-# and figures.
+# Reads data/design.csv; writes one row per fit to output/recovery_results.csv.
+# The fitting loop is run_recovery() in shared/scripts.
 
 library(here)
 library(cmdstanr)
@@ -20,13 +16,11 @@ design <- read.csv(here("Simulations", "Sim_Case1_Radiocarbon", "data",
 limit  <- as.integer(Sys.getenv("RECOVERY_LIMIT", "0"))  # 0 = whole design
 if (limit > 0) design <- design[seq_len(min(limit, nrow(design))), ]
 
-#' Everything the models need from one dataset, built once and shared by all of
-#' them so they see identical dates. Calibration is the expensive part, so the
-#' same CalDates object serves the weight rows and the envelope summaries.
-#'
-#' mass_kept rides along in `extra`: how much of the calibrated posterior the
-#' HPD envelope keeps, which is the loss the point-date models take and the
-#' marginalised one does not.
+# One dataset: simulate, calibrate, and prepare what each model reads.
+#   midpoint           centre of the 95% HPD range (start, end)
+#   median             calibrated median
+#   full distribution  the whole calibrated distribution on the grid (weights)
+# mass_kept is the share of each calibrated distribution inside its 95% range.
 prepare_dataset <- function(d) {
   sim <- simulate_c14(d$N, d$intercept, d$slope, d$sigma,
                       c(d$window_start, d$window_end), d$lab_error,

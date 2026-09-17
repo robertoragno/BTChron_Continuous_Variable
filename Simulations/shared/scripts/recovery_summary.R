@@ -1,75 +1,40 @@
-# Turning one-row-per-fit results into the paper's result axes.
+# Recovery metrics, tables and figures shared by every case's 04_ script.
 #
-# Shared by every case's 04_ script: the metrics are the same whatever the
-# dating is, and only the factor a case is faceted by differs.
+#   bias         posterior median minus the true value, averaged over datasets
+#   attenuation  how much of the true slope survives (1 = all of it)
+#   accuracy     how often the 90% interval contains the true value (target 0.9)
+#   precision    how wide that interval is
 #
-# Vocabulary follows the earlier studies rather than inventing new terms:
-#
-#   bias         how far the posterior median sits from the truth, on average
-#   attenuation  how much of the true slope survives estimation (target 1)
-#   accuracy     how often the 90% interval contained the truth (target 0.9).
-#                 This is what the statistical literature calls coverage.
-#   precision    how wide that interval was. Narrower is better, but only once
-#                 accuracy is on target - a narrow interval that misses the truth
-#                 is worse than a wide one that does not.
-#
-# Bias and accuracy are reported side by side and never combined into a single
-# score. A model can be unbiased and still badly calibrated, which is the point
-# of Claim A.
-#
-# Bias alone cannot see attenuation, and in these designs it never will. True
-# slopes are drawn symmetrically about zero, so the mean truth is ~0; an error
-# that scales with the truth then averages to (c - 1) * 0 = 0 whatever c is,
-# because the positive-slope and negative-slope datasets cancel. Case 1's median
-# model reports a mean bias of +6e-06 while flattening every slope by 18%.
-# Attenuation is therefore reported alongside bias, not instead of it: bias
-# catches an error of fixed size, attenuation an error proportional to the
-# effect, and the two are blind to each other.
-#
-# Greyscale with a single dark-red accent for the model being argued for, after
-# the palette in the archived Sim_Linear figures. Prints legibly in black and
-# white, and shape carries the model as well as colour, so neither is
-# load-bearing on its own.
+# Greyscale, with dark red for the full-distribution model.
 
 library(ggplot2)
 
-# All five metrics. metric_long() carries every one into recovery_table.csv; the
-# headline figures show only the three that carry the argument (HEADLINE_METRICS,
-# defined next to plot_metrics below).
+# Metrics carried into recovery_table.csv
 METRICS <- c("Slope bias", "Slope attenuation", "Slope accuracy (90%)",
              "Slope precision (90% width)", "Sigma error")
 
-# "marginal" plays the role the earlier studies labelled EIV. The point-date
-# baselines recede; the model under test carries the accent.
-MODEL_LEVELS  <- c("midpoint", "median", "latent", "marginal")
-MODEL_LABELS  <- c(midpoint = "Midpoint", median = "Median",
-                   latent = "Latent date", marginal = "Date-marginalised")
+# Model names, colours and shapes used in every figure
+MODEL_LEVELS  <- c("midpoint", "median", "marginal")
+MODEL_LABELS  <- c(midpoint = "Midpoint", median = "Calibrated median",
+                   marginal = "Full distribution")
 MODEL_COLOURS <- c(Midpoint = "grey55", `Midpoint / Median` = "grey55",
-                   Median = "grey25", `Latent date` = "grey40",
-                   `Date-marginalised` = "#780000")
-MODEL_SHAPES  <- c(Midpoint = 17, `Midpoint / Median` = 17, Median = 15,
-                   `Latent date` = 18, `Date-marginalised` = 16)
+                   `Calibrated median` = "grey25", `Full distribution` = "#780000")
+MODEL_SHAPES  <- c(Midpoint = 17, `Midpoint / Median` = 17, `Calibrated median` = 15,
+                   `Full distribution` = 16)
 
-# The one non-grey in every figure: the model being argued for, or the true
-# calendar date in the anatomy figures. Kept here so it is defined once.
 ACCENT <- "#780000"
 
 panel_theme <- theme_classic(base_size = 11) +
   theme(plot.title = element_text(size = 11, face = "bold"),
-        plot.subtitle = element_text(size = 9),
         strip.background = element_blank(),
         strip.text = element_text(face = "bold"),
         legend.position = "top",
-        legend.title = element_blank(),
-        plot.caption = element_text(size = 8, colour = "grey35", hjust = 0))
+        legend.title = element_blank())
 
-#' Drop failed fits and label the models for plotting.
+#' Read a results file, drop failed fits and label the models.
 #'
-#' merge_median is for the flat-window cases, where median was not fitted
-#' because it is the same estimator as midpoint (00_check_median_identity.R).
-#' The surviving row is relabelled so a reader is not left wondering which of
-#' the two they are looking at. Passed explicitly rather than inferred, so
-#' shared code never guesses what a case meant.
+#' merge_median: for flat windows the median model is not fitted (it equals the
+#' midpoint), so the midpoint row is labelled "Midpoint / Median".
 read_recovery <- function(path, merge_median = FALSE) {
   r <- read.csv(path)
   n_failed <- sum(!is.na(r$error))
@@ -87,26 +52,15 @@ read_recovery <- function(path, merge_median = FALSE) {
   droplevels(r)
 }
 
-#' Mean and its Monte Carlo standard error: how precisely this summary is known
-#' given only n simulated datasets, so a gap between models can be read against
-#' simulation noise rather than eyeballed. Shrinks as 1/sqrt(n_datasets).
+#' Mean and its Monte Carlo standard error (how precisely the mean is known from
+#' this many datasets)
 mc_mean <- function(x) {
   x <- x[is.finite(x)]
   c(mean = mean(x), se = sd(x) / sqrt(length(x)))
 }
 
-#' Accuracy is a proportion, so it gets a Jeffreys interval rather than a
-#' normal-approximation standard error.
-#'
-#' The normal approximation, p +/- 2 sqrt(p(1-p)/n), misbehaves at the
-#' boundaries: at accuracy 0.98 with n = 100 it draws a bar running past 1.0,
-#' which is meaningless. Accuracy near 1 is the expected result for the
-#' date-marginalised model, so the boundary is not a corner case here.
-#'
-#' Jeffreys puts a Beta(0.5, 0.5) prior on the proportion, giving a posterior
-#' Beta(k + 0.5, n - k + 0.5); the interval is its equal-tailed quantiles. It
-#' stays inside [0, 1] and goes asymmetric near the edges, which is the honest
-#' shape. Asymmetric, so it is returned as bounds rather than as one SE.
+#' A proportion (e.g. accuracy) with a 95% Jeffreys interval, which stays
+#' inside 0-1 even near 1
 jeffreys_prop <- function(x, level = 0.95) {
   x <- x[!is.na(x)]
   n <- length(x)
@@ -117,22 +71,12 @@ jeffreys_prop <- function(x, level = 0.95) {
     hi = qbeta(1 - a, k + 0.5, n - k + 0.5))
 }
 
-#' Attenuation: the share of the true slope that survives estimation.
+#' Attenuation: the slope of estimated slopes regressed on true slopes, with a 95%
+#' interval. 1 means the slope is recovered one-for-one, below 1 flattened.
 #'
-#' Every dataset in a recovery study has its own true slope, so the estimates
-#' can be regressed on the truths that produced them. The fitted line's slope is
-#' the attenuation factor c: an estimator that recovers the truth one-for-one
-#' gives c = 1, one that systematically flattens gives c < 1, one that
-#' exaggerates gives c > 1. Distance from 1 is what is being read, in either
-#' direction.
-#'
-#' The truth is reconstructed as slope_med - slope_err rather than joined back
-#' from the design, so this works on a results file alone and cannot go out of
-#' step with a design that was rebuilt.
-#'
-#' Returns NA where the truths do not vary - the zero-slope cells have no
-#' regression to fit, and asking for one there is a category error, not a
-#' failure.
+#' Bias alone cannot show this: true slopes are drawn around zero, so flattening
+#' positive and negative slopes cancels out in the average error. NA when the
+#' true slopes do not vary (zero-slope datasets).
 attenuation <- function(d, level = 0.95) {
   truth <- d$slope_med - d$slope_err
   ok    <- is.finite(truth) & is.finite(d$slope_med)
@@ -143,6 +87,7 @@ attenuation <- function(d, level = 0.95) {
   c(mean = unname(coef(fit)[2]), lo = ci[1], hi = ci[2])
 }
 
+#' One row of metrics per group (e.g. per model, or per model and N)
 summarise_models <- function(d, by) {
   stats <- do.call(rbind, lapply(split(seq_len(nrow(d)), d[by], drop = TRUE),
     function(i) {
@@ -152,7 +97,26 @@ summarise_models <- function(d, by) {
       acc   <- jeffreys_prop(s$slope_cov90)
       prec  <- mc_mean(s$slope_width90)
       sig   <- mc_mean(s$sigma_err)
+      # Intercept and sigma get the same bias / accuracy / precision as the
+      # slope. They go to the tables only, not the headline figures.
+      int_bias <- mc_mean(s$intercept_err)
+      int_acc  <- jeffreys_prop(s$intercept_cov90)
+      int_prec <- mc_mean(s$intercept_width90)
+      sig_acc  <- jeffreys_prop(s$sigma_cov90)
+      sig_prec <- mc_mean(s$sigma_width90)
       data.frame(s[1, by, drop = FALSE], n_fits = nrow(s),
+                 intercept_bias         = int_bias["mean"],
+                 intercept_bias_se      = int_bias["se"],
+                 intercept_accuracy     = int_acc["mean"],
+                 intercept_accuracy_lo  = int_acc["lo"],
+                 intercept_accuracy_hi  = int_acc["hi"],
+                 intercept_precision    = int_prec["mean"],
+                 intercept_precision_se = int_prec["se"],
+                 sigma_accuracy         = sig_acc["mean"],
+                 sigma_accuracy_lo      = sig_acc["lo"],
+                 sigma_accuracy_hi      = sig_acc["hi"],
+                 sigma_precision        = sig_prec["mean"],
+                 sigma_precision_se     = sig_prec["se"],
                  slope_bias         = bias["mean"],
                  slope_bias_se      = bias["se"],
                  slope_atten        = atten["mean"],
@@ -170,14 +134,11 @@ summarise_models <- function(d, by) {
   stats[order(stats$model), ]
 }
 
-#' Wide summary to one row per (group, metric). rbind() drops factor level
-#' order, so the levels are reapplied rather than trusted.
+#' Summary table to long format: one row per group and metric, with bounds
 metric_long <- function(stats, keep) {
   long <- do.call(rbind, lapply(seq_len(nrow(stats)), function(i) {
     s <- stats[i, ]
-    # Bounds rather than a single se: accuracy and attenuation carry their own
-    # asymmetric or regression intervals, the rest are +/- 2 Monte Carlo SE.
-    # Both kinds are named in the caption.
+    # Accuracy and attenuation have their own intervals; the rest are +/- 2 SE
     value <- c(s$slope_bias, s$slope_atten, s$slope_accuracy, s$slope_precision,
                s$sigma_err)
     se    <- c(s$slope_bias_se, NA, NA, s$slope_precision_se, s$sigma_err_se)
@@ -192,19 +153,11 @@ metric_long <- function(stats, keep) {
   long
 }
 
-# The three axes that carry the argument. Bias is ~0 by construction here (true
-# slopes are symmetric about zero) and precision is only readable once accuracy
-# is on target, so both live in recovery_table.csv rather than the headline
-# figure. Cutting from five panels to three is also what makes the strip labels
-# and axis numbers fit without colliding.
+# The three metrics shown in the headline figures
 HEADLINE_METRICS <- c("Slope attenuation", "Slope accuracy (90%)", "Sigma error")
 
-#' The headline metrics per model, optionally faceted by a case's own factor.
-#'
-#' One panel per metric, each with its own x scale - attenuation sits near 1,
-#' accuracy near 0.9, sigma error near 0, and forcing them onto a shared axis
-#' would flatten the differences that matter. The dotted line in each panel is
-#' that metric's target.
+#' Headline metrics per model, one panel per metric, optionally one row per level
+#' of a factor. The dotted line in each panel is the target value.
 plot_metrics <- function(long, facet_row = NULL, title) {
   long <- long[long$metric %in% HEADLINE_METRICS, ]
   long$metric <- factor(long$metric, levels = HEADLINE_METRICS)
@@ -221,12 +174,7 @@ plot_metrics <- function(long, facet_row = NULL, title) {
     scale_colour_manual(values = MODEL_COLOURS) +
     scale_shape_manual(values = MODEL_SHAPES) +
     scale_x_continuous(n.breaks = 4) +
-    labs(title = title, x = NULL, y = NULL,
-         caption = paste("Accuracy: Jeffreys 95% interval.",
-                         "Attenuation: 95% interval on the regression of",
-                         "estimate on truth.\nSigma error: +/- 2 Monte Carlo",
-                         "standard errors. Bias and precision are in",
-                         "recovery_table.csv.")) +
+    labs(title = title, x = NULL, y = NULL) +
     panel_theme +
     theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
   if (is.null(facet_row))
@@ -235,11 +183,7 @@ plot_metrics <- function(long, facet_row = NULL, title) {
     p + facet_grid(stats::reformulate("metric", facet_row), scales = "free_x")
 }
 
-#' Bias, attenuation and accuracy against sample size. All three should stay
-#' flat as N grows and only the spread should shrink; that is what separates a
-#' systematic error from noise. Accuracy falling as N rises is the signature of
-#' a systematic error the intervals do not know about - more data narrows them
-#' around the wrong value.
+#' Bias, attenuation and accuracy against dataset size
 plot_by_n <- function(d, title) {
   by_n <- summarise_models(d, c("model", "N"))
   long <- droplevels(metric_long(by_n, c("model", "N")))
@@ -258,42 +202,17 @@ plot_by_n <- function(d, title) {
     scale_shape_manual(values = MODEL_SHAPES) +
     facet_wrap(~ metric, scales = "free_y", nrow = 1) +
     scale_x_continuous(trans = "log2", breaks = sort(unique(long$N))) +
-    labs(title = title, x = "Sample size", y = NULL,
-         caption = paste("Accuracy and attenuation: 95% intervals.",
-                         "Bias: +/- 2 Monte Carlo standard errors.")) +
+    labs(title = title, x = "Sample size", y = NULL) +
     panel_theme
 }
 
-#' Was a sweep actually run, and is the column there to tell?
-#'
-#' Guards the `if` around each optional figure. The distinction matters: a
-#' column holding one value means that sweep was not part of this design, which
-#' is a fine reason to skip the figure. A column that is absent entirely means
-#' the study's 03_ script did not carry it into the results, which is a bug -
-#' and testing `length(unique(d$missing)) > 1` silently reports FALSE for both,
-#' so the figure just never appears. That happened to Case 2's overhang sweep:
-#' 400 fits ran and were scored, and nothing ever plotted them.
-has_sweep <- function(d, column) {
-  if (!column %in% names(d))
-    stop("results have no '", column, "' column, so the figure grouped by it ",
-         "cannot be drawn. Add it to the keep vector in the 03_ script and ",
-         "re-run, or join it from the design.")
-  length(unique(d[[column]])) > 1
-}
-
-#' One sweep, as a table and a figure: the models compared across the levels of
-#' whatever factor this case varies.
-#'
-#' Every case asks the same question of its own factor - lab error, dating
-#' resolution, deposition skew, window overhang, broad-period width - and the
-#' answer is always the same table and the same faceted figure. Only the column,
-#' the file name and the title differ, so those are the arguments.
-#'
-#' @param d       the rows this sweep is read from, already filtered by the case
-#' @param column  the design column whose levels the facets are
-#' @param name    file stem: writes recovery_by_<name>.csv and .png
+#' Table and figure for one sweep: writes recovery_by_<name>.csv and .png.
+#' Does nothing if the results do not vary in `column`, and stops if the column
+#' is missing (the 03_ script did not keep it).
 sweep_figure <- function(d, column, name, title, out_dir, fig_dir) {
-  if (!has_sweep(d, column)) return(invisible(NULL))
+  if (!column %in% names(d))
+    stop("results have no '", column, "' column; add it to the keep vector in the 03_ script")
+  if (length(unique(d[[column]])) < 2) return(invisible(NULL))
   stats <- summarise_models(d, c("model", column))
   write.csv(stats, file.path(out_dir, paste0("recovery_by_", name, ".csv")),
             row.names = FALSE)
@@ -306,46 +225,23 @@ sweep_figure <- function(d, column, name, title, out_dir, fig_dir) {
   invisible(stats)
 }
 
-#' Zero-slope cells: how often a 90% interval excludes the true zero.
+#' Zero-slope datasets: how often the 90% interval excludes zero
 false_positive_rate <- function(d) {
   zero <- d[d$slope_condition == "zero", ]
   if (nrow(zero) == 0) return(NULL)
   round(tapply(zero$slope_cov90, zero$model, function(x) 1 - mean(x)), 3)
 }
 
-# --- what a dataset looks like before any model sees it -----------------------
-
-#' The structure of a single dataset, in the idiom of the archived Sim_Linear
-#' scenario figures: one row per find at its measured value, the dating window a
-#' faint horizontal segment, the true calendar date a dark-red dot, the
-#' point-date estimate a grey square, the true trend a dashed line. Where the
-#' dating is by phases, the phase boundaries are alternating vertical bands
-#' behind the cloud, so it is visible which phase each find sits in.
+#' One simulated dataset per panel: each find at its measured value, its dating
+#' range as a segment, its point date as a square, its true date as a red dot,
+#' and the true trend dashed.
 #'
-#' One representative dataset per small multiple. What the panels vary - lab
-#' error, overlap, merge width, plateau vs control - is the case's own factor,
-#' passed in the `panel` column already labelled.
-#'
-#' The helper never inspects the case. Each case builds the frame it needs:
-#' `Point_date` is the calibrated median for radiocarbon and the window midpoint
-#' for the flat-window cases, computed by the caller, not here.
-#'
-#' @param d       one row per find: panel, Start_date, End_date, True_date,
-#'                 Value, Point_date.
-#' @param ribbon  optional phase bands: panel, xmin, xmax. Alternate shading is
-#'                 assigned from left to right within each panel.
-#' @param trend   optional true lines: panel, intercept, slope.
-#' @param free_x  TRUE when panels sit on different calendar ranges (Case 1's two
-#'                 windows do), FALSE when they share one axis.
-#' @param point_label,span_label  what the grey square and the grey segment are
-#'                 in this case, named in the legend. They are not the same
-#'                 object from case to case: for a flat window the square is the
-#'                 midpoint and the segment is the recorded window; for
-#'                 radiocarbon the square is the calibrated median and the
-#'                 segment is the 95% HPD envelope. Naming them in the figure
-#'                 rather than only in the caption is the point - the gap
-#'                 between the square and the red dot is the dating error, and
-#'                 a reader should not have to infer which is which.
+#' @param d        one row per find: panel, Start_date, End_date, True_date,
+#'                 Value, Point_date
+#' @param ribbon   optional phase bands: panel, xmin, xmax
+#' @param trend    optional true trends: panel, intercept, slope
+#' @param free_x   TRUE when panels cover different calendar ranges
+#' @param point_label, span_label  legend names for the square and the segment
 dataset_anatomy <- function(d, ribbon = NULL, trend = NULL, title = NULL,
                             free_x = FALSE,
                             point_label = "window midpoint",
@@ -358,8 +254,7 @@ dataset_anatomy <- function(d, ribbon = NULL, trend = NULL, title = NULL,
   p <- ggplot(d, aes(y = Value))
 
   if (!is.null(ribbon)) {
-    # Match the ribbon's panels to the data's, so shading and facet order do not
-    # depend on how the caller ordered its rows.
+    # Alternate shading of phase bands within each panel
     ribbon$panel <- factor(as.character(ribbon$panel), levels = levels(d$panel))
     ribbon <- do.call(rbind, by(ribbon, ribbon$panel, function(g) {
       g <- g[order(g$xmin), ]
@@ -378,9 +273,7 @@ dataset_anatomy <- function(d, ribbon = NULL, trend = NULL, title = NULL,
       geom_abline(data = trend, aes(intercept = intercept, slope = slope),
                   linetype = "dashed", colour = "grey20", linewidth = 0.4)
 
-  # One legend for all three marks, so colour and shape carry the same breaks.
-  # The segment has no shape (NA) and the points have no line; ggplot draws each
-  # key from the layer that uses it.
+  # One legend for the segment and both kinds of point
   keys <- c(point_label, "simulated date", span_label)
 
   p +
@@ -400,9 +293,7 @@ dataset_anatomy <- function(d, ribbon = NULL, trend = NULL, title = NULL,
     facet_wrap(~ panel, scales = if (free_x) "free_x" else "fixed") +
     labs(title = title, shape = NULL, colour = NULL,
          x = "calendar year", y = "measured value") +
-    # Its own theme rather than the shared panel_theme: this helper is called
-    # from the 00_check scripts, which each define a panel_theme of their own,
-    # and the figure should look the same whichever one is in scope.
+    # Own theme, so it looks the same whichever script calls it
     theme_classic(base_size = 11) +
     theme(plot.title = element_text(size = 11, face = "bold"),
           strip.background = element_blank(),

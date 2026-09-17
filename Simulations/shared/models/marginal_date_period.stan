@@ -23,13 +23,23 @@
 // divided out - it carries the information about how well the shared period
 // accounts for the dates, which is what makes the period estimable.
 //
-// Normal is the wrong shape: the generator draws dates uniformly over the
-// window. It is used because attenuation is driven by var(x) rather than by the
-// shape of the date distribution, so recovering the variance should be enough
-// to say whether the mechanism is the right one. A trapezoid - ramp, plateau,
-// ramp - is the shape to reach for if this confirms the diagnosis, being both
-// closer to how deposition behaves and smooth at the boundaries in a way a
-// uniform is not.
+// The period has no fixed shape: it is a fixed basis of evenly spaced bumps
+// whose weights are estimated. Six free-moving bumps were tried first and were
+// unusable - 2-4 hours a fit - because their positions and widths are only
+// weakly identified. Fixing the basis keeps the flexibility and drops the cost.
+//
+// Two fixed shapes were tried first and both failed by getting the spread
+// wrong, which is what drives slope attenuation. A normal collapsed to sd 93
+// against a true 115 on the plateau. A trapezoid reached 98, still short, and
+// only 76 against 105 once deposition was skewed - a symmetric flat top cannot
+// represent exponential deposition. Heaton (arXiv:2109.15024) makes the general
+// argument and fits a Dirichlet process mixture; a finite mixture is the
+// standard truncation of that, and marginalising over the year grid here
+// removes the multimodality that forced slice sampling there.
+//
+// Normalised over the grid rather than in closed form, which keeps the prior
+// proper whatever the components do. This is the prior's own constant and is
+// unrelated to the per-row constant above, which stays undivided.
 //
 // Not for model comparison as it stands: log_lik below is left as the
 // no-prior version, so LOO or WAIC against marginal_date.stan would compare
@@ -106,6 +116,32 @@ transformed data {
 
   real neg_log_sqrt_2pi = -0.9189385332046727;  // -0.5 * log(2 * pi())
 
+  // Fixed basis of overlapping bumps, evenly spaced over the grid. Only their
+  // weights are estimated, so the basis is built once here rather than every
+  // iteration, and the period is one matrix-vector product in the model block.
+  //
+  // Letting the bumps move as well cost 2-4 hours a fit against 10 minutes for
+  // a two-parameter shape: free centres and widths are barely identified, and
+  // the sampler spends its time exploring which bump is which rather than what
+  // the period looks like. Fixing them makes the density linear in the weights,
+  // which is the whole saving.
+  // K sets the resolution: the bumps are spaced 2/(K-1) apart and are 0.8 of
+  // that wide, so K = 12 gives bumps of 115 yr on this axis - as wide as the
+  // period being measured, which put the recovered spread at 173 against a true
+  // 115. K = 40 gives 32 yr, fine enough to resolve a 400-yr window.
+  // ponytail: fixed K and spacing, raise K if a period needs finer structure
+  int K = 40;
+  matrix[n_years, K] basis;
+  {
+    real spacing = 2.0 / (K - 1);
+    for (k in 1:K) {
+      vector[n_years] col =
+        exp(-0.5 * square((grid_year_norm - (-1 + (k - 1) * spacing))
+                          / (spacing * 0.8)));
+      basis[, k] = col / sum(col);
+    }
+  }
+
   // Where each row begins inside the flat log_year_prob_packed vector.
   array[N] int row_offset;
   {
@@ -146,12 +182,11 @@ parameters {
   real beta;
   real<lower=0> sigma;
 
-  // The shared date distribution, on the normalised [-1, 1] calendar axis.
-  // The true 400-yr window inside a 1576-yr grid spans about 0.51 normalised
-  // units, so a uniform over it has sd near 0.15; the priors below are wide
-  // enough not to impose that and weak enough to keep tau off zero.
-  real mu_norm;
-  real<lower=0> tau_norm;
+  // How much of the period sits under each basis bump, on the log scale. A
+  // random walk along the bumps rather than a simplex prior: see the model
+  // block. softmax() makes it a proper density whatever the values do.
+  vector[K] log_weight;
+  real<lower=0> weight_sd;
 }
 
 model {
@@ -163,8 +198,25 @@ model {
   // design range for every case.
   beta  ~ normal(0, 40);
   sigma ~ exponential(1);
-  mu_norm  ~ normal(0, 1);
-  tau_norm ~ normal(0, 0.5);
+  // Neighbouring bumps carry similar weight, by an amount the data sets. This
+  // is what a period is: a contiguous stretch of time, not a scatter of
+  // isolated years.
+  //
+  // Two dirichlet priors were tried first and neither works. Flat, it behaves
+  // like K pseudo-observations spread over the whole calendar axis and the
+  // recovered spread came out at 212 against a true 115. Sparse (alpha = 1/K)
+  // recovers the spread but costs 120 minutes a fit against 3: below 1 the
+  // density spikes wherever a weight approaches zero, and the sampler has to
+  // crawl through that. Smoothness buys the same concentration with none of the
+  // geometry, because adjacent-and-similar is a weaker demand than
+  // few-and-isolated.
+  log_weight[1] ~ normal(0, 2);
+  log_weight[2:K] ~ normal(log_weight[1:(K - 1)], weight_sd);
+  weight_sd ~ normal(0, 1);
+
+  // Floored against underflow: a bump's tail can round to zero several bumps
+  // away, and log(0) would take the whole target with it.
+  vector[n_years] log_period = log(basis * softmax(log_weight) + 1e-12);
 
   // For each observation, ask how well the current line explains it at every
   // year it could belong to, then average those answers weighted by how likely
@@ -183,11 +235,8 @@ model {
 
     // log(probability of the year) + log(normal density of that miss),
     // summed over years on the probability scale
-    // The shared period, evaluated at each candidate year. Written out rather
-    // than normal_lpdf(), which sums a vector instead of returning one value
-    // per element.
-    vector[row_n_years[n]] log_period_prior = neg_log_sqrt_2pi - log(tau_norm)
-      - 0.5 * square((candidate_year - mu_norm) / tau_norm);
+    vector[row_n_years[n]] log_period_prior =
+      segment(log_period, row_first_year[n], row_n_years[n]);
 
     target += log_sum_exp(candidate_log_prob + log_period_prior
                           + neg_log_sqrt_2pi - log(sigma)
@@ -240,8 +289,15 @@ generated quantities {
   real slope_original    = 2 * beta / time_ref_range;
   real baseline_original = alpha - beta - 2 * beta * time_ref_min / time_ref_range;
 
-  // The estimated period, back on the calendar scale, so it can be read against
-  // the window the design actually used.
-  real period_centre_original = time_ref_min + (mu_norm + 1) / 2 * time_ref_range;
-  real period_sd_original     = tau_norm * time_ref_range / 2;
+  // The estimated period, back on the calendar scale. Reported as the fitted
+  // density's own mean and sd rather than as the bounds: the ramps sit outside
+  // the flat top, so the bounds overstate the width that var(x) actually sees.
+  real period_centre_original;
+  real period_sd_original;
+  {
+    vector[n_years] p  = basis * softmax(log_weight);
+    vector[n_years] yr = time_ref_min + (grid_year_norm + 1) / 2 * time_ref_range;
+    period_centre_original = dot_product(p, yr);
+    period_sd_original = sqrt(dot_product(p, square(yr - period_centre_original)));
+  }
 }
