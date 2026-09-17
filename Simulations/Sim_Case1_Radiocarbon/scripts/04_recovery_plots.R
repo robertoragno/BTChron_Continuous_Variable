@@ -28,7 +28,12 @@ write.csv(by_model, file.path(out_dir, "recovery_table.csv"), row.names = FALSE)
 print(by_model, row.names = FALSE)
 
 p1 <- plot_metrics(metric_long(by_model, c("model", "window")), facet_row = "window",
-                   title = "Case 1: what each model gets right and wrong")
+                   title = "Case 1 (radiocarbon): parameter recovery by model",
+                   caption = paste0(
+                     "Each point summarises all simulated datasets; dotted lines mark the target. Bars are 95% intervals:\n",
+                     "OLS confidence interval for the calibration slope b in estimated\u1d62 = a + b \u00b7 true\u1d62 + \u03b5\u1d62 ",
+                     "(slope in dataset i; estimated = posterior median);\n",
+                     "Jeffreys interval for coverage; \u00b12 Monte Carlo SE for bias in \u03c3 (posterior median minus true \u03c3)."))
 ggsave(file.path(fig_dir, "recovery_summary.png"), p1, width = 8,
        height = 2.2 + 1.6 * length(unique(by_model$window)), dpi = 300, bg = "white")
 

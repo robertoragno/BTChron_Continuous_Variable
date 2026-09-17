@@ -64,10 +64,11 @@
 //   Case 3  uniform over the assigned phase's window
 //   Case 4  uniform over the union of the merged phases' windows
 //
-// The probabilities sit on a SHARED annual grid, so they are supplied ragged:
-// one flat vector, plus each row's first grid index and its length. Rows are
-// trimmed to their support (a 100-yr window out of a 1500-yr axis is 93% zeros)
-// and renormalised in R before being passed in.
+// All finds share one grid of candidate years, but each find only covers some
+// of them, so rows have different lengths. They are passed as one long vector
+// with rows placed end to end, plus where each row starts on the grid and how
+// long it is. Rows are trimmed to the years they cover (a 100-yr window out of
+// a 1500-yr axis is 93% zeros) and renormalised in R before being passed in.
 //
 // Calendar years are mapped to [-1, 1] using reference constants passed as data,
 // not derived from the realised dates, so the prior on beta is the same prior on
@@ -83,11 +84,11 @@ data {
   int<lower=1> n_years;
   vector[n_years] grid_year;
 
-  // Ragged probability rows, already normalised so each row sums to 1.
+  // Probability rows, already normalised so each row sums to 1.
   //
-  // Stan has no ragged array type and every observation covers a different
-  // number of years, so the rows are glued end to end into one flat vector and
-  // two index arrays say where each row lives inside it:
+  // Every observation covers a different number of years and Stan has no array
+  // for rows of different lengths, so the rows are placed end to end in one
+  // vector and two index arrays say where each row sits inside it:
   //
   //   obs 1: 3 years   obs 2: 4 years   obs 3: 2 years
   //   packed = [ . . . | . . . . | . . ]

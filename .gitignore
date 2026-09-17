@@ -6,6 +6,7 @@
 *.Rproj
 **/output/
 **/archive/
+.lintr 
 
 # Run helpers and their logs — machine-specific, not part of the paper
 *.sh

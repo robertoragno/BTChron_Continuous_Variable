@@ -85,18 +85,31 @@ RECOVERY_LIMIT=20 RECOVERY_WORKERS=8 RECOVERY_WARMUP=300 RECOVERY_SAMPLING=300 \
 
 | Metric | Meaning | Target |
 |---|---|---|
-| bias | posterior median minus the true value, averaged over datasets | 0 |
-| attenuation | how much of the true slope survives (estimated slopes regressed on true slopes) | 1 |
-| accuracy | how often the 90% interval contains the true value (coverage) | 0.90 |
-| precision | how wide that interval is | narrower, once accuracy is on target |
+| bias | mean of posterior median minus the true value | 0 |
+| RMSE | root mean squared error of the posterior median | as small as possible |
+| empirical SE | SD of the errors across datasets | as small as possible |
+| calibration slope | slope of estimated slopes regressed on true slopes | 1 |
+| coverage | proportion of 90% equal-tailed credible intervals that contain the true value | 0.90 |
+| interval width | mean width of the 90% credible interval | narrower, once coverage is on target |
 
-Attenuation is reported because bias cannot show it: true slopes are drawn around
-zero, so flattening positive and negative slopes cancels out in the average error.
+The calibration slope is reported because bias cannot show attenuation: true slopes
+are drawn around zero, so flattening positive and negative slopes cancels out in the
+average error. Below 1 the trend is attenuated (flattened), above 1 exaggerated.
+Case READMEs call it the "slope ratio".
+
+Note on terms. Earlier versions of these scripts called coverage "accuracy" and
+interval width "precision". Both names were dropped because they clash with standard
+usage: accuracy is closeness of the estimates to the truth (summarised here by bias
+and RMSE), and precision is their spread across datasets (the empirical SE). The
+performance measures follow Morris, White and Crowther (2019, Statistics in Medicine
+38: 2074-2102). Coverage and width describe the posterior intervals, not the point
+estimates.
 
 The error bars in the summary figures show how precisely each number is known from a
-limited number of simulated datasets: a Jeffreys interval for accuracy (it stays
-inside 0-1), and +/- 2 Monte Carlo standard errors for the rest. Each fit saves the
-50, 80, 90 and 95% intervals, so the reported level can be changed without refitting.
+limited number of simulated datasets: a Jeffreys interval for coverage (it stays
+inside 0-1), an OLS 95% confidence interval for the calibration slope, and +/- 2
+Monte Carlo standard errors for bias and interval width. Each fit saves the 50, 80,
+90 and 95% intervals, so the reported level can be changed without refitting.
 
 ## Checks
 

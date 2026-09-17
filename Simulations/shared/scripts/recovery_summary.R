@@ -1,17 +1,19 @@
 # Recovery metrics, tables and figures shared by every case's 04_ script.
 #
-#   bias         posterior median minus the true value, averaged over datasets
-#   attenuation  how much of the true slope survives (1 = all of it)
-#   accuracy     how often the 90% interval contains the true value (target 0.9)
-#   precision    how wide that interval is
+#   bias               mean of posterior median minus the true value
+#   RMSE               root mean squared error of the posterior median
+#   empirical SE       SD of the error across datasets
+#   calibration slope  estimated slopes regressed on true slopes (1 = one-for-one)
+#   coverage           how often the 90% interval contains the true value (target 0.9)
+#   interval width     mean width of the 90% interval
 #
 # Greyscale, with dark red for the full-distribution model.
 
 library(ggplot2)
 
 # Metrics carried into recovery_table.csv
-METRICS <- c("Slope bias", "Slope attenuation", "Slope accuracy (90%)",
-             "Slope precision (90% width)", "Sigma error")
+METRICS <- c("Slope bias", "Calibration slope", "Slope 90% interval coverage",
+             "Slope 90% interval width", "Bias in \u03c3 (residual SD)")
 
 # Model names, colours and shapes used in every figure
 MODEL_LEVELS  <- c("midpoint", "median", "marginal")
@@ -29,7 +31,9 @@ panel_theme <- theme_classic(base_size = 11) +
         strip.background = element_blank(),
         strip.text = element_text(face = "bold"),
         legend.position = "top",
-        legend.title = element_blank())
+        legend.title = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey35", hjust = 0),
+        plot.caption.position = "plot")
 
 #' Read a results file, drop failed fits and label the models.
 #'
@@ -52,6 +56,13 @@ read_recovery <- function(path, merge_median = FALSE) {
   droplevels(r)
 }
 
+#' Root mean squared error and empirical SE (SD of the errors) of a vector of
+#' errors
+rmse_empse <- function(err) {
+  err <- err[is.finite(err)]
+  c(rmse = sqrt(mean(err^2)), emp_se = sd(err))
+}
+
 #' Mean and its Monte Carlo standard error (how precisely the mean is known from
 #' this many datasets)
 mc_mean <- function(x) {
@@ -59,7 +70,7 @@ mc_mean <- function(x) {
   c(mean = mean(x), se = sd(x) / sqrt(length(x)))
 }
 
-#' A proportion (e.g. accuracy) with a 95% Jeffreys interval, which stays
+#' A proportion (e.g. coverage) with a 95% Jeffreys interval, which stays
 #' inside 0-1 even near 1
 jeffreys_prop <- function(x, level = 0.95) {
   x <- x[!is.na(x)]
@@ -71,7 +82,7 @@ jeffreys_prop <- function(x, level = 0.95) {
     hi = qbeta(1 - a, k + 0.5, n - k + 0.5))
 }
 
-#' Attenuation: the slope of estimated slopes regressed on true slopes, with a 95%
+#' Calibration slope: the slope of estimated slopes regressed on true slopes, with a 95%
 #' interval. 1 means the slope is recovered one-for-one, below 1 flattened.
 #'
 #' Bias alone cannot show this: true slopes are drawn around zero, so flattening
@@ -97,7 +108,9 @@ summarise_models <- function(d, by) {
       acc   <- jeffreys_prop(s$slope_cov90)
       prec  <- mc_mean(s$slope_width90)
       sig   <- mc_mean(s$sigma_err)
-      # Intercept and sigma get the same bias / accuracy / precision as the
+      slope_re <- rmse_empse(s$slope_err)
+      sig_re   <- rmse_empse(s$sigma_err)
+      # Intercept and sigma get the same bias / coverage / width as the
       # slope. They go to the tables only, not the headline figures.
       int_bias <- mc_mean(s$intercept_err)
       int_acc  <- jeffreys_prop(s$intercept_cov90)
@@ -107,28 +120,32 @@ summarise_models <- function(d, by) {
       data.frame(s[1, by, drop = FALSE], n_fits = nrow(s),
                  intercept_bias         = int_bias["mean"],
                  intercept_bias_se      = int_bias["se"],
-                 intercept_accuracy     = int_acc["mean"],
-                 intercept_accuracy_lo  = int_acc["lo"],
-                 intercept_accuracy_hi  = int_acc["hi"],
-                 intercept_precision    = int_prec["mean"],
-                 intercept_precision_se = int_prec["se"],
-                 sigma_accuracy         = sig_acc["mean"],
-                 sigma_accuracy_lo      = sig_acc["lo"],
-                 sigma_accuracy_hi      = sig_acc["hi"],
-                 sigma_precision        = sig_prec["mean"],
-                 sigma_precision_se     = sig_prec["se"],
+                 intercept_coverage     = int_acc["mean"],
+                 intercept_coverage_lo  = int_acc["lo"],
+                 intercept_coverage_hi  = int_acc["hi"],
+                 intercept_width90    = int_prec["mean"],
+                 intercept_width90_se = int_prec["se"],
+                 sigma_coverage         = sig_acc["mean"],
+                 sigma_coverage_lo      = sig_acc["lo"],
+                 sigma_coverage_hi      = sig_acc["hi"],
+                 sigma_width90        = sig_prec["mean"],
+                 sigma_width90_se     = sig_prec["se"],
                  slope_bias         = bias["mean"],
                  slope_bias_se      = bias["se"],
-                 slope_atten        = atten["mean"],
-                 slope_atten_lo     = atten["lo"],
-                 slope_atten_hi     = atten["hi"],
-                 slope_accuracy     = acc["mean"],
-                 slope_accuracy_lo  = acc["lo"],
-                 slope_accuracy_hi  = acc["hi"],
-                 slope_precision    = prec["mean"],
-                 slope_precision_se = prec["se"],
-                 sigma_err          = sig["mean"],
-                 sigma_err_se       = sig["se"],
+                 slope_calib        = atten["mean"],
+                 slope_calib_lo     = atten["lo"],
+                 slope_calib_hi     = atten["hi"],
+                 slope_coverage     = acc["mean"],
+                 slope_coverage_lo  = acc["lo"],
+                 slope_coverage_hi  = acc["hi"],
+                 slope_width90      = prec["mean"],
+                 slope_width90_se   = prec["se"],
+                 slope_rmse         = slope_re["rmse"],
+                 slope_emp_se       = slope_re["emp_se"],
+                 sigma_rmse         = sig_re["rmse"],
+                 sigma_emp_se       = sig_re["emp_se"],
+                 sigma_bias         = sig["mean"],
+                 sigma_bias_se      = sig["se"],
                  row.names = NULL)
     }))
   stats[order(stats$model), ]
@@ -138,12 +155,12 @@ summarise_models <- function(d, by) {
 metric_long <- function(stats, keep) {
   long <- do.call(rbind, lapply(seq_len(nrow(stats)), function(i) {
     s <- stats[i, ]
-    # Accuracy and attenuation have their own intervals; the rest are +/- 2 SE
-    value <- c(s$slope_bias, s$slope_atten, s$slope_accuracy, s$slope_precision,
-               s$sigma_err)
-    se    <- c(s$slope_bias_se, NA, NA, s$slope_precision_se, s$sigma_err_se)
-    lo    <- c(NA, s$slope_atten_lo, s$slope_accuracy_lo, NA, NA)
-    hi    <- c(NA, s$slope_atten_hi, s$slope_accuracy_hi, NA, NA)
+    # Coverage and calibration slope have their own intervals; the rest are +/- 2 SE
+    value <- c(s$slope_bias, s$slope_calib, s$slope_coverage, s$slope_width90,
+               s$sigma_bias)
+    se    <- c(s$slope_bias_se, NA, NA, s$slope_width90_se, s$sigma_bias_se)
+    lo    <- c(NA, s$slope_calib_lo, s$slope_coverage_lo, NA, NA)
+    hi    <- c(NA, s$slope_calib_hi, s$slope_coverage_hi, NA, NA)
     data.frame(s[, keep, drop = FALSE], metric = METRICS, value = value,
                lo = ifelse(is.na(se), lo, value - 2 * se),
                hi = ifelse(is.na(se), hi, value + 2 * se),
@@ -154,11 +171,11 @@ metric_long <- function(stats, keep) {
 }
 
 # The three metrics shown in the headline figures
-HEADLINE_METRICS <- c("Slope attenuation", "Slope accuracy (90%)", "Sigma error")
+HEADLINE_METRICS <- METRICS[c(2, 3, 5)]
 
 #' Headline metrics per model, one panel per metric, optionally one row per level
 #' of a factor. The dotted line in each panel is the target value.
-plot_metrics <- function(long, facet_row = NULL, title) {
+plot_metrics <- function(long, facet_row = NULL, title, caption = NULL) {
   long <- long[long$metric %in% HEADLINE_METRICS, ]
   long$metric <- factor(long$metric, levels = HEADLINE_METRICS)
   # The value each metric should land on, in the same order as HEADLINE_METRICS.
@@ -174,7 +191,7 @@ plot_metrics <- function(long, facet_row = NULL, title) {
     scale_colour_manual(values = MODEL_COLOURS) +
     scale_shape_manual(values = MODEL_SHAPES) +
     scale_x_continuous(n.breaks = 4) +
-    labs(title = title, x = NULL, y = NULL) +
+    labs(title = title, caption = caption, x = NULL, y = NULL) +
     panel_theme +
     theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
   if (is.null(facet_row))
@@ -183,7 +200,7 @@ plot_metrics <- function(long, facet_row = NULL, title) {
     p + facet_grid(stats::reformulate("metric", facet_row), scales = "free_x")
 }
 
-#' Bias, attenuation and accuracy against dataset size
+#' Bias, calibration slope and coverage against dataset size
 plot_by_n <- function(d, title) {
   by_n <- summarise_models(d, c("model", "N"))
   long <- droplevels(metric_long(by_n, c("model", "N")))

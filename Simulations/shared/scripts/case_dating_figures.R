@@ -80,11 +80,14 @@ curve <- data.frame(year = yrs, cra = cc$ccCRA, err = cc$ccError)
 strip1 <- ggplot(curve, aes(year, cra)) +
   geom_rect(aes(xmin = window[1], xmax = window[2], ymin = -Inf, ymax = Inf,
                 fill = "study window"), data = data.frame(x = 1), inherit.aes = FALSE) +
-  geom_ribbon(aes(ymin = cra - err, ymax = cra + err, fill = "IntCal20 (mean ± 1σ)"),
+  geom_ribbon(aes(ymin = cra - 2 * err, ymax = cra + 2 * err), fill = "grey45",
               alpha = 0.6) +
   geom_line(linewidth = 0.4) +
-  scale_fill_manual(values = c("study window" = "grey92",
-                               "IntCal20 (mean ± 1σ)" = "grey45")) +
+  # Labelled on the curve, so its swatch does not sit next to the calibrated
+  # distributions in the legend
+  annotate("text", x = -250, y = max(curve$cra), label = "IntCal20, mean ± 2σ",
+           hjust = 1, vjust = 1, size = 3.2, colour = "grey20") +
+  scale_fill_manual(values = c("study window" = "grey92")) +
   labs(x = NULL, y = expression({}^14*C~age~(BP))) +
   strip_theme +
   theme(axis.text.y = element_text(), axis.ticks.y = element_line(),
@@ -92,10 +95,10 @@ strip1 <- ggplot(curve, aes(year, cra)) +
 
 rows1 <- ggplot(dens) +
   geom_ribbon(aes(year, ymin = ymin, ymax = ymax, group = row,
-                  fill = "calibrated distribution"),
+                  fill = "calibrated date"),
               colour = "grey40", linewidth = 0.2) +
   geom_point(data = c14, aes(True_date, row, colour = TRUE_LAB), size = 2) +
-  scale_fill_manual(values = "grey70") +
+  scale_fill_manual(values = c("calibrated date" = "grey70")) +
   scale_colour_manual(values = ACCENT) +
   bce_axis +
   labs(x = "calendar year", y = ROW_LAB) +
@@ -123,7 +126,7 @@ rows2 <- ggplot(typo) +
   base_theme
 
 save_fig(NULL, rows2, "Case 2: typochronology",
-         "Each find has its own window: 6% of the period if well dated, about 25% if not",
+         "Each find has its own window: 6% of the period if well dated, 20-30% if coarsely dated",
          "case2_dating.png", c(-300, 1300))
 
 K <- 6; ALPHA <- 1; PHASE_SEED <- 35
