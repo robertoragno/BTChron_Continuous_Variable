@@ -4,20 +4,72 @@
 > Work in progress for the [first BTChron paper](). This readme will be updated soon with more details.
 
 > [!IMPORTANT]
-> Note to self (RR): I need to clean up the code a bit, for instance I can move the partition function to a single helper. I also need to make some comments shorter and more elegant
+> Note to self (RR): make some comments shorter and more elegant.
 
 ## Repository structure
 
 ```
 BTChron_Paper_1/
 ├── Simulations/
-│   ├── Sim_Linear/        # Linear regression (baseline + slope)
-│   ├── Sim_Changepoint/   # Changepoint regression (two slopes)
-│   ├── archive/Sim_GP/    # Gaussian Process (bell-curve trend), probably remove later
-│   └── (each contains: data/ figures/ scripts/ models/ output/)
-├── Real_Data/
-│   ├── dataset_1/          # Linear case study (GINI database)
-│   ├── dataset_2/          # not yet started
-│   ├── dataset_3/          # not yet started
-│   └── (each contains: data/ figures/ scripts/ models/ output/ archive/)
+│   ├── shared/                        # what all four cases have in common
+│   │   ├── models/                    # Stan models: full distribution, midpoint/median, latent date
+│   │   ├── scripts/                   # functions every case sources (weight rows, fitting, summaries)
+│   │   ├── checks/                    # full distribution vs latent-date equivalence check
+│   │   ├── figures/                   # example periodisations
+│   │   └── README.md                  # the shared method, explained once
+│   ├── Sim_Case1_Radiocarbon/         # calibrated 14C dates: Hallstatt plateau vs steep section
+│   ├── Sim_Case2_Typochronology/      # independent typological windows ("first half of the 1st c. CE")
+│   ├── Sim_Case3_OverlappingPhases/   # ceramic phases that overlap at their edges
+│   ├── Sim_Case4_MergedPhases/        # finds dated to a broad period spanning several phases
+│   └── Sim_Sweep_Ratio/               # side study: dating uncertainty relative to the spread of the material
+└── Real_Data/
+    ├── dataset_1/                     # linear case study (GINI database)
+    ├── dataset_2/                     # not yet started
+    └── dataset_3/                     # not yet started
 ```
+
+Every simulation case has the same layout:
+
+```
+Sim_CaseN_<name>/
+├── README.md                # the dating problem, the result, what each file does
+├── findings.md              # detailed notes on what has been measured so far
+├── data/design.csv          # every simulated dataset: its settings and its seed
+├── scripts/
+│   ├── simulate.R           # generates one dataset
+│   ├── 01_design.R          # builds data/design.csv
+│   ├── 03_recovery_study.R  # fits every model to every dataset (slow)
+│   ├── 04_recovery_plots.R  # tables and figures from the fits
+│   ├── 05_single_fit.R      # one dataset, fitted and shown up close
+│   └── checks/              # tests that the generator does what it claims
+└── figures/
+    ├── dataset_anatomy.png          # what the data looks like before fitting
+    ├── single_fit_comparison.png    # one fit, midpoint vs full distribution
+    ├── recovery_summary.png         # the headline result
+    ├── recovery_by_<factor>.png     # the result as dating gets coarser
+    └── checks/                      # secondary sweeps and generator checks
+```
+
+Case 1 also has `02_figures.R` (the calibrated-date overview) and `scripts/diagnostics/`
+(side investigations). Model fits are written to `output/`, which is not tracked.
+
+## Models compared
+
+| Figures | Code | What the date becomes |
+|---|---|---|
+| Midpoint | `midpoint` | one year: the middle of the window or HPD envelope |
+| Calibrated median | `median` | one year: the median of the calibrated distribution (Case 1 only) |
+| Full distribution | `marginal` | the whole dating distribution, year by year |
+
+## Running a case
+
+From the repository root, in order:
+
+```
+Rscript Simulations/Sim_Case4_MergedPhases/scripts/01_design.R
+Rscript Simulations/Sim_Case4_MergedPhases/scripts/03_recovery_study.R
+Rscript Simulations/Sim_Case4_MergedPhases/scripts/04_recovery_plots.R
+Rscript Simulations/Sim_Case4_MergedPhases/scripts/05_single_fit.R
+```
+
+Case 4 is the shortest and the easiest to read first.

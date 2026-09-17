@@ -1,4 +1,4 @@
-"sweep","rep","N","slope_condition","merge_max","dataset_id","seed","intercept","sigma","slope","K","alpha_conc","t_min","t_max","time_ref_min","time_ref_range"
+"sweep","rep","N","slope_condition","merge_max","dataset_id","seed","intercept","sigma","slope","K","alpha_conc","period_start","period_end","time_ref_min","time_ref_range"
 "core",1,50,"random",3,1,1,11.0827551214024,3.36239572416525,0.0178956262674183,6,1.341419982838,100,900,100,800
 "core",2,50,"random",3,2,2,9.2348965764977,1.21284860174637,-0.00485980030149221,10,0.699302492548254,100,900,100,800
 "core",3,50,"random",3,3,3,3.82181944954209,2.53771955391858,0.0185551993176341,7,4.75666833660151,100,900,100,800

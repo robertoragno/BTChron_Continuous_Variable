@@ -3,11 +3,8 @@
 # Reads data/design.csv and re-declares nothing. The study itself is
 # run_recovery() in shared/scripts, the same one Cases 1 and 4 use - the only
 # difference here is that a window produces a flat weight row instead of a
-# calibrated one.
-#
-# Note the two meanings of "grid". The design's `grid` column is the 25-yr
-# snapping of window boundaries; GRID_STEP below is the spacing of candidate
-# years the marginalised model sums over. They are unrelated.
+# calibrated one. GRID_STEP is the spacing of candidate years the marginalised
+# model sums over.
 
 library(here)
 library(cmdstanr)
@@ -35,13 +32,13 @@ if (limit > 0) design <- design[seq_len(min(limit, nrow(design))), ]
 case_models <- setdiff(MODELS, "median")
 
 prepare_dataset <- function(d) {
-  widths <- typo_widths(d$period_start, d$period_end, d$min_frac, d$max_frac,
-                        d$grid)
   sim <- simulate_typo(d$N, d$intercept, d$slope, d$sigma,
-                       d$period_start, d$period_end, widths,
-                       width_prob = typo_width_prob(widths, d$width_mix,
-                                                    d$strength),
-                       skew_shape = d$skew_shape, grid = d$grid, seed = d$seed)
+                       prop_coarse_samples = d$prop_coarse_samples,
+                       coarse_frac = d$coarse_frac, fine_frac = d$fine_frac,
+                       precision_trend = d$precision_trend,
+                       growth_ratio = d$growth_ratio,
+                       period_start = d$period_start, period_end = d$period_end,
+                       seed = d$seed)
 
   grid <- seq(d$time_ref_min, d$time_ref_min + d$time_ref_range, by = GRID_STEP)
   list(sim = sim,
@@ -51,13 +48,15 @@ prepare_dataset <- function(d) {
                     weights = uniform_rows(sim$Start_date, sim$End_date, grid)))
 }
 
-# Every design column a figure groups by has to travel into the results file.
-# max_frac was missing here once: the overhang sweep ran, wrote its fits, and
-# 04_ skipped the whole figure without an error because the column it grouped by
-# did not exist. Silent, so add to this list whenever the design gains a factor.
+# Every design column a figure groups by has to travel into the results file,
+# or 04_ cannot draw that sweep. Add to this list whenever the design gains a
+# factor. intercept, slope and sigma are kept for the noise ratio in 04_.
 run_recovery(design, prepare_dataset,
              keep = c("dataset_id", "sweep", "N", "slope_condition",
-                      "width_mix", "skew_shape", "max_frac"),
+                      "prop_coarse_samples", "coarse_frac", "growth_ratio",
+                      "precision_trend",
+                      "intercept", "slope", "sigma", "period_start",
+                      "period_end"),
              models = case_models,
              output_csv = Sys.getenv("RECOVERY_OUT",
                                      here("Simulations", "Sim_Case2_Typochronology",

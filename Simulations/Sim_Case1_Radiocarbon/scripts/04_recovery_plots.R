@@ -1,6 +1,5 @@
 # Case 1 tables and figures from output/recovery_results.csv.
-# The metrics and their plots live in shared/scripts/recovery_summary.R; this
-# file only says what Case 1 is faceted by, which is the calendar window.
+# Metrics and plots live in shared/scripts/recovery_summary.R.
 
 library(here)
 
@@ -10,19 +9,18 @@ results_csv <- Sys.getenv("RECOVERY_OUT",
                           here("Simulations", "Sim_Case1_Radiocarbon", "output",
                                "recovery_results.csv"))
 fig_dir <- here("Simulations", "Sim_Case1_Radiocarbon", "figures")
+chk_dir <- file.path(fig_dir, "checks")
 out_dir <- here("Simulations", "Sim_Case1_Radiocarbon", "output")
+dir.create(chk_dir, showWarnings = FALSE)
 
 r <- read_recovery(results_csv)
 
-# The design names the second window "steep"; the paper and this case's README
-# call it the control. Use the reader-facing name in every table and figure.
-r$window <- factor(unname(c(plateau = "plateau", steep = "control")[r$window]),
-                   levels = c("plateau", "control"))
+# Readable window names, on two lines so the facet strips fit
+WINDOW_LABELS <- c(plateau = "Hallstatt plateau\n(800–400 BCE)",
+                   steep   = "Steep section\n(1600–1200 BCE)")
+r$window <- factor(unname(WINDOW_LABELS[r$window]), levels = WINDOW_LABELS)
 
-# The headline is the reference condition, so the deposition sweep is held out
-# of it: growth appears in its own figures below and nowhere else. Without this
-# the headline silently averages 100 growth datasets per window into the totals
-# and stops being comparable with earlier runs.
+# Headline results use even deposition only; growth has its own figures below
 reference <- r[r$growth_ratio == 1, ]
 
 by_model <- summarise_models(reference, c("model", "window"))
@@ -37,33 +35,26 @@ ggsave(file.path(fig_dir, "recovery_summary.png"), p1, width = 8,
 core <- reference[reference$sweep == "core" &
                   reference$slope_condition == "random", ]
 if (nrow(core) > 0)
-  ggsave(file.path(fig_dir, "recovery_by_n.png"),
+  ggsave(file.path(chk_dir, "recovery_by_n.png"),
          plot_by_n(core, "Case 1: more data does not fix a biased estimator"),
          width = 8, height = 4.2, dpi = 300, bg = "white")
 
-# Lab error is Case 1's other factor: wider calibrated posteriors should deepen
-# attenuation in the point-date models and leave the marginal model alone.
+# Lab error sweep
 sweep_figure(reference[reference$sweep == "factor", ], "lab_error", "lab_error",
              "Case 1: effect of lab error", out_dir, fig_dir)
 
-# Deposition: uniform against fourfold growth in find density across the window.
-# The reference cells are the `factor` ones at the reference lab error, so the
-# only thing that differs between the two rows of each panel is the deposition
-# shape. One figure per window rather than one pooled: the whole point is
-# whether growth bites on the plateau and not off it, and a pooled figure would
-# average that away.
+# Deposition: even vs 4 times denser at the end, lab error 30, one figure per
+# window so the plateau and the steep section are not averaged together
 deposition <- r[r$sweep %in% c("factor", "deposition") &
                 r$lab_error == 30 & r$slope_condition == "random", ]
-for (w in levels(droplevels(deposition$window)))
-  sweep_figure(deposition[deposition$window == w, ], "growth_ratio",
-               paste0("deposition_", w),
-               sprintf("Case 1: uniform vs growing deposition (%s)", w),
-               out_dir, fig_dir)
+for (code in names(WINDOW_LABELS))
+  sweep_figure(deposition[deposition$window == WINDOW_LABELS[code], ], "growth_ratio",
+               paste0("deposition_", code),
+               sprintf("Case 1: uniform vs growing deposition, %s",
+                       sub("\n", " ", WINDOW_LABELS[code])),
+               out_dir, chk_dir)
 
-# Convergence before conclusions. read_recovery() has already dropped and counted
-# the fits that errored outright; these are the ones that returned an answer but
-# may not have earned it. Broken down by sweep so a problem in one block - the
-# deposition cells, say - shows up isolated rather than averaged into the total.
+# Convergence: R-hat and divergent transitions, by sweep and model
 cat("\nconvergence:", sum(r$max_rhat > 1.01, na.rm = TRUE), "fits with rhat > 1.01,",
     sum(r$max_rhat > 1.05, na.rm = TRUE), "above 1.05, worst",
     sprintf("%.4f", max(r$max_rhat, na.rm = TRUE)), "\n")

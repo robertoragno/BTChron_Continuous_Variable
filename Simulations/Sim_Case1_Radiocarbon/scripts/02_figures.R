@@ -1,14 +1,8 @@
-# Case 1 overview figure: what a calibrated date looks like as a weight row, and
-# what the models do with a whole dataset of them.
-#
-# Panel A is one plateau date. Panel B is a 50-date dataset from the same window,
-# fitted the same way 00_check_fit.R does, same seed. Each date in Panel B is
-# drawn as its whole calibrated distribution, a slab sitting at that date's y
-# value, because that whole distribution is what the date-marginalised model
-# consumes - not a single summarised year.
-#
-# Greyscale with the single dark-red accent for the model under test, matching
-# the recovery figures (shared/scripts/recovery_summary.R).
+# Case 1 illustration figures.
+#   figures/checks/overview.png  A: one calibrated date on the Hallstatt plateau
+#                                B: a 50-date dataset, full distribution vs
+#                                   regression on calibrated medians
+#   figures/dataset_anatomy.png  one dataset per window, before any fitting
 
 library(here)
 suppressMessages(library(rcarbon))
@@ -27,7 +21,7 @@ STEP      <- 5
 INTERCEPT <- 8
 SLOPE     <- 0.02
 SIGMA     <- 2
-OUT <- here("Simulations", "Sim_Case1_Radiocarbon", "figures", "overview.png")
+OUT <- here("Simulations", "Sim_Case1_Radiocarbon", "figures", "checks", "overview.png")
 
 ACCENT   <- "#780000"   # the model under test, as in recovery_summary.R
 INK      <- "grey15"
@@ -44,7 +38,7 @@ bce_axis <- scale_x_continuous(
   labels = function(x) ifelse(x < 0, paste0(abs(x), " BCE"), x),
   expand = expansion(mult = 0.03))
 
-# ---- Panel A: one plateau date as a weight row ----
+# Panel A: one calibrated date on the plateau
 
 demo <- calibrate(2450, errors = 25, calCurves = "intcal20",
                   calMatrix = TRUE, verbose = FALSE)
@@ -82,7 +76,7 @@ pA <- ggplot(dA, aes(year, prob)) +
        x = NULL, y = "probability per year") +
   panel_theme
 
-# ---- Panel B: a dataset, and what the models recover ----
+# Panel B: a dataset, fitted
 
 pad  <- c14_grid_pad(WINDOW, LAB_ERROR)
 grid <- seq(WINDOW[1] - pad, WINDOW[2] + pad, by = STEP)
@@ -115,7 +109,7 @@ ols        <- coef(lm(sim$Value ~ med_bcad))
 slope_marg <- median(fit$draws("slope_original", format = "draws_matrix")[, 1])
 pts        <- data.frame(med = med_bcad, y = sim$Value)
 
-lv <- c("true trend", "date-marginalised", "regression on calibrated medians")
+lv <- c("true trend", "full distribution", "regression on calibrated medians")
 fitlines <- rbind(
   data.frame(kind = lv[1], x = x_pred, y = INTERCEPT + SLOPE * x_pred),
   data.frame(kind = lv[2], x = x_pred, y = apply(mu, 2, median)),
@@ -132,31 +126,31 @@ pB <- ggplot(fitlines, aes(x, y)) +
   scale_linetype_manual(values = setNames(c("solid", "solid", "dashed"), lv)) +
   bce_axis +
   labs(title = "B  Fifty dates from the same window",
-       subtitle = sprintf(paste("slope: true %.4f  |  date-marginalised %.4f  |",
+       subtitle = sprintf(paste("slope: true %.4f  |  full distribution %.4f  |",
                                  "calibrated medians %.4f"),
                           SLOPE, slope_marg, ols[2]),
        caption = paste("Points sit at each date's calibrated median; the",
-                       "date-marginalised model reads the whole distribution.",
-                       "\nBand: the date-marginalised 90% interval for the trend."),
+                       "full-distribution model reads the whole distribution.",
+                       "\nBand: the full-distribution 90% interval for the trend."),
        x = "calendar year", y = "y") +
   panel_theme
 
 ggsave(OUT, pA / pB, width = 7.4, height = 7.8, dpi = 300, bg = "white")
 cat("wrote", OUT, "\n")
 
-# ---- dataset anatomy: plateau vs control, in the shared idiom ----
-#
-# The flat-window cases get a segment from Start_date to End_date. Radiocarbon
-# has no window, so the segment here is each date's 95% HPD envelope - the same
-# span the midpoint model collapses the date to - and the grey square is the
-# calibrated median. free_x because the two windows are 800 yr apart and would
-# not share an axis.
+# Dataset anatomy: each date's 95% HPD range as a segment, its calibrated median
+# as a square. The two windows get their own x axis.
 
-anat_windows <- list("plateau (800-400 BCE)"  = c(-800, -400),
-                     "control (1600-1200 BCE)" = c(-1600, -1200))
+anat_windows <- list("Hallstatt plateau (800–400 BCE)" = c(-800, -400),
+                     "Steep section (1600–1200 BCE)"   = c(-1600, -1200))
+
+# Shift the intercept per window so both panels sit at the same height
+N_ANAT <- 25
+anat_intercept <- function(win) INTERCEPT - SLOPE * mean(win)
 
 anat <- do.call(rbind, Map(function(lab, win) {
-  s   <- simulate_c14(N, INTERCEPT, SLOPE, SIGMA, win, LAB_ERROR, seed = 1)
+  s   <- simulate_c14(N_ANAT, anat_intercept(win), SLOPE, SIGMA, win, LAB_ERROR,
+                      seed = 1)
   cm  <- calmatrix_to_calendar(
     calibrate(s$CRA, errors = s$Error, calCurves = "intcal20",
               calMatrix = TRUE, verbose = FALSE))
@@ -171,7 +165,8 @@ anat$panel <- factor(anat$panel, levels = names(anat_windows))
 
 trend <- data.frame(panel = factor(names(anat_windows),
                                    levels = names(anat_windows)),
-                    intercept = INTERCEPT, slope = SLOPE)
+                    intercept = sapply(anat_windows, anat_intercept),
+                    slope = SLOPE)
 
 ANAT <- here("Simulations", "Sim_Case1_Radiocarbon", "figures",
              "dataset_anatomy.png")
