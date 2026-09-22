@@ -6,8 +6,8 @@
 #' Roman 2").
 #' Memo for the readme/paper:
 #' - Each find is assumed to be independent.
-#' - The broad period is a run of phases drawn per find, not a fixed hierarchy.
-#' Whether a fixed (nested) hierarchy is the better design is still open.
+#' - The phases abut, and the broad period is a run of them drawn per find,
+#'   not a fixed hierarchy. Settled with the supervisor on 2026-09-22.
 
 #' Function simulate_merged to simulate a single (Case 4) dataset.
 #'

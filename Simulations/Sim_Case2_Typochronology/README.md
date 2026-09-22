@@ -75,6 +75,8 @@ on a 5-year grid (to speed up computation). We do not provide the study period t
 so a range that is earlier or later than the period's boundaries keep part of the probability outside it.
 In this case it should not be a huge issue since the deposition is uniform, but on a separate test
 (just OLS) the slope seemed to be recovered better if the window was inside the study period (see results).
+Not telling the model the period is deliberate: the period selects which finds enter the study, it is not
+part of the model (supervisor, 2026-09-22).
 
 ![One simulated dataset per proportion of coarsely dated finds](figures/dataset_anatomy.png)
 
@@ -102,8 +104,12 @@ coarse windows are 45% of the period.
 Both models flatten the slope as coarse dating increases, and the
 full-distribution model is only slightly better (slope ratio 0.94 against 0.90
 with coarse windows at 45% of the period). The flattening comes from the period
-edges. In a separate test, cutting each range at the start and end of the period
-brought the slope ratio back to 1.00 and slope coverage to about 90%.
+edges. A separate test shows this: cutting each range at the start and end of the
+period brings the slope ratio back to 1.00 and slope coverage to about 90%. That
+test is a diagnostic. Ranges are not cut in the study, because the study period
+is an inclusion criterion and the model is not told it (supervisor, 2026-09-22,
+`Notes/supervisor_questions_2026-09-17.md`), so the flattening stands as a result
+and is reported as a limitation.
 
 Denser deposition at the end of the period, or coarse dating concentrated early,
 changes the results very little. With no real trend, both models report one in
