@@ -12,9 +12,9 @@ We test whether both groups can go into one model, and whether a model given the
 full probability distribution (flat over the phase or broad period) does better
 than a model that uses midpoints.
 
-> [!NOTE]
-> Open question for the supervisor: here each find draws its own run of phases
-> (merged). A fixed hierarchy of periods (nested) is the alternative design.
+The phases abut: each find draws its own run of adjacent phases, and there is
+no fixed hierarchy of periods above them. Settled with the supervisor on
+2026-09-22 (`Notes/supervisor_questions_2026-09-17.md`).
 
 ## How the data is generated
 

@@ -111,9 +111,14 @@ tests this (steep section, 120 datasets per setting):
 | study window given | 1.02 | 0.88 | 1.01 | 0.90 |
 | study window estimated | 1.02 | 0.86 | 1.01 | 0.92 |
 
-Estimating the window (a normal prior on the dates) works as well as giving it,
-and recovers its width to within 1% (401 and 404 yr). Still to check: the plateau,
-and the zero-slope datasets (`07_period_full_check.R`).
+The last two rows are diagnostics, not the result. They confirm that the spread
+past the edges is what flattens the slope: pinning the dates to the window, or
+estimating where they lie (a normal prior on the dates, which recovers the width
+to within 1%, 401 and 404 yr), removes the flattening. Neither is used in the
+study. The study period is an inclusion criterion and the model is not told it
+(supervisor, 2026-09-22, `Notes/supervisor_questions_2026-09-17.md`), so the
+flattening on the steep section stands as a result and is reported as a
+limitation.
 
 Four times denser deposition at the end changes nothing we can detect with 100
 datasets per setting. With no real trend, the 90% interval excludes zero in 12%
