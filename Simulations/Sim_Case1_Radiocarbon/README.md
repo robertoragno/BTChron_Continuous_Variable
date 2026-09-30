@@ -62,7 +62,12 @@ widest calibrated date over both windows and all lab errors) so no date is cut.
 
 ## Results
 
-Recovery study of 2026-09-08, uniform deposition only:
+Recovery study of 2026-09-08, uniform deposition only. The plateau column pools
+the dataset size sweep (lab error 30, N 50 to 500, including datasets with no
+true slope) with the lab error sweep (N 200, lab error 15, 30 and 50). The steep
+column is the lab error sweep only. On the lab error sweep alone the plateau
+slope ratios are 1.07, 0.82 and 0.95 (second table below), so the comparison
+holds on matched datasets.
 
 | Model | Plateau: slope ratio | coverage | σ bias | Steep: slope ratio | coverage | σ bias |
 |---|---|---|---|---|---|---|
@@ -100,30 +105,77 @@ model's (8.04 against 7.74), which is what brings its coverage closer to 0.90.
 On the steep section slope RMSE and interval width barely differ between models.
 
 On the steep section all three flatten the slope. Each calibrated date spreads
-past the edges of the window, nothing ties the dates together, so the dates look
-more spread out than they are and the slope flattens. `scripts/diagnostics/`
-tests this (steep section, 120 datasets per setting):
+past the edges of where the samples really are, nothing ties the dates together,
+so the dates look more spread out than they are and the slope flattens.
+`scripts/diagnostics/` tests this (steep section, 120 datasets per setting):
 
 | Condition | Lab error 15: slope ratio | coverage | Lab error 50: slope ratio | coverage |
 |---|---|---|---|---|
 | true dates | 1.01 | 0.88 | 1.01 | 0.92 |
 | full distribution, as in the study | 0.94 | 0.73 | 0.73 | 0.23 |
 | study window given | 1.02 | 0.88 | 1.01 | 0.90 |
-| study window estimated | 1.02 | 0.86 | 1.01 | 0.92 |
+| date distribution estimated, single normal | 1.02 | 0.86 | 1.01 | 0.92 |
 
-The last two rows are diagnostics, not the result. They confirm that the spread
-past the edges is what flattens the slope: pinning the dates to the window, or
-estimating where they lie (a normal prior on the dates, which recovers the width
-to within 1%, 401 and 404 yr), removes the flattening. Neither is used in the
-study. The study period is an inclusion criterion and the model is not told it
-(supervisor, 2026-09-22, `Notes/supervisor_questions_2026-09-17.md`), so the
-flattening on the steep section stands as a result and is reported as a
-limitation.
+The last two rows are diagnostics, not the result. "Study window given" cuts
+each date at the true window edges, which uses information a real analyst does
+not have. "Date distribution estimated" gives the dates a shared distribution
+whose shape is learnt from the data, and never sees the window. In this run
+(`06_`, 9 Sep) that distribution was a single normal curve. Both remove the
+flattening on the steep section, which confirms that the spread past the edges
+is what causes it.
+
+The model is not told the study period, since the period is an inclusion
+criterion (supervisor, 2026-09-22, `Notes/supervisor_questions_2026-09-17.md`),
+so the flattening on the steep section stands as a result and is reported as a
+limitation. Whether estimating a distribution for the dates is acceptable is
+still to ask.
+
+The single normal came out too narrow on the plateau, so it was replaced by a
+free shape made of 40 fixed bumps whose weights are estimated
+(`shared/models/marginal_date_period.stan`). Rerun on the whole design (`07_`,
+28 Sep). The table compares the two windows on the same datasets, the lab error
+sweep (N 200, lab error 15, 30 and 50, 300 datasets per window), since the
+plateau alone also has the dataset size and zero-slope sweeps. It fixes the
+steep section but steepens the plateau:
+
+| Model | Plateau: slope ratio | coverage | Steep: slope ratio | coverage |
+|---|---|---|---|---|
+| midpoint | 1.07 | 0.81 | 0.80 | 0.43 |
+| calibrated median | 0.82 | 0.61 | 0.82 | 0.47 |
+| full distribution, as in the study | 0.95 | 0.84 | 0.83 | 0.49 |
+| date distribution estimated, 40 bumps | 1.14 | 0.84 | 1.00 | 0.90 |
+
+The single normal gave 1.32 on the plateau on the same datasets, so the free
+shape halves the overcorrection but does not remove it. The estimated
+distribution is probably still too narrow on the plateau, squeezing the dates
+together (not checked, the run did not save it). It does not make up trends: with a true slope of zero, 13%
+of datasets exclude zero against 14% for the full distribution. It is slow (79
+hours for the full design). Results in `output/period_full/`.
 
 Four times denser deposition at the end changes nothing we can detect with 100
 datasets per setting. With no real trend, the 90% interval excludes zero in 12%
 (midpoint), 13% (median) and 14% (full distribution) of datasets, against 10%
 expected.
+
+### Side tests
+
+Three quick tests from the meeting of 18 Sep, on single datasets (details in
+`Notes/`):
+
+- Reversed (`08_`): the date as the response of a value known exactly, following
+  Crema's measurement_error_example.R. On the plateau the regression on median
+  calibrated dates halves the slope (0.14 against a true 0.27), the Nimble model
+  with the full calibrated dates gets 0.24.
+- One date fixed to a constant (`09_`): replacing one sample's calibrated date
+  with a single year changes the total log likelihood by about that sample's
+  term alone. A wrong year moves the slope by about two thirds of its posterior
+  SD and raises sigma.
+- Which kind of error a calibrated date carries (`10_`, no model fitted): on the
+  steep section calibrated dates are more spread out than the true dates
+  (classical-like), on the plateau they are squeezed together (Berkson-like).
+  Spreading hurts when the date is the predictor, squeezing hurts when it is the
+  response. The expected slope ratios reproduce the fitted ones (0.83 steep,
+  1.11 plateau midpoint, 0.51 reversed).
 
 ![Recovery by lab error](figures/recovery_by_lab_error.png)
 
@@ -136,7 +188,7 @@ expected.
 | File | Shows |
 |---|---|
 | `figures/dataset_anatomy.png` | one dataset per window, before any fitting |
-| `figures/single_fit_comparison.png` | one dataset on the plateau, fitted by the midpoint, calibrated-median and full-distribution models; each panel shows that model's input |
+| `figures/single_fit_comparison.png` | one dataset on the plateau, fitted by the midpoint, calibrated-median and full-distribution models; each panel shows that model's input (panel C draws 20 of the 50 calibrated dates, for legibility) |
 | `figures/single_fit_comparison_steep.png` | the same for the steep section |
 | `figures/recovery_summary.png` | headline result across all datasets |
 | `figures/recovery_by_lab_error.png` | recovery by lab error and window |
@@ -156,6 +208,6 @@ Run in order: `01` → `03` → `04`, then `02` and `05`.
 | `scripts/05_single_fit.R` | `single_fit_comparison.png` and `single_fit_comparison_steep.png` |
 | `scripts/checks/00_check_rows.R` | calibrated weight rows give the same medians as `rcarbon` |
 | `scripts/checks/00_check_fit.R` | simulate, calibrate and fit one dataset |
-| `scripts/diagnostics/` | why the steep section flattens the slope (`05_`), estimating the study window (`06_`, `07_`) |
+| `scripts/diagnostics/` | why the steep section flattens the slope (`05_`), estimating a distribution for the dates (`06_`, `07_`), the reversed test (`08_`), fixing one date to a constant (`09_`), which kind of error a calibrated date carries (`10_`) |
 
 Older runs are in `output/superseded_*`.

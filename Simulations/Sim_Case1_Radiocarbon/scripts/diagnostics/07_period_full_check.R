@@ -69,6 +69,10 @@ run_recovery(design, prepare_dataset,
 
 # Tables only. The headline figures are built by 04_ from the reported run and
 # are deliberately not rebuilt here.
+# The shared labels only know the three paper models, so without this the
+# period fits come back as NA and silently drop out of the table.
+MODEL_LEVELS <- c(MODEL_LEVELS, "period")
+MODEL_LABELS <- c(MODEL_LABELS, period = "Estimated date distribution")
 r <- read_recovery(file.path(out_dir, "recovery_results.csv"))
 r$window <- factor(unname(c(plateau = "plateau", steep = "control")[r$window]),
                    levels = c("plateau", "control"))

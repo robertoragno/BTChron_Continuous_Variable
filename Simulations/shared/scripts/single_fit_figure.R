@@ -26,10 +26,50 @@ fit_single_example <- function(dates, y, time_ref_min, time_ref_range, x_pred,
   fits
 }
 
+#' Blob polygons from packed weight rows (the same rows marginal_date.stan
+#' fits), one per sample: a horizontal violin at y = the sample's value,
+#' spread along x = calendar year, wide where the calibrated date is likely.
+#'
+#' w: weights list from pack_rows()/calibrated_rows() - row_first_year,
+#'    row_n_years, log_year_prob_packed, relative to grid.
+#' y: the sample's observed value, one per row of w.
+#' scale: half-height, in y units, of a fully peaked density.
+#' rows: which rows of w to draw (default all). On a window where dates
+#'   overlap heavily, drawing every row turns the panel into a solid wash;
+#'   a subsample keeps individual shapes visible. The fit itself always uses
+#'   every row - this only controls what gets drawn.
+#' one_sided: FALSE draws a symmetric violin (density up and down from y[i],
+#'   as in Crema's figure). TRUE draws a flat baseline at y[i] with density
+#'   growing upward only - the same one-dimensional information (the density
+#'   is over calendar year, not over y), with half the ink. Symmetry only
+#'   earns its keep when items sit in fixed side-by-side lanes; these blobs
+#'   float freely at each sample's own value, so the mirrored half adds
+#'   nothing and mostly adds clutter when many overlap.
+calibrated_blob_data <- function(w, grid, y, scale, rows = seq_along(w$row_n_years),
+                                 one_sided = FALSE) {
+  row_offset <- c(0L, cumsum(w$row_n_years))  # start of each row in the packed vector
+  blobs <- vector("list", length(rows))
+  for (j in seq_along(rows)) {
+    i     <- rows[j]
+    k     <- w$row_n_years[i]
+    idx   <- row_offset[i] + seq_len(k)
+    years <- grid[w$row_first_year[i] + seq_len(k) - 1L]
+    p     <- exp(w$log_year_prob_packed[idx])
+    p     <- p / max(p)
+    top    <- y[i] + p * scale
+    bottom <- if (one_sided) rep(y[i], length(years)) else y[i] - p * scale
+    blobs[[j]] <- data.frame(x = c(years, rev(years)), y = c(top, rev(bottom)), id = i)
+  }
+  do.call(rbind, blobs)
+}
+
 #' Trend panels: fitted trend with 50% and 90% bands, true trend dashed.
 #' obs: data.frame(x, y) drawn as points (e.g. window midpoints).
 #' ranges: data.frame(xmin, xmax, y) drawn as horizontal bars (e.g. dating ranges).
+#' blobs: data.frame(x, y, id) from calibrated_blob_data(), drawn as filled
+#'   violins instead of ranges (Case 1, where the calibrated date has a shape).
 trend_panel <- function(fit, x_pred, truth, title, obs = NULL, ranges = NULL,
+                        blobs = NULL,
                         obs_label = "midpoint of dating range",
                         range_label = "dating range", obs_shape = 16) {
   mu    <- fit$draws("mu_pred", format = "draws_matrix")
@@ -39,6 +79,10 @@ trend_panel <- function(fit, x_pred, truth, title, obs = NULL, ranges = NULL,
                       lo50 = apply(mu, 2, quantile, 0.25), hi50 = apply(mu, 2, quantile, 0.75))
   ref   <- data.frame(x = x_pred, y = truth$intercept + truth$slope * x_pred)
   p <- ggplot(trend)
+  if (!is.null(blobs))
+    p <- p + geom_polygon(data = blobs, aes(x, y, group = id),
+                          fill = "steelblue", colour = NA, alpha = 0.22,
+                          inherit.aes = FALSE)
   if (!is.null(ranges))
     p <- p + geom_segment(data = ranges,
                           aes(x = xmin, xend = xmax, y = y, yend = y, colour = range_label),
@@ -105,11 +149,14 @@ posterior_panel <- function(fits, truth, title) {
 
 #' The whole figure, one trend panel per fitted model.
 #' obs: data.frame(x, y), points on the midpoint panel (and on the
-#'   full-distribution panel if ranges is not given).
+#'   full-distribution panel if neither ranges nor blobs is given).
 #' median_obs: data.frame(x, y), points on the calibrated-median panel.
 #' ranges: data.frame(xmin, xmax, y), bars on the full-distribution panel.
+#' blobs: data.frame(x, y, id) from calibrated_blob_data(), violins on the
+#'   full-distribution panel instead of ranges.
 single_fit_comparison_figure <- function(fits, x_pred, truth, out_path, title,
-                                         obs = NULL, ranges = NULL, median_obs = NULL,
+                                         obs = NULL, ranges = NULL, blobs = NULL,
+                                         median_obs = NULL, subtitle = NULL,
                                          obs_label = "midpoint of dating range",
                                          median_label = "calibrated median",
                                          range_label = "dating range") {
@@ -120,6 +167,8 @@ single_fit_comparison_figure <- function(fits, x_pred, truth, out_path, title,
     if (m == "median")
       panels[[i]] <- trend_panel(fits[[m]], x_pred, truth, panel_title, median_obs,
                                  obs_label = median_label, obs_shape = 15)
+    else if (m == "marginal" && !is.null(blobs))
+      panels[[i]] <- trend_panel(fits[[m]], x_pred, truth, panel_title, blobs = blobs)
     else if (m == "marginal" && !is.null(ranges))
       panels[[i]] <- trend_panel(fits[[m]], x_pred, truth, panel_title,
                                  ranges = ranges, range_label = range_label)
@@ -128,7 +177,7 @@ single_fit_comparison_figure <- function(fits, x_pred, truth, out_path, title,
                                  obs_label = obs_label)
   }
   # Same calendar axis on every trend panel
-  xlim <- range(x_pred, obs$x, median_obs$x, ranges$xmin, ranges$xmax)
+  xlim <- range(x_pred, obs$x, median_obs$x, ranges$xmin, ranges$xmax, blobs$x)
   for (i in seq_along(panels))
     panels[[i]] <- panels[[i]] + coord_cartesian(xlim = xlim)
 
@@ -141,7 +190,7 @@ single_fit_comparison_figure <- function(fits, x_pred, truth, out_path, title,
   n <- length(fits)
   fig <- patchwork::wrap_elements(top) / pPost +
     patchwork::plot_layout(heights = c(1.1, 0.6 * n)) +
-    patchwork::plot_annotation(title = title,
+    patchwork::plot_annotation(title = title, subtitle = subtitle,
                                theme = theme(plot.title = element_text(size = 13, face = "bold")))
   ggsave(out_path, fig, width = 6 * n, height = 5.5 + 2.5 * n, dpi = 300, bg = "white")
   invisible(fig)

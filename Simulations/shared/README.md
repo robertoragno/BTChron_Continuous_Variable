@@ -41,8 +41,9 @@ dating error.
 `latent_date.stan` samples one date per find inside its window instead. For flat
 windows it gives the same answer as the full-distribution model, so it is not
 reported, but `checks/00_check_marginal.R` uses it to check that the full-distribution
-model is correct. `marginal_date_period.stan` is a prototype that also estimates the
-study period, used only by Case 1's `diagnostics/`.
+model is correct. `marginal_date_period.stan` is a prototype that also gives the
+dates a shared distribution learnt from the data (40 fixed bumps whose weights
+are estimated), used only by Case 1's `diagnostics/`.
 
 ## Layout
 
