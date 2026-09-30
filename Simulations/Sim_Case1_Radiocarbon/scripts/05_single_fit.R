@@ -43,18 +43,29 @@ for (k in 1:2) {
                              seed = 1)
 
   # What each model reads from the calibrated dates:
-  # midpoint of the 95% range, calibrated median, and the 95% range itself
+  # midpoint of the 95% range, calibrated median, and the calibrated shape
+  # itself (the same weight rows marginal_date.stan is fitted on)
   midpoints <- data.frame(x = (smry$start + smry$end) / 2, y = sim$Value)
   medians   <- data.frame(x = smry$median, y = sim$Value)
-  ranges    <- data.frame(xmin = smry$start, xmax = smry$end, y = sim$Value)
+
+  # Drawing every date's shape floods the plateau panel into a solid wash, so
+  # only a subsample is drawn, spread evenly across the dataset's calibrated
+  # medians so the whole window is represented. The fit still uses all N.
+  BLOB_N   <- 20
+  blob_idx <- order(smry$median)[unique(round(seq(1, N, length.out = min(N, BLOB_N))))]
+  blobs    <- calibrated_blob_data(dates$weights, grid, sim$Value,
+                                   scale = 0.06 * diff(range(sim$Value)),
+                                   rows = blob_idx, one_sided = TRUE)
 
   out <- here("Simulations", "Sim_Case1_Radiocarbon", "figures", file_names[k])
   single_fit_comparison_figure(
     fits, x_pred, truth, out,
     title = paste("Case 1: one dataset on", window_names[k],
                   "- three models"),
-    obs = midpoints, median_obs = medians, ranges = ranges,
-    obs_label = "midpoint of 95% calibrated range",
-    range_label = "95% calibrated range")
+    subtitle = if (length(blob_idx) < N)
+      sprintf("Panel C shows %d of %d calibrated dates for legibility; every model is fitted on all %d",
+              length(blob_idx), N, N),
+    obs = midpoints, median_obs = medians, blobs = blobs,
+    obs_label = "midpoint of 95% calibrated range")
   cat("wrote", out, "\n")
 }

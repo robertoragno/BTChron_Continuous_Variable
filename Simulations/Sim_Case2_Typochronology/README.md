@@ -62,86 +62,65 @@ setting, 3200 in total:
 0% and 100% coarsely dated are reference points, not "realistic" datasets.
 
 ## Feeding the models
-> [!CAUTION]
-> This section needs to be edited.
 
-Both models (midpoint vs full distribution) see each sample's date range and measured value, 
-not the true date.
+Both models see each find's range and measured value, not the true date.
 
-The midpoint model places each find at the centre of its range, (start + end) / 2.
+The midpoint model puts each find at the centre of its range, (start + end) / 2.
+The median is not fitted: for a flat range it is the same as the midpoint.
 
-The full-distribution model gives each year of the range the same probability,
-on a 5-year grid (to speed up computation). We do not provide the study period to the model,
-so a range that is earlier or later than the period's boundaries keep part of the probability outside it.
-In this case it should not be a huge issue since the deposition is uniform, but on a separate test
-(just OLS) the slope seemed to be recovered better if the window was inside the study period (see results).
-Not telling the model the period is deliberate: the period selects which finds enter the study, it is not
-part of the model (supervisor, 2026-09-22).
+The full-distribution model gives every year of the range the same probability,
+on a 5-year grid to speed things up. The model is not told the study period (the
+period decides which finds enter the study, it is not part of the model;
+supervisor, 2026-09-22), so a range that runs past the start or end of the period
+keeps part of its probability outside it. This matters, see the results.
 
 ![One simulated dataset per proportion of coarsely dated finds](figures/dataset_anatomy.png)
 
 ## Results
-> [!CAUTION]
-> This section needs to be written.
 
-Before fitting, plain least squares on 200,000 finds gives the midpoint slope
-ratio expected from the design. It follows `1 / (1 + mean(width^2) / period^2)`:
+At the reference setting (N = 200, half the finds coarsely dated, coarse windows
+25% of the period), 200 datasets:
 
-| Coarse window | Coarsely dated | Midpoint slope ratio |
+| | Midpoint | Full distribution |
 |---|---|---|
-| 10% of period | 50% | 0.993 |
-| 10% of period | 100% | 0.990 |
-| 25% of period | 50% | 0.968 |
-| 25% of period | 100% | 0.940 |
-| 45% of period | 50% | 0.906 |
-| 45% of period | 100% | 0.830 |
+| Slope ratio | 0.96 | 0.97 |
+| Slope coverage | 0.73 | 0.78 |
+| Sigma bias | +0.16 | 0.00 |
+| Sigma coverage | 0.52 | 0.89 |
 
-The full-distribution model recovers sigma in every setting. The midpoint model
-overestimates it: once half or more of the finds are coarsely dated, its 90%
-interval contains the true sigma in only 50-57% of datasets, and in 37% when
-coarse windows are 45% of the period.
+The full distribution fixes sigma. The midpoint overestimates it, more so as
+dating gets coarser (coverage 0.37 with coarse windows at 45% of the period,
+against 0.92 for the full distribution).
 
-Both models flatten the slope as coarse dating increases, and the
-full-distribution model is only slightly better (slope ratio 0.94 against 0.90
-with coarse windows at 45% of the period). The flattening comes from the period
-edges. A separate test shows this: cutting each range at the start and end of the
-period brings the slope ratio back to 1.00 and slope coverage to about 90%. That
-test is a diagnostic. Ranges are not cut in the study, because the study period
-is an inclusion criterion and the model is not told it (supervisor, 2026-09-22,
-`Notes/supervisor_questions_2026-09-17.md`), so the flattening stands as a result
-and is reported as a limitation.
+Both models flatten the slope, the full distribution only a bit less. With more
+coarsely dated finds the slope ratio goes from 0.99 to 0.94 for both. With
+longer coarse windows it goes to 0.90 (midpoint) and 0.94 (full distribution) at
+45% of the period, with slope coverage 0.39 and 0.58.
 
-Denser deposition at the end of the period, or coarse dating concentrated early,
-changes the results very little. With no real trend, both models report one in
-about 10% of datasets, as expected for a 90% interval.
+For the midpoint this is expected. The true date is drawn first and the range
+placed around it, which is classical error, and it flattens the slope by
+`1 / (1 + mean(width^2) / period^2)`: 0.97 expected against 0.96 fitted at the
+reference, 0.91 against 0.90 at 45% windows.
+
+The full distribution flattens because ranges run past the period edges and the
+model does not know where the period is. Cutting the ranges at the edges brings
+the slope ratio back to 1.00 and coverage to about 0.90 (separate test, not used
+in the study since the period is only an inclusion criterion). So this stays as
+a limitation.
+
+Denser deposition at the end, or coarse dating more common early, changes very
+little. With no real trend both models report one in about 10% of datasets, as
+expected.
+
+A continuous spread of widths instead of two groups (same mean squared width)
+gives the same numbers: slope ratio 0.96 either way for the midpoint, 0.97 for
+the full distribution (`scripts/checks/01_check_continuous_widths.R`).
 
 ![Recovery by proportion of coarsely dated finds](figures/recovery_by_prop_coarse.png)
 
 ![Recovery by coarse window length](figures/recovery_by_coarse_width.png)
 
 ![One dataset fitted by both models](figures/single_fit_comparison.png)
-
-### Two groups of widths or a continuous spread?
-
-The design has two groups of finds (well dated or coarsely dated). Real datasets
-have a range of widths, so `scripts/checks/01_check_continuous_widths.R` repeats
-the 200 reference datasets with the same true dates and values, but gives each
-find a width drawn uniformly between 6.25% and 28.2% of the period. The upper
-limit keeps the mean squared width the same as in the two-group design (0.034),
-which is what sets how much the midpoint flattens the slope. 800 fits, no
-divergences, R-hat below 1.02.
-
-| Widths | Model | Calibration slope [95% CI] | Slope coverage | Slope RMSE (10⁻³) | σ bias | σ coverage |
-|---|---|---|---|---|---|---|
-| two groups | Midpoint | 0.962 [0.957, 0.967] | 0.73 | 0.98 | +0.16 | 0.52 |
-| continuous | Midpoint | 0.961 [0.956, 0.967] | 0.73 | 1.00 | +0.16 | 0.48 |
-| two groups | Full distribution | 0.969 [0.964, 0.974] | 0.78 | 0.89 | +0.00 | 0.89 |
-| continuous | Full distribution | 0.966 [0.960, 0.971] | 0.75 | 0.94 | +0.01 | 0.89 |
-
-The two versions give the same calibration slope and σ recovery for both models.
-Slope coverage and RMSE of the full-distribution model are slightly worse with
-continuous widths (0.75 against 0.78), within the Jeffreys intervals of each
-other. The two-group structure does not drive the results.
 
 ## Figures
 
