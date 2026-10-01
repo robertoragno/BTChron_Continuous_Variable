@@ -39,7 +39,7 @@ source(here("Simulations", "shared", "scripts", "weight_rows.R"))
 source(here("Simulations", "shared", "scripts", "fit_models.R"))
 source(here("Simulations", "Sim_Case1_Radiocarbon", "scripts", "simulate.R"))
 
-out_dir <- here("Simulations", "Sim_Case1_Radiocarbon", "output", "fixed_date")
+out_dir <- here("Simulations", "Sim_Case1_Radiocarbon", "output", "diagnostics", "fixed_date")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # Study settings, the reference cell of the main design ----

@@ -1,180 +1,69 @@
-# shared: the models and code all four cases use
+# shared: the model all four cases use
 
-Each dating case lives in its own `Sim_Case*/` folder. The models, the weight rows,
-the fitting loop and the summary figures live here. The overall design is in
-`docs/IMPLEMENTATION_PLAN.md`.
+## One model
 
-## One idea behind all four cases
+`models/linear_dates.stan` fits `value = intercept + slope * date + noise` when the
+date of each find is uncertain. Each find comes with a set of candidate years and a
+probability for each. The model averages the fit over those years, weighted by
+their probability, so the date never has to be fixed to one year.
 
-Every case gives the model a grid of candidate calendar years and, for each find, a
-row of probabilities over that grid. Only the shape of the row changes:
+Every method, in every case, is the same model with a different table of dates:
 
-| Case | Dating | Weight row |
-|---|---|---|
-| 1 | radiocarbon | the calibrated distribution |
-| 2 | typochronology | flat over the find's own window |
-| 3 | overlapping phases | flat over the assigned phase |
-| 4 | merged phases | flat over the run of merged phases |
+| Method | Candidate years |
+|---|---|
+| Midpoint | one year, the middle of the range, probability 1 |
+| Calibrated median (Case 1) | one year, the median, probability 1 |
+| Full distribution, Case 1 | every grid year, with its calibrated probability |
+| Full distribution, Cases 2-4 | every grid year inside the window, equally likely |
 
-So one Stan model serves all four cases.
+For a flat window the median is the midpoint, so Cases 2-4 fit it once and call it
+"Midpoint / Median".
 
-## The models
+Details:
 
-| Name in figures | In code | What the date becomes | Stan file |
-|---|---|---|---|
-| Midpoint | `midpoint` | the middle of the range | `midpoint.stan` |
-| Calibrated median | `median` | the median of the date distribution | `midpoint.stan` with start = end = median |
-| Full distribution | `marginal` | every candidate year, weighted by its probability | `marginal_date.stan` |
-
-For a flat window the median equals the midpoint, so Cases 2-4 fit only the midpoint
-and label it "Midpoint / Median" (checked in Case 2's
-`checks/00_check_median_identity.R`).
-
-The full-distribution model does not pick one year per find. For each candidate year
-it asks how well the trend fits if the find dates to that year, and averages the
-answers weighted by that year's probability (the `log_sum_exp` in the Stan code). The
-date is integrated out, so the model has only three parameters (intercept, slope,
-sigma) whatever the number of finds. This is an errors-in-variables regression with
-a known dating distribution per find; sigma is the scatter around the trend, not the
-dating error.
-
-`latent_date.stan` samples one date per find inside its window instead. For flat
-windows it gives the same answer as the full-distribution model, so it is not
-reported, but `checks/00_check_marginal.R` uses it to check that the full-distribution
-model is correct. `marginal_date_period.stan` is a prototype that also gives the
-dates a shared distribution learnt from the data (40 fixed bumps whose weights
-are estimated), used only by Case 1's `diagnostics/`.
-
-## Layout
-
-```
-shared/
-  models/    the Stan files above
-  scripts/   weight_rows.R          weight rows for all cases
-             design.R               ids, seeds and true trends for every 01_
-             fit_models.R           Stan data per model, one fit to one dataset
-             run_recovery.R         fits every model to every dataset, in parallel
-             recovery_summary.R     metrics, tables and figures for every 04_
-             single_fit_figure.R    one dataset, two or three models, for every 05_
-             case_dating_figures.R  figures/caseN_dating.png: how each case dates finds
-  checks/    00_check_marginal.R    full-distribution vs latent model
-```
-
-Each case folder has the same structure: `simulate.R`, then `01_design.R` (writes
-`data/design.csv`), `03_recovery_study.R` (fits), `04_recovery_plots.R` (tables and
-figures), `05_single_fit.R` (one fit up close). Only Case 1 has a `02_figures.R`. The
-`03_` and `04_` scripts read every setting from the design file.
-
-## Running a study
-
-```
-Rscript Simulations/Sim_Case1_Radiocarbon/scripts/01_design.R
-Rscript Simulations/Sim_Case1_Radiocarbon/scripts/03_recovery_study.R   # hours
-Rscript Simulations/Sim_Case1_Radiocarbon/scripts/04_recovery_plots.R
-```
-
-`03_` does nothing if `output/recovery_results.csv` already exists; delete it to refit.
-A failed fit is recorded in the `error` column instead of stopping the run. For a
-quick test:
-
-```
-RECOVERY_LIMIT=20 RECOVERY_WORKERS=8 RECOVERY_WARMUP=300 RECOVERY_SAMPLING=300 \
-  RECOVERY_OUT=/tmp/test.csv Rscript .../03_recovery_study.R
-```
+- The grid is every 5 years. In Case 1 each 5-year cell adds up the yearly
+  calibrated probabilities around it.
+- Each find only uses the run of grid years where it has probability (`first` to
+  `last`), which keeps the fits fast.
+- The slope is sampled per 100 years and reported per year. Per year it is a very
+  small number next to the intercept, which makes sampling about 4 times slower.
+- Priors: slope normal(0, 0.05) per year, the same in every case; value at the
+  centre of the period normal(0, 10); sigma exponential(1).
 
 ## Metrics
 
+From `04_recovery_plots.R` in each case, written to `output/recovery_metrics.csv`:
+
 | Metric | Meaning | Target |
 |---|---|---|
-| bias | mean of posterior median minus the true value | 0 |
-| RMSE | root mean squared error of the posterior median | as small as possible |
-| empirical SE | SD of the errors across datasets | as small as possible |
-| calibration slope | slope of estimated slopes regressed on true slopes | 1 |
-| coverage | proportion of 90% equal-tailed credible intervals that contain the true value | 0.90 |
-| interval width | mean width of the 90% credible interval | narrower, once coverage is on target |
+| slope bias | mean of posterior median minus true slope | 0 |
+| calibration slope | estimated slopes regressed on true slopes | 1 |
+| 90% coverage | share of 90% intervals that contain the true slope | 0.90 |
+| 90% interval width | mean width of those intervals | narrower, once coverage is right |
+| bias in sigma | mean of posterior median minus true sigma | 0 |
 
-**Coverage.** Each fit returns a 90% credible interval for the parameter. In a
-simulation the true value is known, so each interval either contains it or not.
-Coverage is the share of datasets where it does. A model whose uncertainty is
-honest has coverage close to 0.90. Below 0.90 its intervals are too narrow
-(overconfident), or they are centred in the wrong place because the estimate is
-biased. Above 0.90 they are wider than they need to be.
+True slopes are drawn on both sides of zero, so a method that flattens every slope
+can still have zero bias. The calibration slope shows it: below 1 the trend is
+flattened, above 1 exaggerated. Case READMEs call it the "slope ratio". Measures
+follow Morris, White and Crowther (2019, Statistics in Medicine 38: 2074-2102).
 
-**RMSE and empirical SE.** Both are computed from the error of each dataset,
-posterior median minus true value, and are in the units of the parameter.
+Error bars are 95% intervals for how well each number is known from 100 or so
+datasets: +/- 2 standard errors for means, the `lm` confidence interval for the
+calibration slope, a Jeffreys interval for coverage.
 
-- RMSE = sqrt(mean(error²)): how far the estimate typically lands from the truth,
-  whatever the reason.
-- Empirical SE = SD(error): how much the error changes from one dataset to the
-  next, ignoring any constant shift.
+## Other files
 
-They are linked by RMSE² ≈ bias² + empirical SE². When RMSE and empirical SE are
-nearly equal, the error is scatter with no systematic shift. When RMSE is clearly
-larger, part of the error is bias. For σ in Case 1 on the plateau, the midpoint
-model has RMSE 0.54 and empirical SE 0.46: the remaining gap is its bias of +0.28
-(0.46² + 0.28² ≈ 0.54²). The full-distribution model has 0.22 and 0.21, with bias
-close to zero.
-
-The calibration slope is reported because bias cannot show attenuation: true slopes
-are drawn around zero, so flattening positive and negative slopes cancels out in the
-average error. Below 1 the trend is attenuated (flattened), above 1 exaggerated.
-Case READMEs call it the "slope ratio".
-
-Note on terms. Earlier versions of these scripts called coverage "accuracy" and
-interval width "precision". Both names were dropped because they clash with standard
-usage: accuracy is closeness of the estimates to the truth (summarised here by bias
-and RMSE), and precision is their spread across datasets (the empirical SE). The
-performance measures follow Morris, White and Crowther (2019, Statistics in Medicine
-38: 2074-2102). Coverage and width describe the posterior intervals, not the point
-estimates.
-
-The error bars in the summary figures show how precisely each number is known from a
-limited number of simulated datasets: a Jeffreys interval for coverage (it stays
-inside 0-1), an OLS 95% confidence interval for the calibration slope, and +/- 2
-Monte Carlo standard errors for bias and interval width. Each fit saves the 50, 80,
-90 and 95% intervals, so the reported level can be changed without refitting.
-
-## Checks
-
-Run both after any change to `weight_rows.R`:
-
-- `checks/00_check_marginal.R`: the full-distribution and latent models must agree on
-  a Case 2 dataset. Last run: slope 0.01921 vs 0.01920.
-- `Sim_Case1_Radiocarbon/scripts/checks/00_check_rows.R`: each calibrated weight row
-  must have the same median as rcarbon's calibration.
-
-`Sim_Case1_Radiocarbon/scripts/checks/00_check_fit.R` runs the whole radiocarbon path
-on one dataset.
+`scripts/` and the other Stan files are the code before the rewrite of October
+2026. They are still used by the checks, by Case 1's `diagnostics/`, and by the
+`05_single_fit.R` of Cases 2-4. `scripts/case_dating_figures.R` draws
+`figures/caseN_dating.png` for the main README.
 
 ## Things that fail without an error
 
-- **Calendar order of calibrated dates.** rcarbon labels rows in cal BP, oldest first,
-  which is already ascending calendar order. The labels need converting
-  (year = 1950 - BP) but the rows must not be reversed; reversing them flips the sign of
-  the slope. `calmatrix_to_calendar()` checks this.
-- **Dates cut at the grid edge.** A calibrated date that loses probability off the grid
-  is pulled inward. `calibrated_rows()` stops if a date loses more than 1%, and Case 1
-  pads the grid (588 yr) so it never happens.
-- **Coarse grids.** On a 5-year grid each cell sums the yearly probabilities around it.
-  Taking every fifth year would throw away most of a calibrated distribution.
-- **Loading rcarbon draws random numbers.** Case 1's design only reproduces because
-  rcarbon is first loaded after `set.seed()`.
-
-## Calendar axis and grid
-
-The calendar range passed to Stan (`time_ref_min`, `time_ref_range`) is fixed per case
-in the design, not taken from each dataset, so the prior on the slope means the same
-thing in every dataset and model.
-
-The full-distribution model checks every candidate year of every row at every sampler
-step, so its cost grows with the grid resolution:
-
-| Grid step | Years per row | Per chain | vs latent model |
-|---|---|---|---|
-| 1 yr | ~120 | ~37 s | ~25x |
-| 5 yr | 26 | ~8.5 s | ~7x |
-
-The 5-year grid is the default. On Case 2 (previous design, windows up to 200 yr) it
-gave the same slope as the annual grid (0.01967 vs 0.01970). It has not been checked
-separately for Case 1, where multi-peaked calibrated dates could be smoothed by a
-coarse grid. Set the step with `MARGINAL_GRID_STEP=5`.
+- rcarbon labels calibrated years in cal BP, oldest first. That is already
+  ascending calendar order: convert the labels (year = 1950 - BP), do not reverse
+  the rows, or the slope changes sign.
+- A calibrated date cut at the grid edge is pulled inward. Case 1 pads the grid by
+  588 years on each side so this never happens.
+- Loading rcarbon draws random numbers. Case 1's design only reproduces because
+  rcarbon is loaded after `set.seed()`.

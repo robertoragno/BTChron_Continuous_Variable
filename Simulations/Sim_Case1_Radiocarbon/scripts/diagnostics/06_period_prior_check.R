@@ -39,7 +39,7 @@ source(here("Simulations", "shared", "scripts", "recovery_summary.R"))
 source(here("Simulations", "Sim_Case1_Radiocarbon", "scripts", "simulate.R"))
 
 output_csv <- Sys.getenv("PERIOD_OUT",
-                         here("Simulations", "Sim_Case1_Radiocarbon", "output",
+                         here("Simulations", "Sim_Case1_Radiocarbon", "output", "diagnostics",
                               "period_prior_check.csv"))
 n_workers <- as.integer(Sys.getenv("RECOVERY_WORKERS", "24"))
 n_rep     <- as.integer(Sys.getenv("PERIOD_REPS", "120"))
