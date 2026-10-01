@@ -8,7 +8,7 @@
 # over-tight period inflates slopes that are really zero.
 #
 # EXPERIMENT, not part of the paper's pipeline. It writes to
-# output/period_full/ and nowhere else, so the reported tables and figures are
+# output/diagnostics/period_full/ and nowhere else, so the reported tables and figures are
 # untouched and no number here can be mistaken for one of those. It draws no
 # figures at all, for the same reason.
 #
@@ -33,7 +33,7 @@ source(here("Simulations", "shared", "scripts", "run_recovery.R"))
 source(here("Simulations", "shared", "scripts", "recovery_summary.R"))
 source(here("Simulations", "Sim_Case1_Radiocarbon", "scripts", "simulate.R"))
 
-out_dir <- here("Simulations", "Sim_Case1_Radiocarbon", "output", "period_full")
+out_dir <- here("Simulations", "Sim_Case1_Radiocarbon", "output", "diagnostics", "period_full")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 design <- read.csv(here("Simulations", "Sim_Case1_Radiocarbon", "data",

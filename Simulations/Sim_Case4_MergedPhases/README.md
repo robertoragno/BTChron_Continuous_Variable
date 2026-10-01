@@ -42,24 +42,34 @@ The design (`scripts/01_design.R`), 100 datasets per setting, 1100 in total:
 
 ## Feeding the models
 
-Both models see each find's window and measured value, not the true date. The
-midpoint model places each find at the centre of its window. The
-full-distribution model spreads it evenly across the window, on a 5-year grid.
-The median is not fitted: for a flat window it equals the midpoint.
+Both fits use the same model (`shared/models/linear_dates.stan`) and see each
+find's window and measured value, not the true date. The midpoint fit places each
+find at the centre of its window. The full-distribution fit spreads it evenly
+across the window, on a 5-year grid. The median is not fitted: for a flat window
+it equals the midpoint.
 
 ![One simulated dataset per merge level](figures/dataset_anatomy.png)
 
 ## Results
 
-Both models recover the slope (slope ratio 1.01-1.04, coverage 0.87-0.93).
+Recovery study rerun on 2026-10-01 with the shared model.
+
+Both models recover the slope (slope ratio 1.00-1.04, coverage 0.85-0.93).
 
 The midpoint model overestimates sigma, more so as broad periods get wider
 (σ bias 0.60, 0.72 and 1.09 at merge_max 2, 3 and 4). Its 90% interval
 contains the true sigma in about a third of datasets. The full-distribution
-model recovers sigma (coverage 0.88-0.93).
+model recovers sigma (coverage 0.87-0.93).
 
 With no real trend, the 90% interval excludes zero in 9% (midpoint) and 10%
 (full distribution) of datasets, against 10% expected.
+
+About 4% of datasets have one phase covering more than 90% of the period (very
+uneven phases, low `alpha_conc`). Every find is then dated to nearly the whole
+period, and the data cannot tell a rising trend from a falling one: the
+full-distribution posterior has two peaks, at +slope and -slope. Three of these
+datasets (153, 169, 1041) did not converge. Whether such phase schemes are
+realistic is still to decide.
 
 ![Recovery by merge level](figures/recovery_by_merge.png)
 
@@ -83,6 +93,8 @@ Run in order: `01` → `03` → `04`, then `05`.
 |---|---|
 | `scripts/simulate.R` | draws the fine phases and dates each find to a run of them |
 | `scripts/01_design.R` | builds the list of datasets to simulate, `data/design.csv`, and checks the generator |
-| `scripts/03_recovery_study.R` | fits every model to every dataset; slow |
-| `scripts/04_recovery_plots.R` | tables (`output/`) and figures |
+| `scripts/03_recovery_study.R` | fits both methods to every dataset; about an hour on 24 workers |
+| `scripts/04_recovery_plots.R` | `output/recovery_metrics.csv`, the figures and `dataset_anatomy.png` |
+
+Older runs are in `output/archive/`.
 | `scripts/05_single_fit.R` | `single_fit_comparison.png` |

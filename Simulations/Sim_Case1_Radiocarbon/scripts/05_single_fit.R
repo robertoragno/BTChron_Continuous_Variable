@@ -1,71 +1,127 @@
-# Case 1 single-fit figures: one dataset per window, fitted by the midpoint,
-# calibrated-median and full-distribution models.
-#   figures/single_fit_comparison.png        Hallstatt plateau
-#   figures/single_fit_comparison_steep.png  steep section
-
-library(here)
+# Case 1: one simulated radiocarbon dataset, fitted three ways.
+# A value changes linearly with calendar date, but each date is only known as a
+# calibrated radiocarbon date. The trend is fitted with shared/models/linear_dates.stan
+# (the model used in the recovery study) on:
+#   1. the midpoint of each 95% calibrated range
+#   2. the median calibrated date
+#   3. the whole calibrated distribution
+# Run for the Hallstatt plateau and for a steep section of the curve.
+library(rcarbon)
 library(cmdstanr)
-suppressMessages(library(rcarbon))
+library(ggplot2)
+library(here)
 
-source(here("Simulations", "shared", "scripts", "weight_rows.R"))
-source(here("Simulations", "shared", "scripts", "fit_models.R"))
-source(here("Simulations", "shared", "scripts", "single_fit_figure.R"))
-source(here("Simulations", "Sim_Case1_Radiocarbon", "scripts", "simulate.R"))
+true.intercept <- 8 # Value at year 0
+true.slope <- 0.02 # Change in value per year
+true.sigma <- 2 # Noise around the trend
+n <- 50 # Number of dated finds
+lab.error <- 25 # Lab error of each 14C measurement
 
-LAB_ERROR <- 25
-INTERCEPT <- 8; SLOPE <- 0.02; SIGMA <- 2
-N <- 50; STEP <- 5
+windows <- list(c(-800, -400), c(-1600, -1200)) # Calendar windows (BCE is negative)
+window.names <- c("the Hallstatt plateau", "the steep section")
+file.names <- c("single_fit_comparison.png", "single_fit_comparison_steep.png")
 
-# The two windows, as in 02_figures.R and the recovery study
-windows      <- list(c(-800, -400), c(-1600, -1200))
-window_names <- c("the Hallstatt plateau", "the steep section")
-file_names   <- c("single_fit_comparison.png", "single_fit_comparison_steep.png")
+model <- cmdstan_model(here("Simulations", "shared", "models", "linear_dates.stan"))
 
-for (k in 1:2) {
-  WINDOW <- windows[[k]]
+for (k in 1:2)
+{
+	window <- windows[[k]]
+	centre <- mean(window)
 
-  pad  <- c14_grid_pad(WINDOW, LAB_ERROR)
-  grid <- seq(WINDOW[1] - pad, WINDOW[2] + pad, by = STEP)
-  sim  <- simulate_c14(N, INTERCEPT, SLOPE, SIGMA, WINDOW, LAB_ERROR, seed = 1)
+	# Simulate the data
+	set.seed(1)
+	true.date <- round(runif(n, window[1], window[2]))
+	# Radiocarbon age at the true date, plus lab and calibration-curve error
+	curve <- uncalibrate(1950 - true.date, verbose = FALSE)
+	cra <- round(rnorm(n, curve$ccCRA, sqrt(lab.error^2 + curve$ccError^2)))
+	value <- round(true.intercept + true.slope * true.date + rnorm(n, 0, true.sigma), 1)
 
-  cal  <- calmatrix_to_calendar(calibrate(sim$CRA, errors = sim$Error,
-                                          calCurves = "intcal20", calMatrix = TRUE,
-                                          verbose = FALSE))
-  smry <- calibrated_summaries(cal, grid)
-  dates <- list(start = smry$start, end = smry$end, median = smry$median,
-                grid = grid, weights = calibrated_rows(cal, grid))
+	# Calibrate, with 600 years either side of the window so no date is cut off
+	cal <- calibrate(cra, rep(lab.error, n), calMatrix = TRUE,
+	                 timeRange = 1950 - c(window[1] - 600, window[2] + 600), verbose = FALSE)
+	years <- 1950 - as.numeric(rownames(cal$calmatrix)) # cal BP to BCE/CE
+	prob <- t(cal$calmatrix) # One row per find, one column per year
+	prob <- prob / rowSums(prob)
 
-  x_pred <- seq(WINDOW[1], WINDOW[2], length.out = 60)
-  truth  <- list(intercept = INTERCEPT, slope = SLOPE, sigma = SIGMA)
+	# Median calibrated date, and midpoint of the 95% HPD range (the most
+	# probable years until they hold 95% of the probability)
+	median.date <- rep(NA, n)
+	midpoint.date <- rep(NA, n)
+	for (i in 1:n)
+	{
+		p <- prob[i, ]
+		median.date[i] <- years[which(cumsum(p) >= 0.5)[1]]
+		cut <- sort(p, decreasing = TRUE)[which(cumsum(sort(p, decreasing = TRUE)) >= 0.95)[1]]
+		midpoint.date[i] <- (min(years[p >= cut]) + max(years[p >= cut])) / 2
+	}
 
-  fits <- fit_single_example(dates, sim$Value, min(grid), max(grid) - min(grid),
-                             x_pred, models = c("midpoint", "median", "marginal"),
-                             seed = 1)
+	# The same model fitted three times. A point date is one candidate year with
+	# probability 1; the full distribution is every year with its calibrated
+	# probability, trimmed to the run of years holding 99.99% of it.
+	first <- rep(NA, n)
+	last <- rep(NA, n)
+	for (i in 1:n)
+	{
+		cum <- cumsum(prob[i, ])
+		first[i] <- which(cum >= 0.00005)[1]
+		last[i] <- which(cum >= 0.99995)[1]
+	}
+	inputs <- list(
+		midpoint = list(year = matrix(midpoint.date, ncol = 1), log_p = matrix(0, n, 1),
+		                first = rep(1, n), last = rep(1, n)),
+		median = list(year = matrix(median.date, ncol = 1), log_p = matrix(0, n, 1),
+		              first = rep(1, n), last = rep(1, n)),
+		full = list(year = matrix(years, nrow = n, ncol = length(years), byrow = TRUE),
+		            log_p = log(prob), first = first, last = last))
 
-  # What each model reads from the calibrated dates:
-  # midpoint of the 95% range, calibrated median, and the calibrated shape
-  # itself (the same weight rows marginal_date.stan is fitted on)
-  midpoints <- data.frame(x = (smry$start + smry$end) / 2, y = sim$Value)
-  medians   <- data.frame(x = smry$median, y = sim$Value)
+	# Fitted trend and 95% interval for each, from the posterior draws
+	model.names <- c(midpoint = "A  Midpoint of 95% range", median = "B  Median calibrated date",
+	                 full = "C  Full distribution")
+	pred.years <- seq(window[1], window[2], by = 5)
+	trend <- data.frame()
+	for (m in names(inputs))
+	{
+		dat <- c(list(n = n, n_years = ncol(inputs[[m]]$year), y = value, centre = centre), inputs[[m]])
+		fit <- model$sample(data = dat, chains = 4, parallel_chains = 4, seed = 1, refresh = 0)
+		posterior <- as.data.frame(fit$draws(c("intercept", "slope", "sigma"), format = "draws_df"))
+		cat(m, ": slope", round(median(posterior$slope), 4), "(true", true.slope, ")\n")
 
-  # Drawing every date's shape floods the plateau panel into a solid wash, so
-  # only a subsample is drawn, spread evenly across the dataset's calibrated
-  # medians so the whole window is represented. The fit still uses all N.
-  BLOB_N   <- 20
-  blob_idx <- order(smry$median)[unique(round(seq(1, N, length.out = min(N, BLOB_N))))]
-  blobs    <- calibrated_blob_data(dates$weights, grid, sim$Value,
-                                   scale = 0.06 * diff(range(sim$Value)),
-                                   rows = blob_idx, one_sided = TRUE)
+		predmatrix <- matrix(NA, nrow = nrow(posterior), ncol = length(pred.years))
+		for (i in 1:nrow(posterior))
+		{
+			predmatrix[i, ] <- posterior$intercept[i] + posterior$slope[i] * pred.years
+		}
+		trend <- rbind(trend, data.frame(model = model.names[m], x = pred.years,
+		                                 fit = apply(predmatrix, 2, median),
+		                                 lo = apply(predmatrix, 2, quantile, 0.025),
+		                                 hi = apply(predmatrix, 2, quantile, 0.975)))
+	}
+	points <- data.frame(model = rep(model.names[1:2], each = n),
+	                     x = c(midpoint.date, median.date), y = c(value, value))
 
-  out <- here("Simulations", "Sim_Case1_Radiocarbon", "figures", file_names[k])
-  single_fit_comparison_figure(
-    fits, x_pred, truth, out,
-    title = paste("Case 1: one dataset on", window_names[k],
-                  "- three models"),
-    subtitle = if (length(blob_idx) < N)
-      sprintf("Panel C shows %d of %d calibrated dates for legibility; every model is fitted on all %d",
-              length(blob_idx), N, N),
-    obs = midpoints, median_obs = medians, blobs = blobs,
-    obs_label = "midpoint of 95% calibrated range")
-  cat("wrote", out, "\n")
+	# Calibrated distributions drawn at the height of each find's value
+	shapes <- data.frame()
+	for (i in 1:n)
+	{
+		inside <- prob[i, ] > 0.0001
+		shapes <- rbind(shapes, data.frame(id = i, x = years[inside], y = value[i],
+		                                   top = value[i] + prob[i, inside] * 60))
+	}
+	shapes$model <- model.names[3]
+
+	p <- ggplot() +
+		geom_ribbon(data = shapes, aes(x = x, ymin = y, ymax = top, group = id),
+		            fill = "lightblue", alpha = 0.5) +
+		geom_point(data = points, aes(x = x, y = y), colour = "grey40") +
+		geom_ribbon(data = trend, aes(x = x, ymin = lo, ymax = hi), fill = "grey50", alpha = 0.4) +
+		geom_line(data = trend, aes(x = x, y = fit)) +
+		geom_abline(intercept = true.intercept, slope = true.slope, linetype = 2) +
+		facet_wrap(~model) +
+		coord_cartesian(xlim = window) +
+		labs(x = "Calendar year", y = "Value",
+		     title = paste("Case 1: one dataset on", window.names[k]),
+		     subtitle = "Solid line and band: fitted trend with 95% interval. Dashed line: true trend.") +
+		theme_classic()
+	ggsave(here("Simulations", "Sim_Case1_Radiocarbon", "figures", file.names[k]),
+	       p, width = 12, height = 4.5, dpi = 300)
 }

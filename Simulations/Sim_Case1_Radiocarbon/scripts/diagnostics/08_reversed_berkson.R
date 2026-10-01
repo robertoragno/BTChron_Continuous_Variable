@@ -21,7 +21,7 @@ library(nimbleCarbon)
 library(coda)
 library(here)
 
-out_dir <- here('Simulations', 'Sim_Case1_Radiocarbon', 'output', 'reversed')
+out_dir <- here('Simulations', 'Sim_Case1_Radiocarbon', 'output', 'diagnostics', 'reversed')
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # Simulate Regression Data ----

@@ -41,11 +41,11 @@ three adjacent phases.
 BTChron_Paper_1/
 ├── Simulations/
 │   ├── shared/                        # what all four cases have in common
-│   │   ├── models/                    # Stan models: full distribution, midpoint/median, latent date
-│   │   ├── scripts/                   # functions every case sources (weight rows, fitting, summaries)
+│   │   ├── models/                    # linear_dates.stan: the one model every case fits
+│   │   ├── scripts/                   # older helpers, still used by checks and diagnostics
 │   │   ├── checks/                    # full distribution vs latent-date equivalence check
 │   │   ├── figures/                   # how each case records a date
-│   │   └── README.md                  # the shared method, explained once
+│   │   └── README.md                  # the model and the metrics, explained once
 │   ├── Sim_Case1_Radiocarbon/         # calibrated 14C dates: Hallstatt plateau vs steep section
 │   ├── Sim_Case2_Typochronology/      # independent typological windows ("first half of the 1st c. CE")
 │   ├── Sim_Case3_OverlappingPhases/   # ceramic phases that overlap at their edges
@@ -66,8 +66,8 @@ Sim_CaseN_<name>/
 ├── scripts/
 │   ├── simulate.R           # generates one dataset
 │   ├── 01_design.R          # builds data/design.csv
-│   ├── 03_recovery_study.R  # fits every model to every dataset (slow)
-│   ├── 04_recovery_plots.R  # tables and figures from the fits
+│   ├── 03_recovery_study.R  # fits every method to every dataset (slow)
+│   ├── 04_recovery_plots.R  # metrics and figures from the fits
 │   ├── 05_single_fit.R      # one dataset, fitted and shown up close
 │   └── checks/              # tests that the generator does what it claims
 └── figures/
@@ -79,13 +79,17 @@ Sim_CaseN_<name>/
 ```
 
 Case 1 also has `02_figures.R` (the calibrated-date overview) and `scripts/diagnostics/`
-(side investigations). Model fits are written to `output/`, which is not tracked.
+(side investigations). Fits are written to `output/`, which is not tracked; older
+runs are in `output/archive/`.
 
-## Models compared
+## Methods compared
+
+All methods use the same Stan model (`Simulations/shared/models/linear_dates.stan`);
+only the dates it is given change.
 
 | Figures | Code | What the date becomes |
 |---|---|---|
-| Midpoint | `midpoint` | one year: the middle of the window or HPD envelope |
+| Midpoint | `midpoint` | one year: the middle of the window or of the 95% calibrated range |
 | Calibrated median | `median` | one year: the median of the calibrated distribution (Case 1 only) |
 | Full distribution | `marginal` | the whole dating distribution, on a 5-year grid |
 
