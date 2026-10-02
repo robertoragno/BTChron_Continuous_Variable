@@ -9,7 +9,7 @@
 library(here)
 library(cmdstanr)
 
-source(here("Simulations", "Sim_Case2_Typochronology", "scripts", "simulate.R"))
+source(here("Simulations", "shared", "dating", "case2_typochronology.R"))
 source(here("Simulations", "shared", "scripts", "weight_rows.R"))
 
 PERIOD_START <- 100

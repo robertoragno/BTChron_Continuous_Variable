@@ -37,34 +37,44 @@ three adjacent phases.
 
 ## Repository structure
 
+The paper looks at time in two roles, and each role is tested on the same four
+dating cases:
+
+- **time as predictor**: a measured value changes with the date
+  (value = intercept + slope × date)
+- **time as response**: the date changes with a measured value known exactly
+  (date = intercept + slope × value), as in Crema's measurement_error_example.R
+
 ```
 BTChron_Paper_1/
 ├── Simulations/
-│   ├── shared/                        # what all four cases have in common
-│   │   ├── models/                    # linear_dates.stan: the one model every case fits
-│   │   ├── scripts/                   # older helpers, still used by checks and diagnostics
-│   │   ├── checks/                    # full distribution vs latent-date equivalence check
-│   │   ├── figures/                   # how each case records a date
-│   │   └── README.md                  # the model and the metrics, explained once
-│   ├── Sim_Case1_Radiocarbon/         # calibrated 14C dates: Hallstatt plateau vs steep section
-│   ├── Sim_Case2_Typochronology/      # independent typological windows ("first half of the 1st c. CE")
-│   ├── Sim_Case3_OverlappingPhases/   # ceramic phases that overlap at their edges
-│   ├── Sim_Case4_MergedPhases/        # finds dated to a broad period spanning several phases
-│   └── Sim_Sweep_Ratio/               # side study: dating uncertainty relative to the spread of the material
+│   ├── shared/
+│   │   ├── models/      # linear_dates.stan (time as predictor), linear_dates_response.stan (time as response)
+│   │   ├── dating/      # how each case dates a find: radiocarbon, windows, phases (used by both roles)
+│   │   ├── scripts/     # older helpers, still used by checks and diagnostics
+│   │   ├── checks/      # full distribution vs latent-date equivalence check
+│   │   ├── figures/     # how each case records a date
+│   │   └── README.md    # the models and the metrics, explained once
+│   ├── time_as_predictor/
+│   │   ├── Case1_Radiocarbon/        # calibrated 14C dates: Hallstatt plateau vs steep section
+│   │   ├── Case2_Typochronology/     # independent typological windows ("first half of the 1st c. CE")
+│   │   ├── Case3_OverlappingPhases/  # ceramic phases that overlap at their edges
+│   │   └── Case4_MergedPhases/       # finds dated to a broad period spanning several phases
+│   ├── time_as_response/             # the same four cases (in progress)
+│   └── archive/                      # earlier simulations, not part of the paper
 └── Real_Data/
     ├── dataset_1/                     # linear case study (GINI database)
     ├── dataset_2/                     # not yet started
     └── dataset_3/                     # not yet started
 ```
 
-Every simulation case has the same layout:
+Every case folder has the same layout:
 
 ```
-Sim_CaseN_<name>/
+CaseN_<name>/
 ├── README.md                # the dating problem, the result, what each file does
 ├── data/design.csv          # every simulated dataset: its settings and its seed
 ├── scripts/
-│   ├── simulate.R           # generates one dataset
 │   ├── 01_design.R          # builds data/design.csv
 │   ├── 03_recovery_study.R  # fits every method to every dataset (slow)
 │   ├── 04_recovery_plots.R  # metrics and figures from the fits
@@ -98,10 +108,10 @@ only the dates it is given change.
 From the repository root, in order:
 
 ```
-Rscript Simulations/Sim_Case4_MergedPhases/scripts/01_design.R
-Rscript Simulations/Sim_Case4_MergedPhases/scripts/03_recovery_study.R
-Rscript Simulations/Sim_Case4_MergedPhases/scripts/04_recovery_plots.R
-Rscript Simulations/Sim_Case4_MergedPhases/scripts/05_single_fit.R
+Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/01_design.R
+Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/03_recovery_study.R
+Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/04_recovery_plots.R
+Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/05_single_fit.R
 ```
 
 Case 4 is the shortest and the easiest to read first.
