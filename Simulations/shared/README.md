@@ -54,8 +54,7 @@ calibration slope, a Jeffreys interval for coverage.
 ## Other files
 
 `scripts/` and the other Stan files are the code before the rewrite of October
-2026. They are still used by the checks, by Case 1's `diagnostics/`, and by the
-`05_single_fit.R` of Cases 2-4. `scripts/case_dating_figures.R` draws
+2026. They are still used by the checks and by Case 1's `diagnostics/`. `scripts/case_dating_figures.R` draws
 `figures/caseN_dating.png` for the main README.
 
 ## Things that fail without an error

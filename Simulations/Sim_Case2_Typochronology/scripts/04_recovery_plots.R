@@ -46,15 +46,15 @@ noise <- core[order(core$noise_band), ]
 sets <- rbind(data.frame(core[, names(r)], figure = "recovery_summary", level = "all"),
               data.frame(core[, names(r)], figure = "checks/recovery_by_n", level = paste("N =", core$N)),
               data.frame(prop, figure = "recovery_by_prop_coarse",
-                         level = paste("share coarse", prop$prop_coarse_samples)),
+                         level = paste(100 * prop$prop_coarse_samples, "% coarse", sep = "")),
               data.frame(width, figure = "recovery_by_coarse_width",
-                         level = paste("coarse window", width$coarse_frac, "of period")),
+                         level = paste("width", width$coarse_frac)),
               data.frame(deposition, figure = "checks/recovery_by_deposition",
-                         level = paste("growth ratio", deposition$growth_ratio)),
+                         level = paste("growth", deposition$growth_ratio)),
               data.frame(precision, figure = "checks/recovery_by_precision",
-                         level = paste("precision trend", precision$precision_trend)),
+                         level = paste("trend", precision$precision_trend)),
               data.frame(noise[, names(r)], figure = "checks/recovery_by_noise",
-                         level = paste("noise ratio", noise$noise_band)))
+                         level = paste("noise", noise$noise_band)))
 metrics <- data.frame()
 for (f in unique(sets$figure))
 {
@@ -102,9 +102,11 @@ for (f in unique(metrics$figure))
 		geom_point(size = 2.4) +
 		scale_colour_manual(values = c("Midpoint / Median" = "grey55", "Full distribution" = "#780000")) +
 		facet_grid(level ~ metric, scales = "free_x") +
+		scale_x_continuous(n.breaks = 4) +
 		labs(title = "Case 2: finds with mixed dating precision", x = NULL, y = NULL, colour = NULL) +
 		theme_classic() +
-		theme(legend.position = "top", axis.text.y = element_blank(), axis.ticks.y = element_blank())
+		theme(legend.position = "top", axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+		      panel.spacing.x = unit(1.5, "lines"))
 	ggsave(file.path(fig.dir, paste0(f, ".png")), p, width = 8,
 	       height = 2 + 1.4 * length(unique(x$level)), dpi = 300)
 }

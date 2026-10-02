@@ -1,42 +1,85 @@
-# Case 4 single-fit comparison figure: one dataset, midpoint vs full
-# distribution, both fitted live.
-
-library(here)
+# Case 4: one simulated dataset, fitted twice with shared/models/linear_dates.stan
+# (the model used in the recovery study):
+#   A. the midpoint of each dating window
+#   B. the whole window, every year in it equally likely
 library(cmdstanr)
+library(ggplot2)
+library(here)
 
-source(here("Simulations", "shared", "scripts", "weight_rows.R"))
-source(here("Simulations", "shared", "scripts", "fit_models.R"))
-source(here("Simulations", "shared", "scripts", "single_fit_figure.R"))
 source(here("Simulations", "Sim_Case4_MergedPhases", "scripts", "simulate.R"))
 
-PERIOD_START <- 100; PERIOD_END <- 900
-GRID_STEP <- 5
-INTERCEPT <- 8; SLOPE <- 0.02; SIGMA <- 1
-N <- 70; MERGE_MAX <- 3
+true.intercept <- 8 # Value at year 0
+true.slope <- 0.02 # Change in value per year
+true.sigma <- 1 # Noise around the trend
+n <- 70 # Number of dated finds
+period <- c(100, 900) # Study period
+pad <- 0 # Merged windows stay inside the period
+grid.step <- 5 # Years between candidate years
+title <- "Case 4: one dataset, broad periods of up to 3 phases"
 
-sim <- simulate_merged(N, INTERCEPT, SLOPE, SIGMA, K = 8, alpha_conc = 1,
-                       merge_max = MERGE_MAX,
-                       period_start = PERIOD_START, period_end = PERIOD_END, seed = 4)
+sim <- simulate_merged(n, true.intercept, true.slope, true.sigma, K = 8, alpha_conc = 1,
+                       merge_max = 3, period_start = period[1], period_end = period[2], seed = 4)
 
-pad <- 0     # merged windows stay inside the period
-grid  <- seq(PERIOD_START - pad, PERIOD_END + pad, by = GRID_STEP)
-dates <- list(start = sim$Start_date, end = sim$End_date,
-              median = (sim$Start_date + sim$End_date) / 2, grid = grid,
-              weights = uniform_rows(sim$Start_date, sim$End_date, grid))
+# The same model fitted twice. The midpoint is one candidate year with
+# probability 1; the full window is every grid year inside it, equally likely.
+midpoint <- (sim$Start_date + sim$End_date) / 2
+grid <- seq(period[1] - pad, period[2] + pad, by = grid.step)
+log_p <- matrix(-Inf, nrow = n, ncol = length(grid))
+first <- rep(NA, n)
+last <- rep(NA, n)
+for (i in 1:n)
+{
+	inside <- grid >= sim$Start_date[i] & grid <= sim$End_date[i]
+	if (!any(inside)) inside[which.min(abs(grid - midpoint[i]))] <- TRUE
+	log_p[i, inside] <- log(1 / sum(inside))
+	first[i] <- min(which(inside))
+	last[i] <- max(which(inside))
+}
+inputs <- list(
+	midpoint = list(year = matrix(midpoint, ncol = 1), log_p = matrix(0, n, 1),
+	                first = rep(1, n), last = rep(1, n)),
+	full = list(year = matrix(grid, nrow = n, ncol = length(grid), byrow = TRUE),
+	            log_p = log_p, first = first, last = last))
 
-x_pred <- seq(PERIOD_START, PERIOD_END, length.out = 60)
-truth  <- list(intercept = INTERCEPT, slope = SLOPE, sigma = SIGMA)
+# Fitted trend and 95% interval for each, from the posterior draws
+model <- cmdstan_model(here("Simulations", "shared", "models", "linear_dates.stan"))
+model.names <- c(midpoint = "A  Midpoint of each window", full = "B  Full window")
+pred.years <- seq(period[1], period[2], by = 5)
+trend <- data.frame()
+for (m in names(inputs))
+{
+	dat <- c(list(n = n, n_years = ncol(inputs[[m]]$year), y = sim$Value, centre = mean(period)),
+	         inputs[[m]])
+	fit <- model$sample(data = dat, chains = 4, parallel_chains = 4, seed = 1, refresh = 0)
+	posterior <- as.data.frame(fit$draws(c("intercept", "slope", "sigma"), format = "draws_df"))
+	cat(m, ": slope", round(median(posterior$slope), 4), "(true", true.slope, ")",
+	    "sigma", round(median(posterior$sigma), 2), "(true", true.sigma, ")\n")
 
-fits <- fit_single_example(dates, sim$Value, PERIOD_START - pad,
-                           (PERIOD_END + pad) - (PERIOD_START - pad),
-                           x_pred, seed = 4)
+	predmatrix <- matrix(NA, nrow = nrow(posterior), ncol = length(pred.years))
+	for (i in 1:nrow(posterior))
+	{
+		predmatrix[i, ] <- posterior$intercept[i] + posterior$slope[i] * pred.years
+	}
+	trend <- rbind(trend, data.frame(model = model.names[m], x = pred.years,
+	                                 fit = apply(predmatrix, 2, median),
+	                                 lo = apply(predmatrix, 2, quantile, 0.025),
+	                                 hi = apply(predmatrix, 2, quantile, 0.975)))
+}
 
-# What each model reads: the midpoint of each dating range, and the range itself
-obs    <- data.frame(x = (sim$Start_date + sim$End_date) / 2, y = sim$Value)
-ranges <- data.frame(xmin = sim$Start_date, xmax = sim$End_date, y = sim$Value)
-out <- here("Simulations", "Sim_Case4_MergedPhases", "figures", "single_fit_comparison.png")
-single_fit_comparison_figure(
-  fits, x_pred, truth, out,
-  title = "Case 4: one dataset, broad periods of up to 3 phases - midpoint vs full distribution",
-  obs = obs, ranges = ranges)
-cat("wrote", out, "\n")
+# What each fit sees: the midpoints in A, the windows in B
+points <- data.frame(model = model.names["midpoint"], x = midpoint, y = sim$Value)
+windows <- data.frame(model = model.names["full"], xmin = sim$Start_date,
+                      xmax = sim$End_date, y = sim$Value)
+
+p <- ggplot() +
+	geom_segment(data = windows, aes(x = xmin, xend = xmax, y = y, yend = y), colour = "grey70") +
+	geom_point(data = points, aes(x = x, y = y), colour = "grey40") +
+	geom_ribbon(data = trend, aes(x = x, ymin = lo, ymax = hi), fill = "grey50", alpha = 0.4) +
+	geom_line(data = trend, aes(x = x, y = fit)) +
+	geom_abline(intercept = true.intercept, slope = true.slope, linetype = 2) +
+	facet_wrap(~model) +
+	labs(x = "Calendar year", y = "Value", title = title,
+	     subtitle = "Solid line and band: fitted trend with 95% interval. Dashed line: true trend.") +
+	theme_classic()
+ggsave(here("Simulations", "Sim_Case4_MergedPhases", "figures", "single_fit_comparison.png"),
+       p, width = 9, height = 4.5, dpi = 300)

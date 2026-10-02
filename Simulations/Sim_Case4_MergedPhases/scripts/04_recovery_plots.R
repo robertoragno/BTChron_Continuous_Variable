@@ -84,9 +84,11 @@ for (f in unique(metrics$figure))
 		geom_point(size = 2.4) +
 		scale_colour_manual(values = c("Midpoint / Median" = "grey55", "Full distribution" = "#780000")) +
 		facet_grid(level ~ metric, scales = "free_x") +
+		scale_x_continuous(n.breaks = 4) +
 		labs(title = "Case 4: merged phases", x = NULL, y = NULL, colour = NULL) +
 		theme_classic() +
-		theme(legend.position = "top", axis.text.y = element_blank(), axis.ticks.y = element_blank())
+		theme(legend.position = "top", axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+		      panel.spacing.x = unit(1.5, "lines"))
 	ggsave(file.path(fig.dir, paste0(f, ".png")), p, width = 8,
 	       height = 2 + 1.4 * length(unique(x$level)), dpi = 300)
 }
