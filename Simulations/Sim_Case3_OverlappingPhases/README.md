@@ -42,8 +42,8 @@ assign_p does nothing without overlap, so overlap 0 appears once.
 
 ## Feeding the models
 
-Both models see each find's phase window and measured value, not the true
-date. The midpoint model places each find at the centre of its window. The
+Both fits use the same model (`shared/models/linear_dates.stan`) and see each
+find's phase window and measured value, not the true date. The midpoint model places each find at the centre of its window. The
 full-distribution model spreads it evenly across the window, on a 5-year grid.
 The median is not fitted: for a flat window it equals the midpoint.
 
@@ -53,14 +53,18 @@ The grid is padded by 249 yr on each side so no stretched window is cut.
 
 ## Results
 
+Recovery study rerun on 2026-10-01 with the shared model; the numbers match the
+September run within sampling noise.
+
 Overlap does not flatten the midpoint slope. With plain least squares the
 midpoint slope ratio stays between 0.994 and 1.002 at every overlap and
 assign_p (`scripts/checks/00_check.R`). A low assign_p shifts the dates a phase
 keeps by about the same number of years in every phase, which moves the
 intercept, not the slope.
 
-The midpoint model overestimates sigma: its 90% interval contains the true
-sigma in 29-53% of datasets. The full-distribution model does better (72-92%).
+The midpoint model overestimates sigma (by 0.42 to 0.75): its 90% interval
+contains the true sigma in 30-53% of datasets. The full-distribution model does
+better (73-94%), slightly underestimating sigma with large overlap.
 
 The full-distribution model flattens the slope instead. At assign_p 0.5 the
 slope ratio is 1.00 without overlap, 0.97 at overlap 0.25 and 0.91 at 0.5, and
@@ -73,8 +77,12 @@ true shape instead, its slope ratio went from 0.945 to 0.999 (one-off test at
 overlap 0.5, assign_p 0.5, 2026-09-15). The size of the effect depends on how
 far the windows are stretched, which is a choice of this simulation.
 
-With no real trend, the 90% interval excludes zero in 12% (midpoint) and 14%
-(full distribution) of datasets, against 10% expected.
+With no real trend, the 90% interval excludes zero in 13% of datasets for both
+models, against 10% expected.
+
+One dataset (1295) did not converge: one of its phases covers 99.5% of the
+period, so the data cannot tell a rising trend from a falling one (see Case 4,
+where this is more common).
 
 An earlier version cut the first and last windows at the period edges. That
 inflated the midpoint slope (ratio about 1.07 at overlap 0.5) and was dropped.
@@ -101,7 +109,9 @@ Run in order: `01` → `03` → `04`, then `05`.
 |---|---|
 | `scripts/simulate.R` | draws the phases, stretches their windows and assigns each find to a phase |
 | `scripts/01_design.R` | builds the list of datasets to simulate, `data/design.csv` |
-| `scripts/03_recovery_study.R` | fits every model to every dataset; slow |
-| `scripts/04_recovery_plots.R` | tables (`output/`) and figures |
+| `scripts/03_recovery_study.R` | fits both methods to every dataset; about 4.5 h on 24 workers |
+| `scripts/04_recovery_plots.R` | `output/recovery_metrics.csv`, the figures and `dataset_anatomy.png` |
 | `scripts/05_single_fit.R` | `single_fit_comparison.png` |
 | `scripts/checks/00_check.R` | midpoint slope ratio without Stan, and `check_depletion.png` |
+
+Older runs are in `output/archive/`.

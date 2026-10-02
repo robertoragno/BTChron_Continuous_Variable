@@ -47,7 +47,8 @@ IntCal20 error moves neighbouring dates together, and no model here can absorb t
 ## Feeding the models
 
 Dates are calibrated with `rcarbon::calibrate()`, once per dataset, and all three
-models see the same calibrated dates.
+fits see the same calibrated dates. All three use the same model
+(`shared/models/linear_dates.stan`).
 
 The midpoint model uses the centre of the 95% range (on average the range keeps
 97.5% of the calibrated probability). The median model uses the calibrated median.
@@ -62,47 +63,31 @@ widest calibrated date over both windows and all lab errors) so no date is cut.
 
 ## Results
 
-Recovery study of 2026-09-08, uniform deposition only. The plateau column pools
+Recovery study rerun on 2026-10-01 with the shared model (it matches the
+2026-09-08 run within sampling noise), uniform deposition only. The plateau column pools
 the dataset size sweep (lab error 30, N 50 to 500, including datasets with no
 true slope) with the lab error sweep (N 200, lab error 15, 30 and 50). The steep
 column is the lab error sweep only. On the lab error sweep alone the plateau
-slope ratios are 1.07, 0.82 and 0.95 (second table below), so the comparison
+slope ratios are 1.06, 0.82 and 0.95 (second table below), so the comparison
 holds on matched datasets.
 
 | Model | Plateau: slope ratio | coverage | σ bias | Steep: slope ratio | coverage | σ bias |
 |---|---|---|---|---|---|---|
-| Midpoint | 1.11 | 0.83 | +0.28 | 0.80 | 0.43 | +0.14 |
-| Calibrated median | 0.82 | 0.73 | +0.26 | 0.82 | 0.47 | +0.14 |
+| Midpoint | 1.11 | 0.82 | +0.28 | 0.80 | 0.43 | +0.14 |
+| Calibrated median | 0.82 | 0.72 | +0.26 | 0.82 | 0.47 | +0.14 |
 | Full distribution | 0.96 | 0.84 | -0.03 | 0.83 | 0.49 | +0.01 |
 
 On the plateau the three models separate. The full-distribution model recovers the
 slope and sigma, the midpoint steepens the slope and the median flattens it. No
 model reaches 0.90 coverage.
 
-Accuracy and precision of the point estimates (posterior medians), from
-`output/recovery_table.csv`. Slope values are in units of 10⁻³ per year. True
-slopes are drawn uniformly between -30 and +30 in these units, or set to 0 in the
-zero-slope datasets. Bias is ± 1 Monte Carlo SE. RMSE is the typical distance from
-the truth; empirical SE is the scatter of the error across datasets. RMSE larger
-than empirical SE means part of the error is bias (see `shared/README.md`,
-Metrics).
-
-| Window | Model | Slope bias | Slope RMSE | Slope empirical SE | 90% interval width | σ bias | σ RMSE | σ empirical SE |
-|---|---|---|---|---|---|---|---|---|
-| Plateau | Midpoint | -0.03 ± 0.15 | 4.92 | 4.92 | 11.74 | +0.28 ± 0.01 | 0.54 | 0.46 |
-| Plateau | Calibrated median | -0.03 ± 0.12 | 3.88 | 3.88 | 7.74 | +0.26 ± 0.01 | 0.50 | 0.43 |
-| Plateau | Full distribution | -0.02 ± 0.10 | 3.46 | 3.46 | 8.04 | -0.03 ± 0.01 | 0.22 | 0.21 |
-| Steep | Midpoint | -0.15 ± 0.23 | 3.97 | 3.97 | 4.23 | +0.14 ± 0.01 | 0.26 | 0.22 |
-| Steep | Calibrated median | -0.13 ± 0.21 | 3.64 | 3.65 | 4.33 | +0.14 ± 0.01 | 0.26 | 0.22 |
-| Steep | Full distribution | -0.14 ± 0.21 | 3.61 | 3.61 | 4.33 | +0.01 ± 0.01 | 0.14 | 0.14 |
-
-Slope bias is close to zero for every model, so slope RMSE and empirical SE are
-almost equal: the error is spread, not a shift. This is why the slope ratio is
-reported. True slopes lie on both sides of zero, and flattening or steepening
-cancels in the mean error. The full-distribution model has the lowest RMSE for
-both parameters on the plateau, and its intervals are wider than the median
-model's (8.04 against 7.74), which is what brings its coverage closer to 0.90.
-On the steep section slope RMSE and interval width barely differ between models.
+Slope bias (mean error) is close to zero for every model, because true slopes lie
+on both sides of zero and flattening or steepening cancels out. That is why the
+slope ratio is reported. In typical error (RMSE, in 10⁻³ per year) the
+full-distribution model is best on the plateau: 3.47, against 3.87 for the median
+and 4.93 for the midpoint. Its 90% intervals are slightly wider than the median
+model's (8.05 against 7.75), which is what brings its coverage closer to 0.90. On
+the steep section the three models barely differ (RMSE 3.60-3.97).
 
 On the steep section all three flatten the slope. Each calibrated date spreads
 past the edges of where the samples really are, nothing ties the dates together,
@@ -150,11 +135,11 @@ shape halves the overcorrection but does not remove it. The estimated
 distribution is probably still too narrow on the plateau, squeezing the dates
 together (not checked, the run did not save it). It does not make up trends: with a true slope of zero, 13%
 of datasets exclude zero against 14% for the full distribution. It is slow (79
-hours for the full design). Results in `output/period_full/`.
+hours for the full design). Results in `output/diagnostics/period_full/`.
 
 Four times denser deposition at the end changes nothing we can detect with 100
-datasets per setting. With no real trend, the 90% interval excludes zero in 12%
-(midpoint), 13% (median) and 14% (full distribution) of datasets, against 10%
+datasets per setting. With no real trend, the 90% interval excludes zero in 13%
+(midpoint), 14% (median) and 13% (full distribution) of datasets, against 10%
 expected.
 
 ### Side tests
@@ -188,7 +173,7 @@ Three quick tests from the meeting of 18 Sep, on single datasets (details in
 | File | Shows |
 |---|---|
 | `figures/dataset_anatomy.png` | one dataset per window, before any fitting |
-| `figures/single_fit_comparison.png` | one dataset on the plateau, fitted by the midpoint, calibrated-median and full-distribution models; each panel shows that model's input (panel C draws 20 of the 50 calibrated dates, for legibility) |
+| `figures/single_fit_comparison.png` | one dataset on the plateau, fitted on midpoints, calibrated medians and the full calibrated distributions (drawn in panel C) |
 | `figures/single_fit_comparison_steep.png` | the same for the steep section |
 | `figures/recovery_summary.png` | headline result across all datasets |
 | `figures/recovery_by_lab_error.png` | recovery by lab error and window |
@@ -203,11 +188,11 @@ Run in order: `01` → `03` → `04`, then `02` and `05`.
 | `scripts/simulate.R` | draws true dates and turns each into a radiocarbon age |
 | `scripts/01_design.R` | builds the list of datasets to simulate, `data/design.csv` |
 | `scripts/02_figures.R` | `dataset_anatomy.png` and `checks/overview.png` |
-| `scripts/03_recovery_study.R` | calibrates each dataset and fits every model; about 3 h on 24 workers |
-| `scripts/04_recovery_plots.R` | tables (`output/`) and figures |
+| `scripts/03_recovery_study.R` | calibrates each dataset and fits the three methods; about 4.5 h on 24 workers |
+| `scripts/04_recovery_plots.R` | `output/recovery_metrics.csv` and the figures |
 | `scripts/05_single_fit.R` | `single_fit_comparison.png` and `single_fit_comparison_steep.png` |
 | `scripts/checks/00_check_rows.R` | calibrated weight rows give the same medians as `rcarbon` |
 | `scripts/checks/00_check_fit.R` | simulate, calibrate and fit one dataset |
 | `scripts/diagnostics/` | why the steep section flattens the slope (`05_`), estimating a distribution for the dates (`06_`, `07_`), the reversed test (`08_`), fixing one date to a constant (`09_`), which kind of error a calibrated date carries (`10_`) |
 
-Older runs are in `output/superseded_*`.
+Older runs are in `output/archive/`, diagnostic results in `output/diagnostics/`.

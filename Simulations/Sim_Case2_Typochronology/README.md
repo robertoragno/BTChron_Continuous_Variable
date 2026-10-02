@@ -63,7 +63,7 @@ setting, 3200 in total:
 
 ## Feeding the models
 
-Both models see each find's range and measured value, not the true date.
+Both fits use the same model (`shared/models/linear_dates.stan`) and see each find's range and measured value, not the true date.
 
 The midpoint model puts each find at the centre of its range, (start + end) / 2.
 The median is not fitted: for a flat range it is the same as the midpoint.
@@ -78,13 +78,16 @@ keeps part of its probability outside it. This matters, see the results.
 
 ## Results
 
+Recovery study rerun on 2026-10-01 with the shared model; the numbers match the
+September run to the second decimal.
+
 At the reference setting (N = 200, half the finds coarsely dated, coarse windows
 25% of the period), 200 datasets:
 
 | | Midpoint | Full distribution |
 |---|---|---|
 | Slope ratio | 0.96 | 0.97 |
-| Slope coverage | 0.73 | 0.78 |
+| Slope coverage | 0.73 | 0.79 |
 | Sigma bias | +0.16 | 0.00 |
 | Sigma coverage | 0.52 | 0.89 |
 
@@ -141,12 +144,13 @@ Run in order: `01` → `03` → `04`, then `05`. No `02_` in this case.
 |---|---|
 | `scripts/simulate.R` | draws a true date, then a well or coarsely dated window around it |
 | `scripts/01_design.R` | builds the list of datasets to simulate, `data/design.csv` |
-| `scripts/03_recovery_study.R` | fits every model to every dataset; slow |
-| `scripts/04_recovery_plots.R` | turns the fits into tables (`output/`) and figures. `recovery_table.csv` is the core sweep with a random slope; `recovery_by_noise.csv` splits it by noise ratio |
+| `scripts/03_recovery_study.R` | fits both methods to every dataset; about 3 h on 24 workers |
+| `scripts/04_recovery_plots.R` | `output/recovery_metrics.csv` and the figures, including `checks/recovery_by_noise.png` (results split by noise ratio) |
 | `scripts/05_single_fit.R` | `single_fit_comparison.png` |
 | `scripts/checks/00_check.R` | generator check figure, and `dataset_anatomy.png` |
 | `scripts/checks/00_check_median_identity.R` | median equals midpoint for a flat window, so median is not fitted |
 | `scripts/checks/01_check_continuous_widths.R` | two groups of widths against a continuous spread; writes `output/check_continuous_widths*.csv` |
 
 The previous design (grid-snapped windows, fine/coarse mix, skew, overhang and
-position sweeps) and its results are in `archive/superseded_run_20260916/`.
+position sweeps) and its results are in `archive/superseded_run_20260916/`. The
+September run of the current design is in `output/archive/`.
