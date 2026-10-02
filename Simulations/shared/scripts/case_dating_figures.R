@@ -14,10 +14,10 @@ library(ggplot2)
 library(patchwork)
 
 source(here("Simulations", "shared", "scripts", "weight_rows.R"))
-source(here("Simulations", "Sim_Case1_Radiocarbon", "scripts", "simulate.R"))
-source(here("Simulations", "Sim_Case2_Typochronology", "scripts", "simulate.R"))
-source(here("Simulations", "Sim_Case3_OverlappingPhases", "scripts", "simulate.R"))
-source(here("Simulations", "Sim_Case4_MergedPhases", "scripts", "simulate.R"))
+source(here("Simulations", "shared", "dating", "case1_radiocarbon.R"))
+source(here("Simulations", "shared", "dating", "case2_typochronology.R"))
+source(here("Simulations", "shared", "dating", "case3_overlapping_phases.R"))
+source(here("Simulations", "shared", "dating", "case4_merged_phases.R"))
 
 OUT_DIR  <- here("Simulations", "shared", "figures")
 ACCENT   <- "#780000"
