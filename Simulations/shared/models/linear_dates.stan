@@ -34,4 +34,18 @@ model {
 generated quantities {
   real slope = slope100 / 100;          // change in value per year
   real intercept = a - slope * centre;  // value at year 0
+
+  // One plausible date per find and per draw: a candidate year picked with
+  // weight (its probability x how well the trend fits there). Not needed for the
+  // recovery study and slow to save, so off; uncomment for real data or figures.
+  // Years with probability 0 (gaps between plateau peaks) are floored, because
+  // categorical_logit_rng does not accept -inf.
+  // vector[n] date;
+  // for (i in 1:n) {
+  //   row_vector[last[i] - first[i] + 1] resid =
+  //     (y[i] - a - slope100 * (year[i, first[i]:last[i]] - centre) / 100) / sigma;
+  //   vector[last[i] - first[i] + 1] w = (log_p[i, first[i]:last[i]] - 0.5 * square(resid))';
+  //   w = fmax(w, max(w) - 700);
+  //   date[i] = year[i, first[i] - 1 + categorical_logit_rng(w)];
+  // }
 }
