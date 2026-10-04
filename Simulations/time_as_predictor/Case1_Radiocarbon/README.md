@@ -117,7 +117,7 @@ still to ask.
 
 The single normal came out too narrow on the plateau, so it was replaced by a
 free shape made of 40 fixed bumps whose weights are estimated
-(`shared/models/marginal_date_period.stan`). Rerun on the whole design (`07_`,
+(now in `Simulations/archive/period_model/`). Rerun on the whole design (`07_`,
 28 Sep). The table compares the two windows on the same datasets, the lab error
 sweep (N 200, lab error 15, 30 and 50, 300 datasets per window), since the
 plateau alone also has the dataset size and zero-slope sweeps. It fixes the
@@ -135,7 +135,8 @@ shape halves the overcorrection but does not remove it. The estimated
 distribution is probably still too narrow on the plateau, squeezing the dates
 together (not checked, the run did not save it). It does not make up trends: with a true slope of zero, 13%
 of datasets exclude zero against 14% for the full distribution. It is slow (79
-hours for the full design). Results in `output/diagnostics/period_full/`.
+hours for the full design). Dropped after the meeting of 2 October; the model,
+scripts `06_` and `07_` and their results are in `Simulations/archive/period_model/`.
 
 Four times denser deposition at the end changes nothing we can detect with 100
 datasets per setting. With no real trend, the 90% interval excludes zero in 13%
@@ -193,6 +194,6 @@ Run in order: `01` → `03` → `04`, then `02` and `05`.
 | `scripts/05_single_fit.R` | `single_fit_comparison.png` and `single_fit_comparison_steep.png` |
 | `scripts/checks/00_check_rows.R` | calibrated weight rows give the same medians as `rcarbon` |
 | `scripts/checks/00_check_fit.R` | simulate, calibrate and fit one dataset |
-| `scripts/diagnostics/` | why the steep section flattens the slope (`05_`), estimating a distribution for the dates (`06_`, `07_`), the reversed test (`08_`), fixing one date to a constant (`09_`), which kind of error a calibrated date carries (`10_`) |
+| `scripts/diagnostics/` | why the steep section flattens the slope (`05_`), the reversed test (`08_`), fixing one date to a constant (`09_`), which kind of error a calibrated date carries (`10_`) |
 
 Older runs are in `output/archive/`, diagnostic results in `output/diagnostics/`.

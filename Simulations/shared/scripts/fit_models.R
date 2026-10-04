@@ -34,8 +34,6 @@ model_stan_data <- function(model, dates, y, time_ref_min, time_ref_range,
   switch(model,
     midpoint = c(common, list(start_date = dates$start, end_date = dates$end)),
     median   = c(common, list(start_date = dates$median, end_date = dates$median)),
-    # period takes exactly the same data as marginal; the prior is internal.
-    period   = ,
     marginal = c(common, list(n_years = length(dates$grid),
                               grid_year = dates$grid,
                               n_weights = dates$weights$n_weights,
@@ -45,11 +43,8 @@ model_stan_data <- function(model, dates, y, time_ref_min, time_ref_range,
     stop("unknown model: ", model))
 }
 
-# "period" (marginal_date_period.stan) estimates the study period too. It is a
-# prototype used only by Case 1's diagnostics/06_period_prior_check.R.
 MODEL_FILE <- c(midpoint = "midpoint.stan", median = "midpoint.stan",
-                marginal = "marginal_date.stan",
-                period = "marginal_date_period.stan")
+                marginal = "marginal_date.stan")
 
 #' Compile the models once, before the parallel workers start.
 compile_models <- function(model_dir, models = MODELS) {
