@@ -52,24 +52,26 @@ it equals the midpoint.
 
 ## Results
 
-Recovery study rerun on 2026-10-01 with the shared model.
+Recovery study rerun on 2026-10-06, with no phase longer than 60% of the period
+(see below).
 
-Both models recover the slope (slope ratio 1.00-1.04, coverage 0.85-0.93).
+Both models recover the slope (slope ratio 1.01-1.05, coverage 0.82-0.90).
 
 The midpoint model overestimates sigma, more so as broad periods get wider
-(σ bias 0.60, 0.72 and 1.09 at merge_max 2, 3 and 4). Its 90% interval
+(σ bias 0.44, 0.64 and 0.87 at merge_max 2, 3 and 4). Its 90% interval
 contains the true sigma in about a third of datasets. The full-distribution
-model recovers sigma (coverage 0.87-0.93).
+model recovers sigma (coverage 0.86-0.93).
 
-With no real trend, the 90% interval excludes zero in 9% (midpoint) and 10%
+With no real trend, the 90% interval excludes zero in 10% (midpoint) and 10%
 (full distribution) of datasets, against 10% expected.
 
-About 4% of datasets have one phase covering more than 90% of the period (very
-uneven phases, low `alpha_conc`). Every find is then dated to nearly the whole
-period, and the data cannot tell a rising trend from a falling one: the
-full-distribution posterior has two peaks, at +slope and -slope. Three of these
-datasets (153, 169, 1041) did not converge. Whether such phase schemes are
-realistic is still to decide.
+Phase lengths are capped at 60% of the period (`max_share` in
+`shared/dating/case4_merged_phases.R`; uneven draws are redrawn). Without the
+cap about 4% of datasets had one phase covering more than 90% of the period:
+every find was then dated to nearly the whole period, the data could not tell a
+rising trend from a falling one, and three datasets did not converge. Such phase
+schemes were judged unrealistic. All fits now converge (R-hat at most 1.01, no
+divergences). The uncapped run is in `output/archive/run_2026-10-01_uncapped/`.
 
 ![Recovery by merge level](figures/recovery_by_merge.png)
 

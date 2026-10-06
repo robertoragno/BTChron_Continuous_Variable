@@ -25,18 +25,24 @@
 #'                             (half on each side). 0 means phases just touch.
 #' @param assign_p             for a find in a shared strip, the chance it is
 #'                             assigned to the earlier phase. 0.5 is a coin flip.
+#' @param max_share            largest share of the study period one phase
+#'                             can cover; longer phases are redrawn
 #' @param period_start, period_end  the study period
 #' @param seed                 random seed
 simulate_overlap <- function(N, intercept, slope, sigma, K, alpha_conc,
-                             overlap = 0.25, assign_p = 0.5,
+                             overlap = 0.25, assign_p = 0.5, max_share = 0.6,
                              period_start = 100, period_end = 900,
                              seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
   span <- period_end - period_start
 
-  # Phase lengths from a Dirichlet "broken stick", at least 1 yr each
-  weights <- rgamma(K, shape = alpha_conc, rate = 1)
-  weights <- weights / sum(weights)
+  # Phase lengths from a Dirichlet "broken stick", at least 1 yr each. Redraw
+  # until no phase covers more than max_share of the period.
+  repeat {
+    weights <- rgamma(K, shape = alpha_conc, rate = 1)
+    weights <- weights / sum(weights)
+    if (max(weights) <= max_share) break
+  }
   lengths <- 1 + weights * (span - K)
   bounds  <- round(period_start + c(0, cumsum(lengths)))
   bounds[c(1, K + 1)] <- c(period_start, period_end)
