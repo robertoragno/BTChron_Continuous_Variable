@@ -30,20 +30,24 @@
 #'                             period than at the start. 1 is uniform (even spread).
 #' @param period_start, period_end  the study period
 #' @param seed                 random seed
+#' @param true_date            given true dates (time as response); if NULL
+#'                             they are drawn across the period
 simulate_typo <- function(N, intercept, slope, sigma,
                           prop_coarse_samples = 0.5, coarse_frac = 0.25,
                           fine_frac = 0.0625, precision_trend = 0,
                           growth_ratio = 1, period_start = 100,
-                          period_end = 900, seed = NULL) {
+                          period_end = 900, seed = NULL, true_date = NULL) {
   if (!is.null(seed)) set.seed(seed)
   span <- period_end - period_start
 
   # When each find was deposited. Same draw as rdeposition() in Case 1.
-  if (growth_ratio == 1) {
-    true_date <- runif(N, period_start, period_end)
-  } else {
-    k <- log(growth_ratio) / span
-    true_date <- period_start + log(1 + runif(N) * (growth_ratio - 1)) / k
+  if (is.null(true_date)) {
+    if (growth_ratio == 1) {
+      true_date <- runif(N, period_start, period_end)
+    } else {
+      k <- log(growth_ratio) / span
+      true_date <- period_start + log(1 + runif(N) * (growth_ratio - 1)) / k
+    }
   }
 
   # Which finds are coarsely dated

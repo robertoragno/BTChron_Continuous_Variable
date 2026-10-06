@@ -16,6 +16,7 @@ library(coda)
 library(cmdstanr)
 library(ggplot2)
 library(here)
+library(patchwork)
 
 true.beta <- 1/3.7 # True slope
 true.sigma <- 70 # True error
@@ -160,16 +161,21 @@ print(results, digits = 3)
 
 # Slope from each model, with 95% intervals, one point per dataset
 p <- ggplot(results, aes(x = nimble.beta, y = stan.beta)) +
-	geom_abline(intercept = 0, slope = 1, colour = "grey70") +
-	geom_hline(yintercept = true.beta, linetype = 2) +
-	geom_vline(xintercept = true.beta, linetype = 2) +
-	geom_errorbar(aes(ymin = stan.lo, ymax = stan.hi), width = 0, colour = "grey50") +
-	geom_errorbar(aes(xmin = nimble.lo, xmax = nimble.hi), width = 0, orientation = "y", colour = "grey50") +
+	geom_abline(aes(intercept = 0, slope = 1, colour = "1:1 line", linetype = "1:1 line")) +
+	geom_hline(aes(yintercept = true.beta, colour = "True slope", linetype = "True slope")) +
+	geom_vline(aes(xintercept = true.beta, colour = "True slope", linetype = "True slope")) +
+	geom_errorbar(aes(ymin = stan.lo, ymax = stan.hi, colour = "95% credible interval", linetype = "95% credible interval"), width = 0) +
+	geom_errorbar(aes(xmin = nimble.lo, xmax = nimble.hi, colour = "95% credible interval", linetype = "95% credible interval"),
+	              width = 0, orientation = "y") +
 	geom_point() +
+	scale_colour_manual(values = c("1:1 line" = "grey70", "True slope" = "black", "95% credible interval" = "grey50")) +
+	scale_linetype_manual(values = c("1:1 line" = "solid", "True slope" = "dashed", "95% credible interval" = "solid")) +
 	facet_wrap(~window) +
-	labs(x = "Slope, Nimble (Crema's model)", y = "Slope, Stan (dates summed over)",
-	     subtitle = "Bars: 95% intervals. Dashed: true slope. Grey line: the two models agree.") +
-	theme_classic()
+	labs(title = "Slope estimates from the Nimble and Stan models",
+	     subtitle = "Posterior medians for 10 simulated datasets in each window",
+	     x = "Slope, Nimble", y = "Slope, Stan (dates summed over)", colour = NULL, linetype = NULL) +
+	theme_classic() +
+	theme(legend.position = "top")
 dir.create(here("Simulations", "time_as_response", "Case1_Radiocarbon", "figures", "checks"),
            showWarnings = FALSE, recursive = TRUE)
 ggsave(here("Simulations", "time_as_response", "Case1_Radiocarbon", "figures", "checks", "compare_nimble.png"),
@@ -177,17 +183,29 @@ ggsave(here("Simulations", "time_as_response", "Case1_Radiocarbon", "figures", "
 
 # Dates: Stan against Nimble, every sample of every dataset (median and 95% interval)
 theta <- do.call(rbind, lapply(list.files(row.dir, pattern = "^theta_", full.names = TRUE), read.csv))
-p <- ggplot(theta, aes(x = nimble.median, y = stan.median)) +
-	geom_abline(intercept = 0, slope = 1, colour = "grey70") +
-	geom_errorbar(aes(ymin = stan.lo, ymax = stan.hi), width = 0, colour = "grey80") +
-	geom_errorbar(aes(xmin = nimble.lo, xmax = nimble.hi), width = 0, orientation = "y", colour = "grey80") +
-	geom_point(size = 0.6) +
+theta$difference <- theta$stan.median - theta$nimble.median
+p.dates <- ggplot(theta, aes(x = nimble.median, y = stan.median)) +
+	geom_abline(aes(intercept = 0, slope = 1, colour = "1:1 line")) +
+	geom_point(size = 0.8, alpha = 0.3) +
+	scale_colour_manual(values = c("1:1 line" = "firebrick")) +
 	facet_wrap(~window, scales = "free") +
-	labs(x = "Date of each sample, Nimble (years BP)", y = "Date of each sample, Stan (years BP)",
-	     subtitle = "Posterior median and 95% interval of every sample's date. Grey line: the two models agree.") +
-	theme_classic()
+	labs(x = "Date, Nimble (years BP)", y = "Date, Stan (years BP)", colour = NULL) +
+	theme_classic() +
+	theme(legend.position = "top")
+p.diff <- ggplot(theta, aes(x = nimble.median, y = difference)) +
+	geom_hline(aes(yintercept = 0, colour = "No difference")) +
+	geom_point(size = 0.8, alpha = 0.3) +
+	scale_colour_manual(values = c("No difference" = "firebrick")) +
+	facet_wrap(~window, scales = "free_x") +
+	labs(x = "Date, Nimble (years BP)", y = "Stan minus Nimble (years)", colour = NULL) +
+	theme_classic() +
+	theme(legend.position = "top")
+p <- (p.dates / p.diff) +
+	plot_annotation(title = "Posterior median date of each sample under the Nimble and Stan models",
+	                subtitle = "All samples from the 10 simulated datasets in each window") &
+	theme(plot.margin = margin(5.5, 20, 5.5, 5.5))
 ggsave(here("Simulations", "time_as_response", "Case1_Radiocarbon", "figures", "checks", "compare_nimble_dates.png"),
-       p, width = 8, height = 4, dpi = 300)
+       p, width = 8, height = 8, dpi = 300)
 
 # Shape of the date posterior for six samples of dataset 1
 draws <- do.call(rbind, lapply(list.files(row.dir, pattern = "^draws_", full.names = TRUE), read.csv))
@@ -198,7 +216,8 @@ p <- ggplot(draws, aes(x = date, colour = model)) +
 	geom_density(adjust = 0.5) +
 	scale_x_reverse() +
 	facet_wrap(window ~ sample, scales = "free", ncol = 6, labeller = label_both) +
-	labs(x = "Date (years BP)", y = "Posterior density", colour = NULL) +
+	labs(title = "Posterior density of the date of six samples from dataset 1 under the Nimble and Stan models",
+	     x = "Date (years BP)", y = "Posterior density", colour = NULL) +
 	theme_classic() +
 	theme(legend.position = "top")
 ggsave(here("Simulations", "time_as_response", "Case1_Radiocarbon", "figures", "checks", "compare_nimble_date_shapes.png"),
