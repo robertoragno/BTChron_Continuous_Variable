@@ -20,6 +20,19 @@ dir.create(file.path(fig.dir, "checks"), showWarnings = FALSE, recursive = TRUE)
 cat("fits:", nrow(r), "| R-hat above 1.01:", sum(r$max_rhat > 1.01),
     "| with a divergent transition:", sum(r$n_divergent > 0), "\n")
 
+# A dataset counts as converged when its full-distribution fit has R-hat below
+# 1.05. Its point-date fits are grouped with it, so every group compares the
+# same datasets.
+full <- r[r$model == "Full distribution", ]
+r$converged <- full$max_rhat[match(r$dataset_id, full$dataset_id)] < 1.05
+full$converged <- full$max_rhat < 1.05
+cat("datasets whose full-distribution fit did not converge:", sum(!full$converged), "of", nrow(full), "\n")
+# What kind of datasets they are: size, and the trend's span and noise as shares of the period
+full$span_share <- abs(full$slope) * (full$x_max - full$x_min) / (full$period_end - full$period_start)
+full$sigma_share <- full$sigma / (full$period_end - full$period_start)
+print(aggregate(cbind(N, span_share, sigma_share) ~ converged, data = full, FUN = mean))
+print(table(full$slope_condition, full$converged))
+
 # Zero-slope datasets: how often the 90% interval wrongly excludes zero
 zero <- r[r$slope_condition == "zero", ]
 cat("false-positive rate on zero-slope datasets:\n")
@@ -38,7 +51,7 @@ width <- rbind(reference, r[r$sweep == "width", ])
 width <- width[order(width$coarse_frac), ]
 precision <- rbind(reference, r[r$sweep == "precision", ])
 precision <- precision[order(precision$precision_trend), ]
-sets <- rbind(data.frame(core, figure = "recovery_summary", level = "all"),
+sets <- rbind(data.frame(core, figure = "recovery_summary", level = ifelse(core$converged, "converged", "not converged")),
               data.frame(core, figure = "checks/recovery_by_n", level = paste("N =", core$N)),
               data.frame(prop, figure = "recovery_by_prop_coarse",
                          level = paste(100 * prop$prop_coarse_samples, "% coarse", sep = "")),

@@ -20,19 +20,35 @@ fig.dir <- here("Simulations", "time_as_response", "Case1_Radiocarbon", "figures
 cat("fits:", nrow(r), "| R-hat above 1.01:", sum(r$max_rhat > 1.01),
     "| with a divergent transition:", sum(r$n_divergent > 0), "\n")
 
+# A dataset counts as converged when its full-distribution fit has R-hat below
+# 1.05. Its point-date fits are grouped with it, so every group compares the
+# same datasets.
+full <- r[r$model == "Full distribution", ]
+r$converged <- full$max_rhat[match(r$dataset_id, full$dataset_id)] < 1.05
+full$converged <- full$max_rhat < 1.05
+cat("datasets whose full-distribution fit did not converge:", sum(!full$converged), "of", nrow(full), "\n")
+# What kind of datasets they are: size, and the trend's span and noise as shares of the period
+full$span_share <- abs(full$slope) * (full$x_max - full$x_min) / (full$window_end - full$window_start)
+full$sigma_share <- full$sigma / (full$window_end - full$window_start)
+print(aggregate(cbind(N, span_share, sigma_share) ~ converged + window, data = full, FUN = mean))
+print(table(full$slope_condition, full$converged))
+
 # Zero-slope datasets: how often the 90% interval wrongly excludes zero
 zero <- r[r$slope_condition == "zero", ]
 cat("false-positive rate on zero-slope datasets:\n")
 print(tapply(!zero$slope_cov90, zero$model, mean))
 
 # The groups of fits each figure compares, one row per level of the setting
-# Headline results: all datasets, one row per window.
+# Headline results: datasets with a real slope, one row per window and convergence.
 # (sorted, so the figure rows run from the smallest setting to the largest)
 core <- r[r$sweep == "core" & r$slope_condition == "random", ]
 core <- core[order(core$N), ]
 lab <- r[r$sweep == "factor", ]
 lab <- lab[order(lab$lab_error), ]
-sets <- rbind(data.frame(r, figure = "recovery_summary", level = r$window),
+real.slope <- r[r$slope_condition == "random", ]
+real.slope$level <- paste0(real.slope$window, ifelse(real.slope$converged, "", ", not converged"))
+real.slope <- real.slope[order(real.slope$window, !real.slope$converged), ]
+sets <- rbind(data.frame(real.slope[, names(r)], figure = "recovery_summary", level = real.slope$level),
               data.frame(core, figure = "checks/recovery_by_n", level = paste("N =", core$N)),
               data.frame(lab, figure = "recovery_by_lab_error", level = paste("lab error", lab$lab_error)))
 metrics <- data.frame()

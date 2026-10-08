@@ -29,11 +29,20 @@
 #'                             can cover; longer phases are redrawn
 #' @param period_start, period_end  the study period
 #' @param seed                 random seed
+#' @param true_date            given true dates (time as response); if NULL
+#'                             they are drawn across the period. When given,
+#'                             the phases cover the range of these dates
+#'                             instead of period_start to period_end.
 simulate_overlap <- function(N, intercept, slope, sigma, K, alpha_conc,
                              overlap = 0.25, assign_p = 0.5, max_share = 0.6,
                              period_start = 100, period_end = 900,
-                             seed = NULL) {
+                             seed = NULL, true_date = NULL) {
   if (!is.null(seed)) set.seed(seed)
+  # Time as response: the dates are given, and the phases cover their range
+  if (!is.null(true_date)) {
+    period_start <- floor(min(true_date))
+    period_end   <- ceiling(max(true_date))
+  }
   span <- period_end - period_start
 
   # Phase lengths from a Dirichlet "broken stick", at least 1 yr each. Redraw
@@ -47,7 +56,7 @@ simulate_overlap <- function(N, intercept, slope, sigma, K, alpha_conc,
   bounds  <- round(period_start + c(0, cumsum(lengths)))
   bounds[c(1, K + 1)] <- c(period_start, period_end)
 
-  true_date <- round(runif(N, period_start, period_end))
+  if (is.null(true_date)) true_date <- round(runif(N, period_start, period_end))
   phase     <- findInterval(true_date, bounds, rightmost.closed = TRUE,
                             all.inside = TRUE)
 

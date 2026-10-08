@@ -12,7 +12,7 @@ library(rcarbon)
 
 source(here("Simulations", "shared", "dating", "case1_radiocarbon.R"))
 
-n.workers <- 48 # Fits run at the same time
+n.workers <- 47 # Fits run at the same time
 output.file <- here("Simulations", "time_as_response", "Case1_Radiocarbon", "output", "recovery_results.csv")
 
 design <- read.csv(here("Simulations", "time_as_response", "Case1_Radiocarbon", "data", "design.csv"))
@@ -82,7 +82,11 @@ results <- mclapply(1:nrow(jobs), function(j)
 	            log_p = log_p, first = first, last = last,
 	            centre = (d$window_start + d$window_end) / 2, x_centre = (d$x_min + d$x_max) / 2,
 	            half_cell = ifelse(method == "marginal", d$grid_step / 2, 0))
-	fit <- model$sample(data = dat, chains = 4, parallel_chains = 1,
+	# Every chain starts near a flat trend through the centre, with sigma about
+	# 100 yr. Stan's default random starts can put a chain so far from the data
+	# that it never comes back, or trap it in a minor peak with a tiny sigma.
+	inits <- lapply(1:4, function(ch) list(a = runif(1, -0.5, 0.5), b = runif(1, -0.001, 0.001), s = runif(1, 0.5, 1.5)))
+	fit <- model$sample(data = dat, chains = 4, parallel_chains = 1, init = inits,
 	                    iter_warmup = 500, iter_sampling = 500, adapt_delta = 0.95,
 	                    seed = d$seed, refresh = 0, show_messages = FALSE,
 	                    show_exceptions = FALSE)

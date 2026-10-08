@@ -26,7 +26,8 @@ cat("false-positive rate on zero-slope datasets:\n")
 print(tapply(!zero$slope_cov90, zero$model, mean))
 
 # The groups of fits each figure compares, one row per level of the setting
-# Headline results use even deposition only, all sweeps, one row per window.
+# Headline results use even deposition and a real (non-zero) slope, all sweeps,
+# one row per window. Zero-slope datasets give the false-positive rate instead.
 # (sorted, so the figure rows run from the smallest setting to the largest)
 reference <- r[r$growth_ratio == 1, ]
 core <- reference[reference$sweep == "core" & reference$slope_condition == "random", ]
@@ -38,7 +39,8 @@ deposition <- r[r$sweep %in% c("factor", "deposition") & r$lab_error == 30 & r$s
 deposition <- deposition[order(deposition$growth_ratio), ]
 plateau <- deposition[deposition$window == "Hallstatt plateau", ]
 steep <- deposition[deposition$window == "Steep section", ]
-sets <- rbind(data.frame(reference, figure = "recovery_summary", level = reference$window),
+headline <- reference[reference$slope_condition == "random", ]
+sets <- rbind(data.frame(headline, figure = "recovery_summary", level = headline$window),
               data.frame(core, figure = "checks/recovery_by_n", level = paste("N =", core$N)),
               data.frame(lab, figure = "recovery_by_lab_error", level = paste("lab error", lab$lab_error)),
               data.frame(plateau, figure = "checks/recovery_by_deposition_plateau",
