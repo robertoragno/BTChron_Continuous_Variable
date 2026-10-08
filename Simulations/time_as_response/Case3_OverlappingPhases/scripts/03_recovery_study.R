@@ -1,7 +1,7 @@
-# Case 2 recovery study, time as response: every dataset in data/design.csv is
+# Case 3 recovery study, time as response: every dataset in data/design.csv is
 # simulated and fitted twice with shared/models/linear_dates_response.stan:
-#   midpoint  centre of each date range
-#   marginal  the whole range, every year in it equally likely
+#   midpoint  centre of each phase window
+#   marginal  the whole window, every year in it equally likely
 # For a flat range the median equals the midpoint, so it is not fitted.
 # Writes one row per fit.
 #
@@ -12,12 +12,12 @@ library(here)
 library(cmdstanr)
 library(parallel)
 
-source(here("Simulations", "shared", "dating", "case2_typochronology.R"))
+source(here("Simulations", "shared", "dating", "case3_overlapping_phases.R"))
 
 n.workers <- 47 # Fits run at the same time
-output.file <- here("Simulations", "time_as_response", "Case2_Typochronology", "output", "recovery_results.csv")
+output.file <- here("Simulations", "time_as_response", "Case3_OverlappingPhases", "output", "recovery_results.csv")
 
-design <- read.csv(here("Simulations", "time_as_response", "Case2_Typochronology", "data", "design.csv"))
+design <- read.csv(here("Simulations", "time_as_response", "Case3_OverlappingPhases", "data", "design.csv"))
 model <- cmdstan_model(here("Simulations", "shared", "models", "linear_dates_response.stan"))
 
 if (length(commandArgs(trailingOnly = TRUE)) > 0 && commandArgs(trailingOnly = TRUE)[1] == "test")
@@ -35,17 +35,15 @@ results <- mclapply(1:nrow(jobs), function(j)
 	d <- design[jobs$row[j], ]
 	method <- jobs$method[j]
 
-	# Values first, then the true dates from the trend, then a date range for
-	# each find. The seed is set once here and not again inside simulate_typo(),
-	# so which finds are coarsely dated does not repeat the draws of x.
+	# Values first, then the true dates from the trend, then the phases (which
+	# cover the range of these dates) and the window of each find. The seed is
+	# set once here and not again inside simulate_overlap().
 	set.seed(d$seed)
 	x <- runif(d$N, d$x_min, d$x_max)
 	true.date <- rnorm(d$N, d$intercept + d$slope * x, d$sigma)
-	sim <- simulate_typo(d$N, 0, 0, 1, prop_coarse_samples = d$prop_coarse_samples,
-	                     coarse_frac = d$coarse_frac, fine_frac = d$fine_frac,
-	                     precision_trend = d$precision_trend,
-	                     period_start = d$period_start, period_end = d$period_end,
-	                     true_date = true.date)
+	sim <- simulate_overlap(d$N, 0, 0, 1, d$K, d$alpha_conc,
+	                        overlap = d$overlap, assign_p = d$assign_p,
+	                        true_date = true.date)
 
 	if (method == "midpoint")
 	{
@@ -57,23 +55,23 @@ results <- mclapply(1:nrow(jobs), function(j)
 	}
 	if (method == "marginal")
 	{
-		# Grid from the earliest to the latest range of this dataset. Every grid
-		# year is equally likely inside a range and impossible outside it.
+		# Grid from the earliest to the latest window of this dataset. Every grid
+		# year is equally likely inside a window and impossible outside it.
 		grid <- seq(floor(min(sim$Start_date) / d$grid_step) * d$grid_step,
 		            ceiling(max(sim$End_date) / d$grid_step) * d$grid_step, by = d$grid_step)
 		year <- matrix(grid, nrow = d$N, ncol = length(grid), byrow = TRUE)
 		log_p <- matrix(-Inf, nrow = d$N, ncol = length(grid))
-		first <- rep(NA, d$N) # First and last grid column inside each range
+		first <- rep(NA, d$N) # First and last grid column inside each window
 		last <- rep(NA, d$N)
 		for (i in 1:d$N)
 		{
 			inside <- grid >= sim$Start_date[i] & grid <= sim$End_date[i]
+			# A phase narrower than the grid step gets the grid year nearest its middle
+			if (!any(inside)) inside[which.min(abs(grid - (sim$Start_date[i] + sim$End_date[i]) / 2))] <- TRUE
 			log_p[i, inside] <- log(1 / sum(inside))
 			first[i] <- min(which(inside))
 			last[i] <- max(which(inside))
 		}
-		# The narrowest range (fine, 50 yr) always holds several grid years
-		stopifnot(all(is.finite(first)), all(last - first >= 1))
 	}
 
 	dat <- list(n = d$N, n_years = ncol(year), x = x, year = year,

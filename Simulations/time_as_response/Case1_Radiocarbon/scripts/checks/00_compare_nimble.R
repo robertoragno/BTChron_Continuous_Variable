@@ -16,7 +16,6 @@ library(coda)
 library(cmdstanr)
 library(ggplot2)
 library(here)
-library(patchwork)
 
 true.beta <- 1/3.7 # True slope
 true.sigma <- 70 # True error
@@ -181,31 +180,24 @@ dir.create(here("Simulations", "time_as_response", "Case1_Radiocarbon", "figures
 ggsave(here("Simulations", "time_as_response", "Case1_Radiocarbon", "figures", "checks", "compare_nimble.png"),
        p, width = 8, height = 4, dpi = 300)
 
-# Dates: Stan against Nimble, every sample of every dataset (median and 95% interval)
+# Dates: Stan against Nimble, posterior median of every sample, one panel per dataset
 theta <- do.call(rbind, lapply(list.files(row.dir, pattern = "^theta_", full.names = TRUE), read.csv))
-theta$difference <- theta$stan.median - theta$nimble.median
-p.dates <- ggplot(theta, aes(x = nimble.median, y = stan.median)) +
+theta$panel <- factor(paste0(theta$window, ", dataset ", theta$dataset),
+                      levels = paste0(rep(names(windows), each = n.datasets), ", dataset ", 1:n.datasets))
+p <- ggplot(theta, aes(x = nimble.median, y = stan.median)) +
 	geom_abline(aes(intercept = 0, slope = 1, colour = "1:1 line")) +
-	geom_point(size = 0.8, alpha = 0.3) +
+	geom_point(size = 0.6, alpha = 0.4) +
 	scale_colour_manual(values = c("1:1 line" = "firebrick")) +
-	facet_wrap(~window, scales = "free") +
-	labs(x = "Date, Nimble (years BP)", y = "Date, Stan (years BP)", colour = NULL) +
+	facet_wrap(~panel, scales = "free", ncol = 5) +
+	scale_x_continuous(n.breaks = 3) +
+	scale_y_continuous(n.breaks = 3) +
+	labs(title = "Posterior median date of each sample under the Nimble and Stan models",
+	     subtitle = "One panel per simulated dataset, one point per sample",
+	     x = "Date, Nimble (years BP)", y = "Date, Stan (years BP)", colour = NULL) +
 	theme_classic() +
-	theme(legend.position = "top")
-p.diff <- ggplot(theta, aes(x = nimble.median, y = difference)) +
-	geom_hline(aes(yintercept = 0, colour = "No difference")) +
-	geom_point(size = 0.8, alpha = 0.3) +
-	scale_colour_manual(values = c("No difference" = "firebrick")) +
-	facet_wrap(~window, scales = "free_x") +
-	labs(x = "Date, Nimble (years BP)", y = "Stan minus Nimble (years)", colour = NULL) +
-	theme_classic() +
-	theme(legend.position = "top")
-p <- (p.dates / p.diff) +
-	plot_annotation(title = "Posterior median date of each sample under the Nimble and Stan models",
-	                subtitle = "All samples from the 10 simulated datasets in each window") &
-	theme(plot.margin = margin(5.5, 20, 5.5, 5.5))
+	theme(legend.position = "top", axis.text = element_text(size = 7))
 ggsave(here("Simulations", "time_as_response", "Case1_Radiocarbon", "figures", "checks", "compare_nimble_dates.png"),
-       p, width = 8, height = 8, dpi = 300)
+       p, width = 10, height = 8.5, dpi = 300)
 
 # Shape of the date posterior for six samples of dataset 1
 draws <- do.call(rbind, lapply(list.files(row.dir, pattern = "^draws_", full.names = TRUE), read.csv))

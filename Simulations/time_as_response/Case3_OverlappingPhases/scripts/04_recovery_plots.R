@@ -1,4 +1,4 @@
-# Case 1 tables and figures from output/recovery_results.csv.
+# Case 3 (time as response) tables and figures from output/recovery_results.csv.
 # For every group of fits (model x setting):
 #   slope bias          mean of posterior median minus true slope
 #   calibration slope   estimated slopes regressed on true slopes (1 = one-for-one)
@@ -10,15 +10,28 @@
 library(here)
 library(ggplot2)
 
-results <- read.csv(here("Simulations", "time_as_predictor", "Case1_Radiocarbon", "output", "recovery_results.csv"))
-design <- read.csv(here("Simulations", "time_as_predictor", "Case1_Radiocarbon", "data", "design.csv"))
+results <- read.csv(here("Simulations", "time_as_response", "Case3_OverlappingPhases", "output", "recovery_results.csv"))
+design <- read.csv(here("Simulations", "time_as_response", "Case3_OverlappingPhases", "data", "design.csv"))
 r <- merge(results, design)
-r$model <- c(midpoint = "Midpoint", median = "Calibrated median", marginal = "Full distribution")[r$model]
-r$window <- ifelse(r$window == "plateau", "Hallstatt plateau", "Steep section")
-fig.dir <- here("Simulations", "time_as_predictor", "Case1_Radiocarbon", "figures")
+r$model <- ifelse(r$model == "midpoint", "Midpoint / Median", "Full distribution")
+fig.dir <- here("Simulations", "time_as_response", "Case3_OverlappingPhases", "figures")
+dir.create(file.path(fig.dir, "checks"), showWarnings = FALSE, recursive = TRUE)
 
 cat("fits:", nrow(r), "| R-hat above 1.01:", sum(r$max_rhat > 1.01),
     "| with a divergent transition:", sum(r$n_divergent > 0), "\n")
+
+# A dataset counts as converged when its full-distribution fit has R-hat below
+# 1.05. Its point-date fits are grouped with it, so every group compares the
+# same datasets.
+full <- r[r$model == "Full distribution", ]
+r$converged <- full$max_rhat[match(r$dataset_id, full$dataset_id)] < 1.05
+full$converged <- full$max_rhat < 1.05
+cat("datasets whose full-distribution fit did not converge:", sum(!full$converged), "of", nrow(full), "\n")
+# What kind of datasets they are: size, and the trend's span and noise as shares of the period
+full$span_share <- abs(full$slope) * (full$x_max - full$x_min) / (full$period_end - full$period_start)
+full$sigma_share <- full$sigma / (full$period_end - full$period_start)
+print(aggregate(cbind(N, span_share, sigma_share) ~ converged, data = full, FUN = mean))
+print(table(full$slope_condition, full$converged))
 
 # Zero-slope datasets: how often the 90% interval wrongly excludes zero
 zero <- r[r$slope_condition == "zero", ]
@@ -26,27 +39,20 @@ cat("false-positive rate on zero-slope datasets:\n")
 print(tapply(!zero$slope_cov90, zero$model, mean))
 
 # The groups of fits each figure compares, one row per level of the setting
-# Headline results use even deposition and a real (non-zero) slope, all sweeps,
-# one row per window. Zero-slope datasets give the false-positive rate instead.
 # (sorted, so the figure rows run from the smallest setting to the largest)
-reference <- r[r$growth_ratio == 1, ]
-core <- reference[reference$sweep == "core" & reference$slope_condition == "random", ]
+core <- r[r$sweep == "core" & r$slope_condition == "random", ]
 core <- core[order(core$N), ]
-lab <- reference[reference$sweep == "factor", ]
-lab <- lab[order(lab$lab_error), ]
-# Deposition: even vs 4 times denser at the end, lab error 30, one figure per window
-deposition <- r[r$sweep %in% c("factor", "deposition") & r$lab_error == 30 & r$slope_condition == "random", ]
-deposition <- deposition[order(deposition$growth_ratio), ]
-plateau <- deposition[deposition$window == "Hallstatt plateau", ]
-steep <- deposition[deposition$window == "Steep section", ]
-headline <- reference[reference$slope_condition == "random", ]
-sets <- rbind(data.frame(headline, figure = "recovery_summary", level = headline$window),
+factor.sweep <- r[r$sweep == "factor", ]
+overlap.sweep <- factor.sweep[factor.sweep$assign_p == 0.5, ]
+overlap.sweep <- overlap.sweep[order(overlap.sweep$overlap), ]
+assign.sweep <- factor.sweep[factor.sweep$overlap == 0.5, ]
+assign.sweep <- assign.sweep[order(assign.sweep$assign_p), ]
+sets <- rbind(data.frame(core, figure = "recovery_summary", level = ifelse(core$converged, "converged", "not converged")),
               data.frame(core, figure = "checks/recovery_by_n", level = paste("N =", core$N)),
-              data.frame(lab, figure = "recovery_by_lab_error", level = paste("lab error", lab$lab_error)),
-              data.frame(plateau, figure = "checks/recovery_by_deposition_plateau",
-                         level = paste("growth ratio", plateau$growth_ratio)),
-              data.frame(steep, figure = "checks/recovery_by_deposition_steep",
-                         level = paste("growth ratio", steep$growth_ratio)))
+              data.frame(overlap.sweep, figure = "recovery_by_overlap",
+                         level = paste("overlap", overlap.sweep$overlap)),
+              data.frame(assign.sweep, figure = "checks/recovery_by_assign_p",
+                         level = paste("assign_p", assign.sweep$assign_p)))
 metrics <- data.frame()
 for (f in unique(sets$figure))
 {
@@ -76,7 +82,7 @@ for (f in unique(sets$figure))
 		}
 	}
 }
-write.csv(metrics, here("Simulations", "time_as_predictor", "Case1_Radiocarbon", "output", "recovery_metrics.csv"),
+write.csv(metrics, here("Simulations", "time_as_response", "Case3_OverlappingPhases", "output", "recovery_metrics.csv"),
           row.names = FALSE)
 print(metrics[metrics$figure == "recovery_summary", c("model", "metric", "value", "lo", "hi")])
 
@@ -92,14 +98,13 @@ for (f in unique(metrics$figure))
 		geom_vline(data = targets, aes(xintercept = target), linetype = "dotted", colour = "grey60") +
 		geom_errorbar(aes(xmin = lo, xmax = hi), width = 0, orientation = "y") +
 		geom_point(size = 2.4) +
-		scale_colour_manual(values = c("Midpoint" = "grey55", "Calibrated median" = "grey25", "Full distribution" = "#780000")) +
+		scale_colour_manual(values = c("Midpoint / Median" = "grey55", "Full distribution" = "#780000")) +
 		facet_grid(level ~ metric, scales = "free_x") +
 		scale_x_continuous(n.breaks = 4) +
-		labs(title = "Case 1: radiocarbon", x = NULL, y = NULL, colour = NULL) +
+		labs(title = "Case 3: overlapping phases, time as response", x = NULL, y = NULL, colour = NULL) +
 		theme_classic() +
 		theme(legend.position = "top", axis.text.y = element_blank(), axis.ticks.y = element_blank(),
 		      panel.spacing.x = unit(1.5, "lines"))
 	ggsave(file.path(fig.dir, paste0(f, ".png")), p, width = 8,
 	       height = 2 + 1.4 * length(unique(x$level)), dpi = 300)
 }
-
