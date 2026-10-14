@@ -3,6 +3,15 @@
 State of the recovery studies, 14 October 2026. Each case folder's README has
 the details; known limitations are in `Notes/limitations.md`.
 
+Contents:
+- [Measures and overview](#measures-and-overview)
+- [Time as predictor](#time-as-predictor)
+- [Time as response](#time-as-response)
+- [Comparison with Crema's Nimble model](#comparison-with-cremas-nimble-model)
+- [Open questions](#open-questions)
+
+## Measures and overview
+
 Measures, computed on datasets with a real (non-zero) slope:
 - **Slope ratio**: posterior median slopes regressed on the true slopes across
   datasets (1 = recovered, below 1 = flattened, above 1 = steepened).
@@ -21,9 +30,9 @@ by its true slope and averaging would not work: many datasets have a true slope
 close to zero, and a small error divided by a near-zero slope gives an enormous
 ratio that would swamp the average.
 
-## Time as predictor (value = intercept + slope × date)
+## Time as predictor
 
-σ in units of the measured value (true σ 0.5-4).
+Value = intercept + slope × date. σ in units of the measured value (true σ 0.5-4).
 
 | Case | Point dates: slope ratio / coverage / σ bias | Full distribution |
 |---|---|---|
@@ -47,9 +56,9 @@ ratio that would swamp the average.
 
 ![Case 3, time as predictor, by overlap](Simulations/time_as_predictor/Case3_OverlappingPhases/figures/recovery_by_overlap.png)
 
-## Time as response (date = intercept + slope × value)
+## Time as response
 
-σ in years.
+Date = intercept + slope × value. σ in years.
 
 | Case | Point dates: slope ratio / coverage / σ bias | Full distribution |
 |---|---|---|
