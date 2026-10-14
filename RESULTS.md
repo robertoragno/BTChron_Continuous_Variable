@@ -13,13 +13,21 @@ Measures, computed on datasets with a real (non-zero) slope:
 
 ![Slope ratio and coverage, all cases](Simulations/shared/figures/overview.png)
 
+Points: the measure across all datasets in a group. Lines: its 95% interval given
+the number of datasets (regression confidence interval for the slope ratio,
+Jeffreys interval for coverage). The slope ratio is the slope of a regression of
+the estimated slopes on the true slopes across datasets. Dividing each estimate
+by its true slope and averaging would not work: many datasets have a true slope
+close to zero, and a small error divided by a near-zero slope gives an enormous
+ratio that would swamp the average.
+
 ## Time as predictor (value = intercept + slope × date)
 
 σ in units of the measured value (true σ 0.5-4).
 
 | Case | Point dates: slope ratio / coverage / σ bias | Full distribution |
 |---|---|---|
-| 1, steep section | 0.80-0.82 / 0.44-0.47 / +0.14 | 0.83 / 0.49 / +0.01 |
+| 1, steep section | midpoint 0.80 / 0.44 / +0.14; median 0.82 / 0.47 / +0.14 | 0.83 / 0.49 / +0.01 |
 | 1, Hallstatt plateau | midpoint 1.11 / 0.79 / +0.45; median 0.82 / 0.64 / +0.41 | 0.96 / 0.83 / −0.02 |
 | 2, typochronology | 0.965 / 0.77 / +0.13 | 0.97 / 0.81 / −0.01 |
 | 3, overlapping phases | 1.00 / 0.87 / +0.41 | 0.97 / 0.76 / −0.16 |
@@ -46,7 +54,7 @@ Measures, computed on datasets with a real (non-zero) slope:
 | Case | Point dates: slope ratio / coverage / σ bias | Full distribution |
 |---|---|---|
 | 1, Hallstatt plateau | midpoint 0.30 / 0.005 / +1.7; median 0.45 / 0.03 / +22 | 0.95 / 0.89 / −1.9 |
-| 1, steep section | 1.04-1.06 / 0.76-0.82 / +24-26 | 1.00 / 0.93 / +0.1 |
+| 1, steep section | midpoint 1.06 / 0.76 / +25.5; median 1.04 / 0.82 / +23.9 | 1.00 / 0.93 / +0.1 |
 | 2, typochronology | 1.00 / 0.88 / +9 | 1.00 / 0.87 / −0.4 |
 | 3, overlapping phases | 0.92 / 0.59 / +16 | 0.91 / 0.58 / −21 |
 | 4, merged phases | 0.83 / 0.43 / +16 | 0.93 / 0.76 / −11 |

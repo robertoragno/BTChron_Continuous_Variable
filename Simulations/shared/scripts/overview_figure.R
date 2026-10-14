@@ -38,7 +38,9 @@ p <- ggplot(x, aes(x = value, y = case, colour = model)) +
 	                               "Full distribution" = "#780000")) +
 	scale_linetype_manual(values = c("Target" = "dotted")) +
 	facet_grid(direction ~ metric, scales = "free_x") +
-	labs(title = "Recovery of the slope, all cases", x = NULL, y = NULL, colour = NULL, linetype = NULL) +
+	labs(title = "Recovery of the slope, all cases", x = NULL, y = NULL, colour = NULL, linetype = NULL,
+	     caption = paste("Lines: 95% intervals given the number of datasets (regression confidence",
+	                     "interval for the slope ratio, Jeffreys interval for coverage).")) +
 	theme_classic() +
 	theme(legend.position = "top", panel.spacing.x = unit(1.5, "lines"))
 ggsave(here("Simulations", "shared", "figures", "overview.png"), p, width = 8, height = 6, dpi = 300)
