@@ -1,7 +1,7 @@
 # BTChron Continuous Variable
 
 > [!NOTE]  
-> Work in progress for the [first BTChron paper](). This readme will be updated soon with more details.
+> Work in progress for a paper. This readme will be updated soon with more details.
 
 > [!IMPORTANT]
 > Note to self (RR): make some comments shorter and more elegant.
