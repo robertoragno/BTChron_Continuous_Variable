@@ -7,7 +7,7 @@ Contents:
 - [Measures and overview](#measures-and-overview)
 - [Time as predictor](#time-as-predictor)
 - [Time as response](#time-as-response)
-- [Comparison with the Nimble model](#comparison-with-cremas-nimble-model)
+- [Comparison with the Nimble model](#comparison-with-the-nimble-model)
 - [Open questions](#open-questions)
 
 ## Measures and overview
