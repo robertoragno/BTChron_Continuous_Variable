@@ -1,9 +1,12 @@
 # Results
 
-State of the recovery studies, 14 October 2026. Each case folder's README has
-the details; known limitations are in `Notes/limitations.md`.
+> [!NOTE]
+> Simulation recovery studies. Last update: 
+14 October 2026. 
 
-Contents:
+Further details for each case are provided in the subfolders' README.
+
+## Contents:
 - [Measures and overview](#measures-and-overview)
 - [Time as predictor](#time-as-predictor)
 - [Time as response](#time-as-response)
