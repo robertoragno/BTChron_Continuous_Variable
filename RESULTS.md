@@ -91,6 +91,7 @@ Date = intercept + slope × value. σ in years.
 Case 1, time as response: posterior dates of single samples agree in 19 of 20
 datasets. In the exception Nimble settled on an almost flat trend with σ of
 20 yr against a true 70 yr.
+The Nimble model uses the code from [this Github repository](https://github.com/ercrema/statistical_modelling_review/blob/main/measurement_error_example.R).
 
 ![Stan against Nimble, one panel per dataset](Simulations/time_as_response/Case1_Radiocarbon/figures/checks/compare_nimble_dates.png)
 
