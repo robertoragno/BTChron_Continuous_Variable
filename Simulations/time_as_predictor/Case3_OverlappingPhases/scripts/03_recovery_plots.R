@@ -1,12 +1,12 @@
 # Case 3 tables and figures from output/recovery_results.csv.
 # For every group of fits (model x setting):
 #   slope bias          mean of posterior median minus true slope
-#   calibration slope   estimated slopes regressed on true slopes (1 = one-for-one)
+#   slope ratio   estimated slopes regressed on true slopes (1 = one-for-one)
 #   90% coverage        how often the 90% interval contains the true slope
 #   90% interval width  mean width of that interval
 #   bias in sigma       mean of posterior median minus true sigma
 # Bars are 95% intervals: +/- 2 standard errors for the means, the lm confidence
-# interval for the calibration slope, a Jeffreys interval for coverage.
+# interval for the slope ratio, a Jeffreys interval for coverage.
 library(here)
 library(ggplot2)
 
@@ -57,7 +57,7 @@ for (f in unique(sets$figure))
 			se.sigma <- sd(s$sigma_err) / sqrt(n)
 			metrics <- rbind(metrics, data.frame(
 				figure = f, level = l, model = m, n = n,
-				metric = c("Slope bias", "Calibration slope", "90% coverage",
+				metric = c("Slope bias", "Slope ratio", "90% coverage",
 				           "90% interval width", "Bias in sigma"),
 				value = c(mean(s$slope_err), coef(calib)[2], k / n,
 				          mean(s$slope_width90), mean(s$sigma_err)),
@@ -75,7 +75,7 @@ write.csv(metrics, here("Simulations", "time_as_predictor", "Case3_OverlappingPh
 print(metrics[metrics$figure == "recovery_summary", c("model", "metric", "value", "lo", "hi")])
 
 # Figures: the three headline metrics, dotted lines at the value each should hit
-headline <- c("Calibration slope", "90% coverage", "Bias in sigma")
+headline <- c("Slope ratio", "90% coverage", "Bias in sigma")
 targets <- data.frame(metric = factor(headline, levels = headline), target = c(1, 0.9, 0))
 for (f in unique(metrics$figure))
 {

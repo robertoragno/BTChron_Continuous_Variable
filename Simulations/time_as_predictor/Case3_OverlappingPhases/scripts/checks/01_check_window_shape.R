@@ -124,7 +124,7 @@ write.csv(results, file.path(case.dir, "output", "check_window_shape.csv"), row.
 for (m in c("flat", "clipped", "exact"))
 {
 	s <- results[results$model == m, ]
-	cat(sprintf("%-8s calibration slope %.3f | 90%% coverage %.2f | bias in sigma %+.3f | R-hat > 1.01: %d\n",
+	cat(sprintf("%-8s slope ratio %.3f | 90%% coverage %.2f | bias in sigma %+.3f | R-hat > 1.01: %d\n",
 	            m, coef(lm(slope_med ~ slope, data = s))[2], mean(s$slope_cov90),
 	            mean(s$sigma_err), sum(s$max_rhat > 1.01)))
 }
