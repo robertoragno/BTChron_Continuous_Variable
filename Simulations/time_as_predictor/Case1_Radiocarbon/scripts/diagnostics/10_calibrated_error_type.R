@@ -8,14 +8,13 @@
 # The last two columns are the slope ratios a regression on that summary gives,
 # with the date as the predictor (cov / var of the summary) and as the response
 # (cov / var of the true date). No model is fitted: these are the expected
-# values, and they reproduce the fitted results in the README and in
-# 08_reversed_berkson.R. 1000 dates per window, Case 1's own generator.
+# values, to compare with the fitted slope ratios of the Case 1 recovery
+# studies in both directions. 1000 dates per window, Case 1's own generator.
 #
 #   Rscript Simulations/time_as_predictor/Case1_Radiocarbon/scripts/diagnostics/10_calibrated_error_type.R
 
 suppressMessages(library(rcarbon))
 library(here)
-source(here("Simulations", "shared", "scripts", "weight_rows.R"))
 source(here("Simulations", "shared", "dating", "case1_radiocarbon.R"))
 
 windows <- list(steep = c(-1600, -1200), plateau = c(-800, -400))
@@ -36,7 +35,10 @@ for (w in names(windows)) {
   # The last summary is the posterior mean under the right prior (the window),
   # which is what the model would give if it were told where the dates lie
   summaries <- list(
-    "midpoint of 95% range" = apply(m, 2, function(p) mean(hpd_envelope(p, years))),
+    # Midpoint of the 95% HPD range: the most probable years until they hold 95%
+    "midpoint of 95% range" = apply(m, 2, function(p) {
+      p <- p / sum(p); cut <- sort(p, decreasing = TRUE)[which(cumsum(sort(p, decreasing = TRUE)) >= 0.95)[1]]
+      (min(years[p >= cut]) + max(years[p >= cut])) / 2 }),
     "calibrated median"     = apply(m, 2, function(p) years[which(cumsum(p) >= 0.5)[1]]),
     "calibrated mean"       = colSums(m * years),
     "mean, window prior"    = apply(m, 2, function(p) { q <- p * inwin; sum(q * years) / sum(q) })

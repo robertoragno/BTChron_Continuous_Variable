@@ -92,7 +92,7 @@ the steep section the three models barely differ (RMSE 3.60-3.97).
 On the steep section all three flatten the slope. Each calibrated date spreads
 past the edges of where the samples really are, nothing ties the dates together,
 so the dates look more spread out than they are and the slope flattens.
-`scripts/diagnostics/` tests this (steep section, 120 datasets per setting):
+A diagnostic run in September 2026 tested this (steep section, 120 datasets per setting):
 
 | Condition | Lab error 15: slope ratio | coverage | Lab error 50: slope ratio | coverage |
 |---|---|---|---|---|
@@ -192,8 +192,6 @@ Run in order: `01` → `03` → `04`, then `02` and `05`.
 | `scripts/03_recovery_study.R` | calibrates each dataset and fits the three methods; about 4.5 h on 24 workers |
 | `scripts/04_recovery_plots.R` | `output/recovery_metrics.csv` and the figures |
 | `scripts/05_single_fit.R` | `single_fit_comparison.png` and `single_fit_comparison_steep.png` |
-| `scripts/checks/00_check_rows.R` | calibrated weight rows give the same medians as `rcarbon` |
-| `scripts/checks/00_check_fit.R` | simulate, calibrate and fit one dataset |
-| `scripts/diagnostics/` | why the steep section flattens the slope (`05_`), the reversed test (`08_`), fixing one date to a constant (`09_`), which kind of error a calibrated date carries (`10_`) |
+| `scripts/diagnostics/10_calibrated_error_type.R` | which kind of error a calibrated date carries, and the slope ratios that implies in both directions |
 
 Older runs are in `output/archive/`, diagnostic results in `output/diagnostics/`.

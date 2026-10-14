@@ -7,7 +7,7 @@
 # For each find this computes the exact distribution of its true date given its
 # phase label, and refits the core datasets with N = 500 (overlap 0.5,
 # assign_p 0.2, random slope) three ways:
-#   flat     the window as in 03_recovery_study.R (taken from recovery_results.csv)
+#   flat     the window as in 02_recovery_study.R (taken from recovery_results.csv)
 #   clipped  the flat window cut to the study period
 #   exact    the exact distribution of the true date given the label
 # Writes output/check_window_shape.csv and figures/checks/check_window_shape.png

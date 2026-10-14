@@ -103,15 +103,15 @@ inflated the midpoint slope (ratio about 1.07 at overlap 0.5) and was dropped.
 
 ## Files
 
-Run in order: `01` → `03` → `04`, then `05`.
+Run in order: `01` → `02` → `03`, then `04`.
 
 | File | What it does |
 |---|---|
 | `shared/dating/case3_overlapping_phases.R` | draws the phases, stretches their windows and assigns each find to a phase |
 | `scripts/01_design.R` | builds the list of datasets to simulate, `data/design.csv` |
-| `scripts/03_recovery_study.R` | fits both methods to every dataset; about 4.5 h on 24 workers |
-| `scripts/04_recovery_plots.R` | `output/recovery_metrics.csv`, the figures and `dataset_anatomy.png` |
-| `scripts/05_single_fit.R` | `single_fit_comparison.png` |
+| `scripts/02_recovery_study.R` | fits both methods to every dataset; about 4.5 h on 24 workers |
+| `scripts/03_recovery_plots.R` | `output/recovery_metrics.csv`, the figures and `dataset_anatomy.png` |
+| `scripts/04_single_fit.R` | `single_fit_comparison.png` |
 | `scripts/checks/00_check.R` | midpoint slope ratio without Stan, and `check_depletion.png` |
 
 Older runs are in `output/archive/`.

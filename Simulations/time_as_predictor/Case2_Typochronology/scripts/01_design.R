@@ -1,5 +1,5 @@
 # Builds the Case 2 design grid and writes it to data/design.csv.
-# 03_recovery_study.R reads that file and re-derives nothing.
+# 02_recovery_study.R reads that file and re-derives nothing.
 #
 # One core sweep plus one sweep per factor. Each factor sweep changes one thing
 # and keeps the rest at the reference (N = 200, half the finds coarsely dated,

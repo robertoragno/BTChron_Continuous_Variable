@@ -1,5 +1,5 @@
 # Builds the Case 4 design grid and writes it to data/design.csv.
-# 03_recovery_study.R reads that file and re-derives nothing.
+# 02_recovery_study.R reads that file and re-derives nothing.
 #
 #   core   dataset size crossed with random / zero slope, broad periods up to
 #          3 phases

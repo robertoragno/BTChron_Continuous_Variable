@@ -41,7 +41,7 @@ Details:
 
 ## Metrics
 
-From `04_recovery_plots.R` in each case, written to `output/recovery_metrics.csv`:
+From the recovery-plots script of each case (`03_recovery_plots.R`; `04_` in Case 1 time as predictor), written to `output/recovery_metrics.csv`:
 
 | Metric | Meaning | Target |
 |---|---|---|
@@ -62,9 +62,9 @@ calibration slope, a Jeffreys interval for coverage.
 
 ## Other files
 
-`scripts/` and the other Stan files are the code before the rewrite of October
-2026. They are still used by the checks and by Case 1's `diagnostics/`. `scripts/case_dating_figures.R` draws
-`figures/caseN_dating.png` for the main README.
+`scripts/case_dating_figures.R` draws `figures/caseN_dating.png` for the main
+README. `scripts/design.R` gives each time-as-predictor dataset its id, seed and
+true trend.
 
 ## Things that fail without an error
 

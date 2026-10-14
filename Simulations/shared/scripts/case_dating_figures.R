@@ -13,7 +13,6 @@ suppressMessages(library(rcarbon))
 library(ggplot2)
 library(patchwork)
 
-source(here("Simulations", "shared", "scripts", "weight_rows.R"))
 source(here("Simulations", "shared", "dating", "case1_radiocarbon.R"))
 source(here("Simulations", "shared", "dating", "case2_typochronology.R"))
 source(here("Simulations", "shared", "dating", "case3_overlapping_phases.R"))
