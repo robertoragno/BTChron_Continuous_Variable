@@ -7,7 +7,7 @@ Contents:
 - [Measures and overview](#measures-and-overview)
 - [Time as predictor](#time-as-predictor)
 - [Time as response](#time-as-response)
-- [Comparison with Crema's Nimble model](#comparison-with-cremas-nimble-model)
+- [Comparison with the Nimble model](#comparison-with-cremas-nimble-model)
 - [Open questions](#open-questions)
 
 ## Measures and overview
@@ -86,7 +86,7 @@ Date = intercept + slope × value. σ in years.
 
 ![Case 3, time as response, by overlap](Simulations/time_as_response/Case3_OverlappingPhases/figures/recovery_by_overlap.png)
 
-## Comparison with Crema's Nimble model
+## Comparison with the Nimble model
 
 Case 1, time as response: posterior dates of single samples agree in 19 of 20
 datasets. In the exception Nimble settled on an almost flat trend with σ of
