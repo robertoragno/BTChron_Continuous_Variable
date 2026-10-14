@@ -12,7 +12,7 @@ for (direction in c("time_as_predictor", "time_as_response"))
 	{
 		m <- read.csv(here("Simulations", direction, case, "output", "recovery_metrics.csv"))
 		# Headline rows only; the not-converged rows of time as response are left out
-		m <- m[m$figure == "recovery_summary" & m$metric %in% c("Calibration slope", "90% coverage") &
+		m <- m[m$figure == "recovery_summary" & m$metric %in% c("Slope ratio", "90% coverage") &
 		       m$level %in% c("Hallstatt plateau", "Steep section", "all", "converged"), ]
 		m$case <- paste("Case", substr(case, 5, 5))
 		m$case[m$level == "Hallstatt plateau"] <- "Case 1, plateau"
@@ -23,7 +23,7 @@ for (direction in c("time_as_predictor", "time_as_response"))
 }
 x$model[x$model == "Midpoint / Median"] <- "Midpoint"
 x$model <- factor(x$model, levels = c("Midpoint", "Calibrated median", "Full distribution"))
-x$metric <- factor(ifelse(x$metric == "Calibration slope", "Slope ratio", "Slope coverage (90%)"),
+x$metric <- factor(ifelse(x$metric == "Slope ratio", "Slope ratio", "Slope coverage (90%)"),
                    levels = c("Slope ratio", "Slope coverage (90%)"))
 x$case <- factor(x$case, levels = rev(c("Case 1, plateau", "Case 1, steep", "Case 2", "Case 3", "Case 4")))
 targets <- data.frame(metric = factor(c("Slope ratio", "Slope coverage (90%)"), levels = levels(x$metric)),

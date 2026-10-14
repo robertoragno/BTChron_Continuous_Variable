@@ -139,7 +139,7 @@ for (l in c(0.5, 0.75, 1))
 	for (m in c("midpoint", "marginal"))
 	{
 		s <- results[results$late_share == l & results$model == m, ]
-		cat(sprintf("late share %-4s %-8s calibration slope %.3f | 90%% coverage %.2f | bias in sigma %+.3f | R-hat > 1.01: %d\n",
+		cat(sprintf("late share %-4s %-8s slope ratio %.3f | 90%% coverage %.2f | bias in sigma %+.3f | R-hat > 1.01: %d\n",
 		            l, m, coef(lm(slope_med ~ slope, data = s))[2], mean(s$slope_cov90),
 		            mean(s$sigma_err), sum(s$max_rhat > 1.01)))
 	}

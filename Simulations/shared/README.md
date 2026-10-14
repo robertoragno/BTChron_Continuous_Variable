@@ -46,19 +46,20 @@ From the recovery-plots script of each case (`03_recovery_plots.R`; `04_` in Cas
 | Metric | Meaning | Target |
 |---|---|---|
 | slope bias | mean of posterior median minus true slope | 0 |
-| calibration slope | estimated slopes regressed on true slopes | 1 |
+| slope ratio | estimated slopes regressed on true slopes | 1 |
 | 90% coverage | share of 90% intervals that contain the true slope | 0.90 |
 | 90% interval width | mean width of those intervals | narrower, once coverage is right |
 | bias in sigma | mean of posterior median minus true sigma | 0 |
 
 True slopes are drawn on both sides of zero, so a method that flattens every slope
-can still have zero bias. The calibration slope shows it: below 1 the trend is
-flattened, above 1 exaggerated. Case READMEs call it the "slope ratio". Measures
-follow Morris, White and Crowther (2019, Statistics in Medicine 38: 2074-2102).
+can still have zero bias. The slope ratio shows it: below 1 the trend is
+flattened, above 1 exaggerated. Measures follow Morris, White and Crowther (2019,
+Statistics in Medicine 38: 2074-2102), who call the slope ratio the calibration
+slope.
 
 Error bars are 95% intervals for how well each number is known from 100 or so
 datasets: +/- 2 standard errors for means, the `lm` confidence interval for the
-calibration slope, a Jeffreys interval for coverage.
+slope ratio, a Jeffreys interval for coverage.
 
 ## Other files
 
