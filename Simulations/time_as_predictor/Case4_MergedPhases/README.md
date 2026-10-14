@@ -1,5 +1,13 @@
 # Case 4 — Merged phases
 
+## Contents
+- [The archaeological case](#the-archaeological-case)
+- [How the data is generated](#how-the-data-is-generated)
+- [Feeding the models](#feeding-the-models)
+- [Results](#results)
+- [Figures](#figures)
+- [Files](#files)
+
 ## The archaeological case
 
 This case covers datasets where finds are dated on one phase scheme but at

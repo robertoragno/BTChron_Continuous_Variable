@@ -1,5 +1,13 @@
 # Case 1 — Radiocarbon
 
+## Contents
+- [The archaeological case](#the-archaeological-case)
+- [How the data is generated](#how-the-data-is-generated)
+- [Feeding the models](#feeding-the-models)
+- [Results](#results)
+- [Figures](#figures)
+- [Files](#files)
+
 ## The archaeological case
 
 This is the case of samples dated by radiocarbon. Each sample has a measured
@@ -149,7 +157,7 @@ Three quick tests from the meeting of 18 Sep, on single datasets (details in
 `Notes/`):
 
 - Reversed (`08_`): the date as the response of a value known exactly, following
-  Crema's measurement_error_example.R. On the plateau the regression on median
+  the reference measurement_error_example.R. On the plateau the regression on median
   calibrated dates halves the slope (0.14 against a true 0.27), the Nimble model
   with the full calibrated dates gets 0.24.
 - One date fixed to a constant (`09_`): replacing one sample's calibrated date

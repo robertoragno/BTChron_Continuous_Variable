@@ -43,7 +43,7 @@ dating cases:
 - **time as predictor**: a measured value changes with the date
   (value = intercept + slope × date)
 - **time as response**: the date changes with a measured value known exactly
-  (date = intercept + slope × value), as in Crema's measurement_error_example.R
+  (date = intercept + slope × value), as in the reference measurement_error_example.R
 
 ```
 BTChron_Paper_1/

@@ -4,15 +4,14 @@
 > Simulation recovery studies. Last update: 
 14 October 2026. 
 
-Further details for each case are provided in the subfolders' README.
+Further details for each case are provided in the subfolders' READMEs.
 
-## Contents:
+## Contents
 - [Measures and overview](#measures-and-overview)
 - [Time as predictor](#time-as-predictor)
 - [Time as response](#time-as-response)
 - [Dates of single finds](#dates-of-single-finds)
 - [Comparison with the Nimble model](#comparison-with-the-nimble-model)
-- [Open questions](#open-questions)
 
 ## Measures and overview
 

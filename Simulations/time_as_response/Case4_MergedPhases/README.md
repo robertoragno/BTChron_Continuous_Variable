@@ -4,6 +4,11 @@ The same dating situation as Case 4 time as predictor (finds dated to one fine
 phase or to a run of adjacent phases), with time as the response: the date
 changes with a measured value known exactly, date = intercept + slope × value.
 
+## Contents
+- [How the data is generated](#how-the-data-is-generated)
+- [Results](#results)
+- [Files](#files)
+
 ## How the data is generated
 
 For each dataset (`scripts/02_recovery_study.R`, dating step in

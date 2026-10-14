@@ -4,6 +4,11 @@ The same dating situation as Case 3 time as predictor (ceramic phases whose
 windows overlap at their edges), with time as the response: the date changes
 with a measured value known exactly, date = intercept + slope × value.
 
+## Contents
+- [How the data is generated](#how-the-data-is-generated)
+- [Results](#results)
+- [Files](#files)
+
 ## How the data is generated
 
 For each dataset (`scripts/02_recovery_study.R`, dating step in
