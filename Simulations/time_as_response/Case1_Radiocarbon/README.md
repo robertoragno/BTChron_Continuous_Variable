@@ -2,8 +2,14 @@
 
 The same dating situation as Case 1 time as predictor (calibrated 14C dates),
 with time as the response: the date changes with a measured value known exactly,
-date = intercept + slope × value. The setup follows Crema's
+date = intercept + slope × value. The setup follows the reference
 measurement_error_example.R.
+
+## Contents
+- [How the data is generated](#how-the-data-is-generated)
+- [Results](#results)
+- [Comparison with the Nimble model](#comparison-with-the-nimble-model)
+- [Files](#files)
 
 ## How the data is generated
 
@@ -72,10 +78,10 @@ peak of the posterior. That run is in `output/archive/run_2026-10-06_random_init
 
 ![Recovery by lab error](figures/recovery_by_lab_error.png)
 
-## Comparison with Crema's Nimble model
+## Comparison with the Nimble model
 
 `scripts/checks/00_compare_nimble.R` fits 10 plateau and 10 steep-section
-datasets with Crema's Nimble model and with the Stan model (run before the
+datasets with the Nimble model and with the Stan model (run before the
 starting values were added). The slopes agree, and the posterior dates of single
 samples agree in 19 of the 20 datasets. In the one exception (plateau, dataset
 10) Nimble settled on an almost flat trend with σ of 20 yr against a true 70 yr;
@@ -90,4 +96,4 @@ Run in order: `01` → `02` → `03`.
 | `scripts/01_design.R` | builds `data/design.csv` |
 | `scripts/02_recovery_study.R` | fits the three methods to every dataset; about three days on 47 workers |
 | `scripts/03_recovery_plots.R` | `output/recovery_metrics.csv` and the figures |
-| `scripts/checks/00_compare_nimble.R` | the comparison with Crema's Nimble model |
+| `scripts/checks/00_compare_nimble.R` | the comparison with the Nimble model |

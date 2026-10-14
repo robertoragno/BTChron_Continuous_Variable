@@ -1,5 +1,13 @@
 # Case 2 — Typochronology
 
+## Contents
+- [The archaeological case](#the-archaeological-case)
+- [How the data is generated](#how-the-data-is-generated)
+- [Feeding the models](#feeding-the-models)
+- [Results](#results)
+- [Figures](#figures)
+- [Files](#files)
+
 ## The archaeological case
 
 This is the case of datasets where samples are dated using typochronology or
