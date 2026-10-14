@@ -57,6 +57,8 @@ fit.r <- model.r$sample(data = list(n = n, n_years = length(grid.r), x = d,
                         chains = 4, parallel_chains = 4, iter_warmup = 500, iter_sampling = 500,
                         adapt_delta = 0.95, init = inits, seed = 1, refresh = 0, show_messages = FALSE)
 draws.r <- as.data.frame(fit.r$draws(c("intercept", "slope", "sigma"), format = "draws_df"))
+cat("time as response: max R-hat", round(max(fit.r$summary(c("slope", "sigma"))$rhat), 3),
+    "| divergences", sum(fit.r$diagnostic_summary(quiet = TRUE)$num_divergent), "\n")
 
 # Posterior date of each find: calibrated probability times the trend's share of
 # each cell, averaged over 400 draws
@@ -82,6 +84,8 @@ fit.p <- model.p$sample(data = list(n = n, n_years = length(grid.p), y = sim$Val
                         chains = 4, parallel_chains = 4, iter_warmup = 500, iter_sampling = 500,
                         adapt_delta = 0.95, seed = 1, refresh = 0, show_messages = FALSE)
 draws.p <- as.data.frame(fit.p$draws(c("intercept", "slope", "sigma"), format = "draws_df"))
+cat("time as predictor: max R-hat", round(max(fit.p$summary(c("slope", "sigma"))$rhat), 3),
+    "| divergences", sum(fit.p$diagnostic_summary(quiet = TRUE)$num_divergent), "\n")
 
 # Posterior date of each find: calibrated probability times how well the trend
 # at that year fits the find's value, averaged over 400 draws
