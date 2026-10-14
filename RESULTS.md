@@ -7,6 +7,7 @@ Contents:
 - [Measures and overview](#measures-and-overview)
 - [Time as predictor](#time-as-predictor)
 - [Time as response](#time-as-response)
+- [Dates of single finds](#dates-of-single-finds)
 - [Comparison with the Nimble model](#comparison-with-the-nimble-model)
 - [Open questions](#open-questions)
 
@@ -86,12 +87,36 @@ Date = intercept + slope × value. σ in years.
 
 ![Case 3, time as response, by overlap](Simulations/time_as_response/Case3_OverlappingPhases/figures/recovery_by_overlap.png)
 
+## Dates of single finds
+
+Fitting the trend also sharpens the date of each find, in both directions.
+
+- Phase windows, time as response (Cases 3-4): each find's 90% date interval
+  shrinks to 60-70% of its window, and contains the true date for 84-88% of finds.
+- Radiocarbon dates on the Hallstatt plateau (one dataset of 100 dates per
+  direction): the trend moves the median of each date by 25-35 years on average
+  (up to 200), while the dates stay consistent with their calibration. With
+  time as response, 1 date of 100 falls below the agreement threshold of 60
+  used in OxCal; with time as predictor, none. The same dataset fitted with the
+  Nimble model gives the same three lowest dates and an overall agreement of 70
+  (Stan 72).
+
+![Agreement of each date with its calibration](Simulations/time_as_response/Case1_Radiocarbon/figures/checks/agreement_index.png)
+
+![The three dates with the lowest agreement in each direction](Simulations/time_as_response/Case1_Radiocarbon/figures/checks/agreement_dates.png)
+
 ## Comparison with the Nimble model
 
 Case 1, time as response: posterior dates of single samples agree in 19 of 20
 datasets. In the exception Nimble settled on an almost flat trend with σ of
 20 yr against a true 70 yr.
 The Nimble model uses the code from [this Github repository](https://github.com/ercrema/statistical_modelling_review/blob/main/measurement_error_example.R).
+
+The 20 plateau datasets that did not converge in Stan were refitted with Nimble:
+18 of them do not converge there either, often worse (R-hat up to 8, chains that
+disagree on the sign of the slope, σ far below the truth). These datasets are
+hard because the data say little about the trend, not because of the model
+software.
 
 ![Stan against Nimble, one panel per dataset](Simulations/time_as_response/Case1_Radiocarbon/figures/checks/compare_nimble_dates.png)
 
