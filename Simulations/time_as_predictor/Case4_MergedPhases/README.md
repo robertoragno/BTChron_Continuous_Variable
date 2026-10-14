@@ -89,14 +89,14 @@ divergences). The uncapped run is in `output/archive/run_2026-10-01_uncapped/`.
 
 ## Files
 
-Run in order: `01` → `03` → `04`, then `05`.
+Run in order: `01` → `02` → `03`, then `04`.
 
 | File | What it does |
 |---|---|
 | `shared/dating/case4_merged_phases.R` | draws the fine phases and dates each find to a run of them |
 | `scripts/01_design.R` | builds the list of datasets to simulate, `data/design.csv`, and checks the generator |
-| `scripts/03_recovery_study.R` | fits both methods to every dataset; about an hour on 24 workers |
-| `scripts/04_recovery_plots.R` | `output/recovery_metrics.csv`, the figures and `dataset_anatomy.png` |
+| `scripts/02_recovery_study.R` | fits both methods to every dataset; about an hour on 24 workers |
+| `scripts/03_recovery_plots.R` | `output/recovery_metrics.csv`, the figures and `dataset_anatomy.png` |
 
 Older runs are in `output/archive/`.
-| `scripts/05_single_fit.R` | `single_fit_comparison.png` |
+| `scripts/04_single_fit.R` | `single_fit_comparison.png` |

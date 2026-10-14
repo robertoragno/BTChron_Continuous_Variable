@@ -1,7 +1,7 @@
 # Case 1, time as response: builds data/design.csv, one row per simulated dataset.
 # Each dataset follows measurement_error_example.R: values x drawn between 0 and
 # 1000, true dates = intercept + slope * x + noise, then each date is turned into
-# a radiocarbon age and calibrated (03_recovery_study.R does the simulating).
+# a radiocarbon age and calibrated (02_recovery_study.R does the simulating).
 #
 # The trend is set relative to the window, not in years: across the values it
 # spans 25-75% of the window, and the noise sd is 5-20% of the window. Dates are

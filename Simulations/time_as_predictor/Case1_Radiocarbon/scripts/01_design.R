@@ -11,7 +11,6 @@
 library(here)
 
 source(here("Simulations", "shared", "scripts", "design.R"))
-source(here("Simulations", "shared", "scripts", "weight_rows.R"))
 source(here("Simulations", "shared", "dating", "case1_radiocarbon.R"))
 
 # ---- settings ----

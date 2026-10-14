@@ -49,13 +49,28 @@ simulate_c14 <- function(N, intercept, slope, sigma, window, lab_error,
   )
 }
 
+#' rcarbon's calMatrix as probabilities over ascending BCE/CE years.
+#'
+#' calMatrix rows are labelled in cal BP, oldest first, which is already
+#' ascending calendar order: the labels need converting (year = 1950 - BP), the
+#' rows must not be reversed. Reversing them would flip the sign of the slope
+#' without any error, hence the check.
+calmatrix_to_calendar <- function(cal_dates) {
+  m <- cal_dates$calmatrix
+  if (is.null(m)) stop("calibrate() must be called with calMatrix = TRUE")
+  years <- 1950 - as.numeric(rownames(m))
+  if (anyNA(years) || is.unsorted(years))
+    stop("calMatrix rows are not cal BP years in ascending calendar order")
+  list(prob = m, years = years)
+}
+
 #' Grid padding for Case 1
 #'
 #' The model is not told the study window, so each calibrated date must fit on
 #' the grid whole. Calibrates one date every 10 yr across the window and returns
 #' the width (yr) of the widest 99.99% range (this should remove the super tiny 
 #' probabilities far from the peak - so the grid is smaller), the same share 
-#' calibrated_rows() keeps of each date.
+#' the recovery study keeps of each date.
 c14_grid_pad <- function(window, lab_error) {
 
   # Calibrate one date every 10 yr across the window

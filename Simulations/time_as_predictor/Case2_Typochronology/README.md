@@ -117,7 +117,7 @@ expected.
 
 A continuous spread of widths instead of two groups (same mean squared width)
 gives the same numbers: slope ratio 0.96 either way for the midpoint, 0.97 for
-the full distribution (`scripts/checks/01_check_continuous_widths.R`).
+the full distribution.
 
 ![Recovery by proportion of coarsely dated finds](figures/recovery_by_prop_coarse.png)
 
@@ -134,22 +134,19 @@ the full distribution (`scripts/checks/01_check_continuous_widths.R`).
 | `figures/recovery_summary.png` | headline result across all datasets |
 | `figures/recovery_by_prop_coarse.png` | how the result changes with the proportion of coarsely dated finds |
 | `figures/recovery_by_coarse_width.png` | how the result changes with coarse window length |
-| `figures/checks/` | generator check, dataset size, deposition, precision trend |
+| `figures/checks/` | dataset size, deposition, precision trend, noise ratio |
 
 ## Files
 
-Run in order: `01` → `03` → `04`, then `05`. No `02_` in this case.
+Run in order: `01` → `02` → `03`, then `04`.
 
 | File | What it does |
 |---|---|
 | `shared/dating/case2_typochronology.R` | draws a true date, then a well or coarsely dated window around it |
 | `scripts/01_design.R` | builds the list of datasets to simulate, `data/design.csv` |
-| `scripts/03_recovery_study.R` | fits both methods to every dataset; about 3 h on 24 workers |
-| `scripts/04_recovery_plots.R` | `output/recovery_metrics.csv` and the figures, including `checks/recovery_by_noise.png` (results split by noise ratio) |
-| `scripts/05_single_fit.R` | `single_fit_comparison.png` |
-| `scripts/checks/00_check.R` | generator check figure, and `dataset_anatomy.png` |
-| `scripts/checks/00_check_median_identity.R` | median equals midpoint for a flat window, so median is not fitted |
-| `scripts/checks/01_check_continuous_widths.R` | two groups of widths against a continuous spread; writes `output/check_continuous_widths*.csv` |
+| `scripts/02_recovery_study.R` | fits both methods to every dataset; about 3 h on 24 workers |
+| `scripts/03_recovery_plots.R` | `output/recovery_metrics.csv`, the figures (including `checks/recovery_by_noise.png`, results split by noise ratio) and `dataset_anatomy.png` |
+| `scripts/04_single_fit.R` | `single_fit_comparison.png` |
 
 The previous design (grid-snapped windows, fine/coarse mix, skew, overhang and
 position sweeps) and its results are in `archive/superseded_run_20260916/`. The

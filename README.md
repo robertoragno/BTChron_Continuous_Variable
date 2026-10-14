@@ -51,8 +51,7 @@ BTChron_Paper_1/
 │   ├── shared/
 │   │   ├── models/      # linear_dates.stan (time as predictor), linear_dates_response.stan (time as response)
 │   │   ├── dating/      # how each case dates a find: radiocarbon, windows, phases (used by both roles)
-│   │   ├── scripts/     # older helpers, still used by checks and diagnostics
-│   │   ├── checks/      # full distribution vs latent-date equivalence check
+│   │   ├── scripts/     # the dating figures and the per-dataset trend draw
 │   │   ├── figures/     # how each case records a date
 │   │   └── README.md    # the models and the metrics, explained once
 │   ├── time_as_predictor/
@@ -60,7 +59,7 @@ BTChron_Paper_1/
 │   │   ├── Case2_Typochronology/     # independent typological windows ("first half of the 1st c. CE")
 │   │   ├── Case3_OverlappingPhases/  # ceramic phases that overlap at their edges
 │   │   └── Case4_MergedPhases/       # finds dated to a broad period spanning several phases
-│   ├── time_as_response/             # the same four cases (in progress)
+│   ├── time_as_response/             # the same four cases, time as the response
 │   └── archive/                      # earlier simulations, not part of the paper
 └── Real_Data/
     ├── dataset_1/                     # linear case study (GINI database)
@@ -76,9 +75,9 @@ CaseN_<name>/
 ├── data/design.csv          # every simulated dataset: its settings and its seed
 ├── scripts/
 │   ├── 01_design.R          # builds data/design.csv
-│   ├── 03_recovery_study.R  # fits every method to every dataset (slow)
-│   ├── 04_recovery_plots.R  # metrics and figures from the fits
-│   ├── 05_single_fit.R      # one dataset, fitted and shown up close
+│   ├── 02_recovery_study.R  # fits every method to every dataset (slow)
+│   ├── 03_recovery_plots.R  # metrics and figures from the fits
+│   ├── 04_single_fit.R      # one dataset, fitted and shown up close (time as predictor)
 │   └── checks/              # tests that the generator does what it claims
 └── figures/
     ├── dataset_anatomy.png          # what the data looks like before fitting
@@ -88,8 +87,9 @@ CaseN_<name>/
     └── checks/                      # secondary sweeps and generator checks
 ```
 
-Case 1 also has `02_figures.R` (the calibrated-date overview) and `scripts/diagnostics/`
-(side investigations). Fits are written to `output/`, which is not tracked; older
+Case 1 time as predictor also has `02_figures.R` (the calibrated-date overview),
+so its later scripts are numbered one higher (`03_recovery_study.R` to
+`05_single_fit.R`), and `scripts/diagnostics/` (side investigations). Fits are written to `output/`, which is not tracked; older
 runs are in `output/archive/`.
 
 ## Methods compared
@@ -109,9 +109,9 @@ From the repository root, in order:
 
 ```
 Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/01_design.R
-Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/03_recovery_study.R
-Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/04_recovery_plots.R
-Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/05_single_fit.R
+Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/02_recovery_study.R
+Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/03_recovery_plots.R
+Rscript Simulations/time_as_predictor/Case4_MergedPhases/scripts/04_single_fit.R
 ```
 
 Case 4 is the shortest and the easiest to read first.

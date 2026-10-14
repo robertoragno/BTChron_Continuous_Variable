@@ -2,7 +2,7 @@
 # Each dataset follows Cases 1 and 2 (time as response): values x drawn between
 # 0 and 1000, true dates = intercept + slope * x + noise, then the dates are
 # split into fine phases and each find gets a window of 1 to merge_max adjacent
-# phases (03_recovery_study.R does the simulating). The phases cover the range
+# phases (02_recovery_study.R does the simulating). The phases cover the range
 # of the dataset's true dates, so every window contains its true date.
 #
 # The trend is set relative to the study period, as in Cases 1 and 2: across the

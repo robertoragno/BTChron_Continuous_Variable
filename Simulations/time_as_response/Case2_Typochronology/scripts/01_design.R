@@ -1,7 +1,7 @@
 # Case 2, time as response: builds data/design.csv, one row per simulated dataset.
 # Each dataset follows Case 1 (time as response): values x drawn between 0 and
 # 1000, true dates = intercept + slope * x + noise, then each find gets a date
-# range that contains its true date (03_recovery_study.R does the simulating).
+# range that contains its true date (02_recovery_study.R does the simulating).
 #
 # The trend is set relative to the study period, as in Case 1: across the values
 # it spans 25-75% of the period, and the noise sd is 5-20% of the period. Dates

@@ -1,5 +1,5 @@
 # Builds the Case 3 design grid and writes it to data/design.csv.
-# 03_recovery_study.R reads that file and re-derives nothing.
+# 02_recovery_study.R reads that file and re-derives nothing.
 #
 #   core    dataset size crossed with random / zero slope, at overlap 0.5 and
 #           assign_p 0.2
