@@ -22,16 +22,30 @@ Measures, computed on datasets with a real (non-zero) slope:
   (target 0.90).
 - **σ bias**: estimated minus true σ (the scatter around the trend). Positive:
   the scatter is overestimated; negative: underestimated. Target 0.
+- **Relative interval width**: mean width of the slope's 90% interval, divided
+  by the size of the true slope. No target — smaller is more precise. Raw
+  width is in the slope's own units (value per year for time as predictor,
+  years per value unit for time as response) and depends on the length of the
+  period, so dividing by the true slope is what makes it readable next to the
+  other cases and the other direction.
 
-![Slope ratio and coverage, all cases](Simulations/shared/figures/overview.png)
+![Slope ratio, coverage and relative interval width, all cases](Simulations/shared/figures/overview.png)
 
 Points: the measure across all datasets in a group. Lines: its 95% interval given
 the number of datasets (regression confidence interval for the slope ratio,
-Jeffreys interval for coverage). The slope ratio is the slope of a regression of
-the estimated slopes on the true slopes across datasets. Dividing each estimate
-by its true slope and averaging would not work: many datasets have a true slope
-close to zero, and a small error divided by a near-zero slope gives an enormous
-ratio that would swamp the average.
+Jeffreys interval for coverage, +/- 2 standard errors for the relative width).
+The slope ratio is the slope of a regression of the estimated slopes on the true
+slopes across datasets. Dividing each estimate by its true slope and averaging
+would not work: many datasets have a true slope close to zero, and a small
+error divided by a near-zero slope gives an enormous ratio that would swamp the
+average.
+
+The three panels answer different questions, and a method can do well on one and
+badly on another. Time as response on the plateau is the clearest example: the
+midpoint gives the narrowest interval of the three (relative width 0.23 against
+0.59 for the full distribution) and its interval almost never contains the true
+slope (coverage 0.005). A narrow interval is only worth having where coverage is
+close to 0.90.
 
 ## Time as predictor
 

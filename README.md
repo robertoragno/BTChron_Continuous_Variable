@@ -1,7 +1,8 @@
 # BTChron Continuous Variable
 
 > [!NOTE]  
-> Work in progress for a paper. This readme will be updated soon with more details.
+> Work in progress for a paper. Simulation results for both directions (time as
+> predictor and time as response) are in [RESULTS.md](RESULTS.md).
 
 > [!IMPORTANT]
 > Note to self (RR): make some comments shorter and more elegant.

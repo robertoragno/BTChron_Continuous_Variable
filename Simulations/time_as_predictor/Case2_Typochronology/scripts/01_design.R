@@ -17,10 +17,6 @@ library(here)
 # Simulating script
 source(here("Simulations", "shared", "dating", "case2_typochronology.R"))
 
-# add_true_trend(): an id, a seed and a true intercept, slope and sigma per dataset
-source(here("Simulations", "shared", "scripts", "design.R"))
-
-# ---- settings ----
 PERIOD_START    <- 100   # Define the period of interest
 PERIOD_END      <- 900
 FINE_FRAC       <- 0.0625 # 50 yr of an 800-yr period
@@ -39,7 +35,6 @@ N_REP           <- 200  # datasets per setting
 OUTPUT_CSV      <- Sys.getenv("DESIGN_CASE2_OUT",
                               here("Simulations", "time_as_predictor", "Case2_Typochronology",
                                    "data", "design.csv"))
-# ------------------
 
 set.seed(2026)
 
@@ -64,7 +59,12 @@ design <- rbind(
   sweep_block("precision",  list(precision_trend = PRECISION_TREND))
 )
 
-design <- add_true_trend(design)
+design$dataset_id <- seq_len(nrow(design))
+design$seed       <- design$dataset_id
+design$intercept  <- runif(nrow(design), 2, 15)
+design$sigma      <- runif(nrow(design), 0.5, 4)
+design$slope      <- ifelse(design$slope_condition == "zero", 0,
+                            runif(nrow(design), -0.03, 0.03))
 
 design$period_start <- PERIOD_START
 design$period_end   <- PERIOD_END

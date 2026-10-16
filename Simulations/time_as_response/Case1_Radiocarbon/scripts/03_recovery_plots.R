@@ -4,6 +4,7 @@
 #   slope ratio   estimated slopes regressed on true slopes (1 = one-for-one)
 #   90% coverage        how often the 90% interval contains the true slope
 #   90% interval width  mean width of that interval
+#   relative interval width  that width over the size of the true slope
 #   bias in sigma       mean of posterior median minus true sigma
 # Bars are 95% intervals: +/- 2 standard errors for the means, the lm confidence
 # interval for the slope ratio, a Jeffreys interval for coverage.
@@ -65,18 +66,27 @@ for (f in unique(sets$figure))
 			se.bias <- sd(s$slope_err) / sqrt(n)
 			se.width <- sd(s$slope_width90) / sqrt(n)
 			se.sigma <- sd(s$sigma_err) / sqrt(n)
+			# Dividing the width by the size of the true slope removes its units
+			# and the length of the period, so the width can be read next to the
+			# other cases and the other direction.
+			slope.scale <- mean(abs(s$slope))
 			metrics <- rbind(metrics, data.frame(
 				figure = f, level = l, model = m, n = n,
 				metric = c("Slope bias", "Slope ratio", "90% coverage",
-				           "90% interval width", "Bias in sigma"),
+				           "90% interval width", "Relative interval width", "Bias in sigma"),
 				value = c(mean(s$slope_err), coef(calib)[2], k / n,
-				          mean(s$slope_width90), mean(s$sigma_err)),
+				          mean(s$slope_width90), mean(s$slope_width90) / slope.scale,
+				          mean(s$sigma_err)),
 				lo = c(mean(s$slope_err) - 2 * se.bias, confint(calib)[2, 1],
 				       qbeta(0.025, k + 0.5, n - k + 0.5),
-				       mean(s$slope_width90) - 2 * se.width, mean(s$sigma_err) - 2 * se.sigma),
+				       mean(s$slope_width90) - 2 * se.width,
+				       (mean(s$slope_width90) - 2 * se.width) / slope.scale,
+				       mean(s$sigma_err) - 2 * se.sigma),
 				hi = c(mean(s$slope_err) + 2 * se.bias, confint(calib)[2, 2],
 				       qbeta(0.975, k + 0.5, n - k + 0.5),
-				       mean(s$slope_width90) + 2 * se.width, mean(s$sigma_err) + 2 * se.sigma)))
+				       mean(s$slope_width90) + 2 * se.width,
+				       (mean(s$slope_width90) + 2 * se.width) / slope.scale,
+				       mean(s$sigma_err) + 2 * se.sigma)))
 		}
 	}
 }
