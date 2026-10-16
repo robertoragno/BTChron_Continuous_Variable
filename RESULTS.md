@@ -22,18 +22,17 @@ Measures, computed on datasets with a real (non-zero) slope:
   (target 0.90).
 - **σ bias**: estimated minus true σ (the scatter around the trend). Positive:
   the scatter is overestimated; negative: underestimated. Target 0.
-- **Relative interval width**: mean width of the slope's 90% interval, divided
-  by the size of the true slope. No target — smaller is more precise. Raw
-  width is in the slope's own units (value per year for time as predictor,
-  years per value unit for time as response) and depends on the length of the
-  period, so dividing by the true slope is what makes it readable next to the
-  other cases and the other direction.
+- **Relative interval width** (precision): mean width of the slope's 90% interval, divided
+  by the size of the true slope (to make it comparable across different cases). Smaller = more precise.
 
 ![Slope ratio, coverage and relative interval width, all cases](Simulations/shared/figures/overview.png)
 
-Points: the measure across all datasets in a group. Lines: its 95% interval given
-the number of datasets (regression confidence interval for the slope ratio,
-Jeffreys interval for coverage, +/- 2 standard errors for the relative width).
+Points: the measure across all datasets in a group. Error bars: its 95% interval,
+of the kind each measure calls for — a regression CI for the slope ratio (it is a
+regression coefficient), a Jeffreys interval for coverage (a proportion, and the
+usual normal approximation breaks down near 0 and 1), +/- 2 standard errors for
+the relative width (a mean).
+
 The slope ratio is the slope of a regression of the estimated slopes on the true
 slopes across datasets. Dividing each estimate by its true slope and averaging
 would not work: many datasets have a true slope close to zero, and a small
@@ -46,6 +45,21 @@ midpoint gives the narrowest interval of the three (relative width 0.23 against
 0.59 for the full distribution) and its interval almost never contains the true
 slope (coverage 0.005). A narrow interval is only worth having where coverage is
 close to 0.90.
+
+The same two measures, accuracy and precision, plotted against each other, one
+panel per direction and method:
+
+![Accuracy against precision](Simulations/shared/figures/accuracy_precision.png)
+
+The bottom left corner is accurate and tight. With time as predictor the full
+distribution moves the plateau left and down, more accurate and tighter at once.
+With time as response it moves it left and up: the accuracy is bought with
+width. Outside radiocarbon the two methods sit close together in both
+directions.
+
+Only the midpoint and the full distribution are shown. In Cases 2-4 the windows
+are flat, so the median is the midpoint; in Case 1 the calibrated median is a
+third method, in the figure above.
 
 ## Time as predictor
 

@@ -40,10 +40,8 @@ p <- ggplot(x, aes(x = value, y = case, colour = model)) +
 	scale_linetype_manual(values = c("Target" = "dotted")) +
 	facet_grid(direction ~ metric, scales = "free_x") +
 	labs(title = "Recovery of the slope, all cases", x = NULL, y = NULL, colour = NULL, linetype = NULL,
-	     caption = paste("Lines: 95% intervals given the number of datasets (regression confidence interval for the",
-	                     "slope ratio,\nJeffreys interval for coverage, +/- 2 standard errors for the relative width).",
-	                     "Relative width is the 90%\ninterval over the size of the true slope: it has no target, and",
-	                     "smaller is more precise.")) +
+	     caption = paste("Error bars: regression CI (slope ratio), Jeffreys (coverage),",
+	                     "+/- 2 SE (relative width).")) +
 	theme_classic() +
 	theme(legend.position = "top", panel.spacing.x = unit(1.5, "lines"))
 ggsave(here("Simulations", "shared", "figures", "overview.png"), p, width = 11, height = 6, dpi = 300)
