@@ -10,10 +10,6 @@ library(here)
 # Simulating script
 source(here("Simulations", "shared", "dating", "case4_merged_phases.R"))
 
-# add_true_trend(): an id, a seed and a true intercept, slope and sigma per dataset
-source(here("Simulations", "shared", "scripts", "design.R"))
-
-# ---- settings ----
 PERIOD_START <- 100
 PERIOD_END   <- 900
 MERGE_LEVELS <- c(2, 3, 4)   # largest number of fine phases in a broad period
@@ -25,7 +21,6 @@ N_REP        <- 100          # datasets per setting
 OUTPUT_CSV   <- Sys.getenv("DESIGN_CASE4_OUT",
                            here("Simulations", "time_as_predictor", "Case4_MergedPhases",
                                 "data", "design.csv"))
-# ------------------
 
 set.seed(2026)
 
@@ -43,7 +38,12 @@ merge_sweep$sweep           <- "merge"
 keep   <- c("sweep", "rep", "N", "slope_condition", "merge_max")
 design <- rbind(core[, keep], merge_sweep[, keep])
 
-design <- add_true_trend(design)
+design$dataset_id <- seq_len(nrow(design))
+design$seed       <- design$dataset_id
+design$intercept  <- runif(nrow(design), 2, 15)
+design$sigma      <- runif(nrow(design), 0.5, 4)
+design$slope      <- ifelse(design$slope_condition == "zero", 0,
+                            runif(nrow(design), -0.03, 0.03))
 design$K          <- sample(K_RANGE, nrow(design), replace = TRUE)
 design$alpha_conc <- 10^(-1 + 2 * rbeta(nrow(design), 2, 3.5))
 

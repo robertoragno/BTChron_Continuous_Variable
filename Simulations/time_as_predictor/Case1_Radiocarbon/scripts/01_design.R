@@ -10,10 +10,8 @@
 
 library(here)
 
-source(here("Simulations", "shared", "scripts", "design.R"))
 source(here("Simulations", "shared", "dating", "case1_radiocarbon.R"))
 
-# ---- settings ----
 # Two windows of the same length. On the plateau IntCal20 is nearly flat, so
 # calibrated dates are wide and multi-peaked. On the steep section they are
 # narrow and single-peaked.
@@ -30,7 +28,6 @@ N_REP        <- 100  # datasets per setting
 OUTPUT_CSV   <- Sys.getenv("DESIGN_CASE1_OUT",
                            here("Simulations", "time_as_predictor", "Case1_Radiocarbon", "data",
                                 "design.csv"))
-# ------------------
 
 set.seed(2026)
 
@@ -60,7 +57,12 @@ design <- rbind(
   sweep_block("deposition", list(window = names(WINDOWS), growth_ratio = GROWTH_RATIO))
 )
 
-design <- add_true_trend(design)
+design$dataset_id <- seq_len(nrow(design))
+design$seed       <- design$dataset_id
+design$intercept  <- runif(nrow(design), 2, 15)
+design$sigma      <- runif(nrow(design), 0.5, 4)
+design$slope      <- ifelse(design$slope_condition == "zero", 0,
+                            runif(nrow(design), -0.03, 0.03))
 
 design$window_start <- sapply(WINDOWS[design$window], `[`, 1)
 design$window_end   <- sapply(WINDOWS[design$window], `[`, 2)

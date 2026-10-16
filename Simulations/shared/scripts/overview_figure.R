@@ -1,6 +1,6 @@
-# Overview of the recovery studies: slope ratio and slope coverage for every
-# case and both directions, read from each case's output/recovery_metrics.csv.
-# Writes figures/overview.png.
+# Overview of the recovery studies: slope ratio, slope coverage and the 90%
+# interval width for every case and both directions, read from each case's
+# output/recovery_metrics.csv. Writes figures/overview.png.
 library(here)
 library(ggplot2)
 
@@ -12,7 +12,8 @@ for (direction in c("time_as_predictor", "time_as_response"))
 	{
 		m <- read.csv(here("Simulations", direction, case, "output", "recovery_metrics.csv"))
 		# Headline rows only; the not-converged rows of time as response are left out
-		m <- m[m$figure == "recovery_summary" & m$metric %in% c("Slope ratio", "90% coverage") &
+		m <- m[m$figure == "recovery_summary" &
+		       m$metric %in% c("Slope ratio", "90% coverage", "Relative interval width") &
 		       m$level %in% c("Hallstatt plateau", "Steep section", "all", "converged"), ]
 		m$case <- paste("Case", substr(case, 5, 5))
 		m$case[m$level == "Hallstatt plateau"] <- "Case 1, plateau"
@@ -23,8 +24,8 @@ for (direction in c("time_as_predictor", "time_as_response"))
 }
 x$model[x$model == "Midpoint / Median"] <- "Midpoint"
 x$model <- factor(x$model, levels = c("Midpoint", "Calibrated median", "Full distribution"))
-x$metric <- factor(ifelse(x$metric == "Slope ratio", "Slope ratio", "Slope coverage (90%)"),
-                   levels = c("Slope ratio", "Slope coverage (90%)"))
+x$metric <- ifelse(x$metric == "90% coverage", "Slope coverage (90%)", x$metric)
+x$metric <- factor(x$metric, levels = c("Slope ratio", "Slope coverage (90%)", "Relative interval width"))
 x$case <- factor(x$case, levels = rev(c("Case 1, plateau", "Case 1, steep", "Case 2", "Case 3", "Case 4")))
 targets <- data.frame(metric = factor(c("Slope ratio", "Slope coverage (90%)"), levels = levels(x$metric)),
                       target = c(1, 0.9))
@@ -39,8 +40,10 @@ p <- ggplot(x, aes(x = value, y = case, colour = model)) +
 	scale_linetype_manual(values = c("Target" = "dotted")) +
 	facet_grid(direction ~ metric, scales = "free_x") +
 	labs(title = "Recovery of the slope, all cases", x = NULL, y = NULL, colour = NULL, linetype = NULL,
-	     caption = paste("Lines: 95% intervals given the number of datasets (regression confidence",
-	                     "interval for the slope ratio, Jeffreys interval for coverage).")) +
+	     caption = paste("Lines: 95% intervals given the number of datasets (regression confidence interval for the",
+	                     "slope ratio,\nJeffreys interval for coverage, +/- 2 standard errors for the relative width).",
+	                     "Relative width is the 90%\ninterval over the size of the true slope: it has no target, and",
+	                     "smaller is more precise.")) +
 	theme_classic() +
 	theme(legend.position = "top", panel.spacing.x = unit(1.5, "lines"))
-ggsave(here("Simulations", "shared", "figures", "overview.png"), p, width = 8, height = 6, dpi = 300)
+ggsave(here("Simulations", "shared", "figures", "overview.png"), p, width = 11, height = 6, dpi = 300)

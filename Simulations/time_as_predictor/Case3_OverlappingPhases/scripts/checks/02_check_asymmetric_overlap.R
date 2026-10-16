@@ -18,7 +18,6 @@ library(cmdstanr)
 library(parallel)
 
 source(here("Simulations", "shared", "dating", "case3_overlapping_phases.R"))
-source(here("Simulations", "shared", "scripts", "design.R"))
 
 n.rep <- 100
 N <- 200
@@ -32,7 +31,12 @@ case.dir <- here("Simulations", "time_as_predictor", "Case3_OverlappingPhases")
 set.seed(2026)
 design <- expand.grid(rep = 1:n.rep, late_share = c(0.5, 0.75, 1), slope_condition = "random",
                       stringsAsFactors = FALSE)
-design <- add_true_trend(design)
+design$dataset_id <- seq_len(nrow(design))
+design$seed       <- design$dataset_id
+design$intercept  <- runif(nrow(design), 2, 15)
+design$sigma      <- runif(nrow(design), 0.5, 4)
+design$slope      <- ifelse(design$slope_condition == "zero", 0,
+                            runif(nrow(design), -0.03, 0.03))
 design$K <- sample(5:10, nrow(design), replace = TRUE)
 design$alpha_conc <- 10^(-1 + 2 * rbeta(nrow(design), 2, 3.5))
 model <- cmdstan_model(here("Simulations", "shared", "models", "linear_dates.stan"))
