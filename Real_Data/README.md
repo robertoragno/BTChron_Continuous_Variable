@@ -8,5 +8,5 @@ each `Simulations/Sim_*` folder: `data/`, `models/`, `scripts/`, `figures/`,
 | Dataset | Case study |
 |---|---|
 | [`dataset_1`](dataset_1/README.md) | Linear model, GINI database (roofed area vs. house date) |
-| `dataset_2` | not yet started |
+| [`dataset_2`](dataset_2/README.md) | Pipe stem bore dating, McMillan 2010 (date vs. mean bore) |
 | `dataset_3` | not yet started |

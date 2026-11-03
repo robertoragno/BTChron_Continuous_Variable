@@ -32,3 +32,12 @@ docs/*.docx
 # Self-contained copy of RESULTS.md for sharing, rebuilt from it
 RESULTS.html
 
+
+# Side tests, not part of the paper
+Simulations/sandbox/
+
+# McMillan 2010 thesis, not redistributed (see Real_Data/dataset_2/README.md)
+Real_Data/dataset_2/data/mcmillan2010.pdf
+Real_Data/dataset_2/data/mcmillan2010_pdf_text.txt
+Real_Data/dataset_2/data/appendixA.csv
+Real_Data/dataset_2/data/pipe_counts_raw.csv

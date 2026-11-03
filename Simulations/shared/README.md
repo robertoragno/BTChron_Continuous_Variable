@@ -2,12 +2,14 @@
 
 `dating/` holds how each case dates a find (radiocarbon, typological windows,
 overlapping or merged phases). Both `time_as_predictor/` and `time_as_response/`
-use it, so the four cases are dated the same way in both roles.
+use it, so the four cases are dated the same way in both roles. The datasets
+themselves are not shared: each role simulates its own (value first or date
+first), with its own design.
 
 `models/linear_dates_response.stan` is the time-as-response version of the model
 below: date = intercept + slope × value + noise, with the same table of candidate
-years and probabilities. It is in progress; the rest of this README describes the
-time-as-predictor model.
+years and probabilities. The rest of this README describes the time-as-predictor
+model.
 
 ## One model
 

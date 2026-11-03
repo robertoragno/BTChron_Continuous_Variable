@@ -1,62 +1,65 @@
-# dataset_1 — Linear case study (GINI database)
+# dataset_1 — House size and date (GINI database)
 
-The linear model from `Simulations/Sim_Linear`, applied to roofed-area data from
-the GINI database (`gini_database_all_records_20240721.csv`). The response is
-`log(RoofedArea)`; each house carries a dating window `[BeginHouse, EndHouse]`
-rather than a known year. The question is the same as the simulation: does
-treating each date as a latent parameter within its window change the inferred
-trend, relative to collapsing the window to its midpoint.
+Roofed area rises across the first millennium, and almost every house in the
+database is dated to a window rather than to a year. Fitting the trend means
+deciding what to do with those windows: collapse each to its midpoint, as is
+usual, or carry the whole window into the model. This is the time-as-predictor
+direction — the measured value is the response, the date the predictor.
 
-Subset: Great Britain, nuclear-family houses, positive roofed area, dated window
-(`EndHouse > BeginHouse`), midpoint year in `[-100, 1000]` — **2682 houses**.
+## Source
 
-> [!IMPORTANT]
->  Alternatively there is this paper, but it is missing a chronological range: https://www.frontiersin.org/journals/ecology-and-evolution/articles/10.3389/fevo.2023.1191274/full
+The GINI database of house sizes (`gini_database_all_records_20240721.csv`).
 
-### Scripts
+Subset: Great Britain, nuclear-family houses, positive roofed area, a dated
+window (`EndHouse > BeginHouse`) and a midpoint in [-100, 1000] — **2,682 houses
+from 746 sites**. The response is `log(RoofedArea)`; the date of each house is
+the window `[BeginHouse, EndHouse]`.
+
+Windows are wide: 3 to 915 years, median 150, against a span of 384 BCE to 700
+CE. Dating is coarse enough here that the choice of treatment is not academic.
+
+## Scripts
 
 | Script | Purpose | Output |
 |---|---|---|
-| `01_prepare.R` | filter the GINI database, write the subset, exploratory panel | `data/gini_gb_filtered.csv`, `figures/dataset_1_exploratory_panel.png` |
-| `02_fit.R` | fit the latent-date and midpoint models, save fits and diagnostics | `output/fit_latent.rds`, `fit_midpoint.rds`, `diagnostics.txt` |
-| `03_compare.R` | comparison figure and per-house date posteriors | `figures/dataset_1_model_comparison.png`, `dataset_1_individual_date_posteriors.png` |
+| `01_prepare.R` | filter the database, write the subset, exploratory panel | `gini_gb_filtered.csv`, `dataset_1_exploratory_panel.png` |
+| `02_fit.R` | fit both dating treatments, save fits and diagnostics | `fits.rds`, `fit_summary.csv`, `diagnostics.txt` |
+| `03_compare.R` | comparison figure | `dataset_1_model_comparison.png` |
 
-Fitting is separated from plotting so figures can be restyled without refitting.
-Both models converged cleanly (0 divergences, max Rhat 1.002, min bulk ESS > 3100).
-Dates are mapped to `[-1, 1]` internally (not `[0, 1]`), which keeps alpha and
-beta from being strongly correlated in the posterior; on this dataset it
-roughly tripled the midpoint model's effective sample size (min bulk ESS 1253
--> 3816) without moving either model's estimates.
+Both treatments use `Simulations/shared/models/linear_dates.stan`, the model the
+simulations use, with a 5-year grid of candidate years. The midpoint treatment
+is the same model given one candidate year per house. Fitting is separated from
+plotting so figures can be restyled without refitting; the fits take about four
+minutes each and are run in a tmux `BTChron` session.
 
-### Exploratory panel
+## Result
+
+| | slope (log roofed area per century) | sigma |
+|---|---|---|
+| midpoint date | 0.179 [0.154, 0.205] | 0.974 [0.952, 0.996] |
+| whole window | 0.186 [0.161, 0.210] | 0.963 [0.940, 0.985] |
+
+Both treatments converged cleanly: 0 divergences, max Rhat 1.00, min bulk ESS
+3,474.
+
+The two agree on the trend well within their intervals: carrying the window
+moves the slope by 4%, against a credible interval five times that wide. Sigma
+is lower under the whole-window treatment, which is the direction the
+simulations predict — date uncertainty that is not modelled is absorbed into the
+residual variance instead. With no ground truth on real data the figures carry
+no truth overlay; the contrast between the two treatments is the point.
+
+The size of that contrast is itself informative. For flat windows of this kind
+the simulations find the midpoint recovers the slope and misstates only sigma,
+so a small slope difference and a lower sigma is the expected result, not a weak
+one.
+
 <p align="center">
-<img src="figures/dataset_1_exploratory_panel.png" height="320" text-align="center"/>
+<img src="figures/dataset_1_model_comparison.png" height="620" text-align="center"/>
 </p>
 
-### Model comparison
-
-The two models agree on the trend within the credible intervals. The latent-date
-model returns a slightly steeper slope (0.00186 vs 0.00179) and a lower sigma
-(0.963 vs 0.974) than the midpoint model, consistent with the simulation
-finding: unmodelled date uncertainty is otherwise absorbed into the residual
-variance. With no ground truth on real data, the figures carry no truth
-overlay; the contrast between the two models is the point. Per the simulation
-study, this gap is expected to be small under uniform-ish, reasonably fine
-dating, and to widen under coarser or skewed dating -- it is not, on its own,
-evidence that either model is "right" here.
+## Exploratory panel
 
 <p align="center">
-<img src="figures/dataset_1_model_comparison.png" height="800" text-align="center"/>
-</p>
-
-### Per-house date posteriors
-
-For a sample of houses, the left panels show the recovered trend with the house's
-dating window (shaded) and observed value (dashed); the right panels show the
-posterior for each estimated date, with the window boundaries (dashed). The
-posteriors stay close to the uniform window prior but tilt toward the end of the
-window that agrees with the trend.
-
-<p align="center">
-<img src="figures/dataset_1_individual_date_posteriors.png" height="900" text-align="center"/>
+<img src="figures/dataset_1_exploratory_panel.png" height="520" text-align="center"/>
 </p>

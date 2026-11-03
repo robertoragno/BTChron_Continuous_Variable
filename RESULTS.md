@@ -27,6 +27,9 @@ Measures, computed on datasets with a real (non-zero) slope:
 
 ![Slope ratio, coverage and relative interval width, all cases](Simulations/shared/figures/overview.png)
 
+The two directions are separate simulations with their own datasets, so their
+panels are not a paired comparison.
+
 Points: the measure across all datasets in a group. Error bars: its 95% interval,
 of the kind each measure calls for — a regression CI for the slope ratio (it is a
 regression coefficient), a Jeffreys interval for coverage (a proportion, and the

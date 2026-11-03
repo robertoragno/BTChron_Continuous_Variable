@@ -21,8 +21,8 @@ source(here("Simulations", "shared", "dating", "case4_merged_phases.R"))
 OUT_DIR  <- here("Simulations", "shared", "figures")
 ACCENT   <- "#780000"
 N_SHOW   <- 16
-TRUE_LAB <- "true date (simulated)"
-ROW_LAB  <- "finds, sorted by true date"
+TRUE_LAB <- "simulated date"
+ROW_LAB  <- "Simulated samples"
 
 base_theme <- theme_classic(base_size = 11) +
   theme(plot.title = element_text(size = 12, face = "bold"),
@@ -35,12 +35,13 @@ strip_theme <- base_theme +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(),
         axis.line.x = element_blank())
 
-save_fig <- function(strip, rows, title, subtitle, file, xlim, strip_h = 1) {
+save_fig <- function(strip, rows, title, subtitle = NULL, file, xlim, strip_h = 1,
+                     caption = NULL) {
   rows <- rows + coord_cartesian(xlim = xlim)
   fig  <- if (is.null(strip)) rows else
     (strip + coord_cartesian(xlim = xlim)) / rows +
       plot_layout(heights = c(strip_h, 3.2), guides = "collect")
-  fig  <- fig + plot_annotation(title = title, subtitle = subtitle,
+  fig  <- fig + plot_annotation(title = title, subtitle = subtitle, caption = caption,
                                 theme = base_theme)
   ggsave(file.path(OUT_DIR, file), fig & theme(legend.position = "bottom"),
          width = 9, height = if (is.null(strip)) 5.4 else 6.1 + 0.7 * strip_h, dpi = 300,
@@ -103,30 +104,29 @@ rows1 <- ggplot(dens) +
   labs(x = "calendar year", y = ROW_LAB) +
   base_theme
 
-save_fig(strip1, rows1, "Case 1: radiocarbon",
-         "Hallstatt plateau, lab error 30 years",
-         "case1_dating.png", c(-1000, -200))
+save_fig(strip1, rows1, "Case 1: Radiocarbon dating",
+         file = "case1_dating.png", xlim = c(-1000, -200))
 
 # Case 2: independent windows, no shared scheme
 
 typo <- sort_rows(simulate_typo(N_SHOW, 8, 0.02, 2, prop_coarse_samples = 0.5, seed = 5))
 
-typo$window <- ifelse(typo$Coarse, "coarsely dated window", "well-dated window")
+typo$window <- ifelse(typo$Coarse, "wide date range", "narrow date range")
 
 rows2 <- ggplot(typo) +
   geom_segment(aes(x = Start_date, xend = End_date, y = row, yend = row,
                    colour = window), linewidth = 2.2) +
   geom_point(aes(True_date, row, colour = TRUE_LAB), size = 2) +
-  scale_colour_manual(values = c("well-dated window" = "grey35",
-                                 "coarsely dated window" = "grey75",
+  scale_colour_manual(values = c("narrow date range" = "grey35",
+                                 "wide date range" = "grey75",
                                  setNames(ACCENT, TRUE_LAB)),
-                      breaks = c("well-dated window", "coarsely dated window", TRUE_LAB)) +
+                      breaks = c("narrow date range", "wide date range", TRUE_LAB)) +
+  scale_x_continuous(breaks = c(1, 500, 1000), labels = c("1 CE", "500 CE", "1000 CE")) +
   labs(x = "calendar year", y = ROW_LAB) +
   base_theme
 
-save_fig(NULL, rows2, "Case 2: typochronology",
-         "Each find has its own window: 6% of the period if well dated, 20-30% if coarsely dated",
-         "case2_dating.png", c(-300, 1300))
+save_fig(NULL, rows2, "Case 2: Independent date ranges",
+         file = "case2_dating.png", xlim = c(0, 1100))
 
 K <- 6; ALPHA <- 1; PHASE_SEED <- 35
 
@@ -141,13 +141,10 @@ ph3   <- data.frame(phase = seq_len(K), lo = b3[-(K + 1)] - reach,
 ov    <- sort_rows(ov)
 in_overlap <- sapply(ov$True_date, function(t)
   any(t >= ph3$lo[-1] & t <= ph3$hi[-K]))
-ov$where <- ifelse(in_overlap, "true date where two phases overlap",
-                   "true date in one phase only")
-edges3 <- geom_vline(xintercept = c(ph3$lo, ph3$hi), colour = "grey70",
-                     linetype = "dashed", linewidth = 0.3)
+ov$where <- ifelse(in_overlap, "simulated date in an overlap",
+                   "simulated date in one phase")
 
 strip3 <- ggplot(ph3) +
-  edges3 +
   geom_rect(aes(xmin = lo, xmax = hi, ymin = K - phase, ymax = K - phase + 0.8),
             fill = "grey85", colour = "grey30", linewidth = 0.3) +
   geom_text(aes(x = mid, y = K - phase + 0.4, label = paste0("P", phase)),
@@ -156,21 +153,24 @@ strip3 <- ggplot(ph3) +
   strip_theme
 
 rows3 <- ggplot(ov) +
-  edges3 +
   geom_segment(aes(x = Start_date, xend = End_date, y = row, yend = row,
-                   colour = "recorded phase window"), linewidth = 2.2) +
+                   colour = "assigned phase"), linewidth = 2.2) +
   geom_point(aes(True_date, row, shape = where), colour = ACCENT, fill = "white",
              size = 2.2, stroke = 0.9) +
   scale_colour_manual(values = "grey55") +
-  scale_shape_manual(values = c("true date in one phase only" = 16,
-                                "true date where two phases overlap" = 21)) +
+  scale_shape_manual(values = c("simulated date in one phase" = 16,
+                                "simulated date in an overlap" = 21),
+                     breaks = c("simulated date in one phase",
+                                "simulated date in an overlap")) +
   guides(colour = guide_legend(order = 1), shape = guide_legend(order = 2)) +
+  scale_x_continuous(breaks = c(1, 250, 500, 750, 1000),
+                     labels = c("1 CE", "250 CE", "500 CE", "750 CE", "1000 CE")) +
   labs(x = "calendar year", y = ROW_LAB) +
   base_theme
 
-save_fig(strip3, rows3, "Case 3: overlapping phases",
-         "A find where two phases overlap is given either phase at random",
-         "case3_dating.png", c(0, 1000), strip_h = 1.8)
+save_fig(strip3, rows3, "Case 3: Overlapping phases",
+         file = "case3_dating.png", xlim = c(0, 1000), strip_h = 1.8,
+         caption = "A sample dated to where two phases overlap is assigned either phase at random")
 
 # Case 4: runs of adjacent abutting phases
 
@@ -179,8 +179,8 @@ mg   <- simulate_merged(N_SHOW + 4, 8, 0.02, 2, K, ALPHA, merge_max = 3,
 b4   <- attr(mg, "bounds")
 ph4  <- data.frame(phase = seq_len(K), lo = b4[-(K + 1)], hi = b4[-1])
 span <- mg$Phases
-mg$span <- factor(paste("window of", span, ifelse(span == 1, "phase", "phases")),
-                  levels = paste("window of", 1:3, c("phase", "phases", "phases")))
+mg$span <- factor(paste("assigned to", span, ifelse(span == 1, "phase", "phases")),
+                  levels = paste("assigned to", 1:3, c("phase", "phases", "phases")))
 mg   <- sort_rows(mg)
 edges4 <- geom_vline(xintercept = b4, colour = "grey70", linetype = "dashed",
                      linewidth = 0.3)
@@ -203,9 +203,61 @@ rows4 <- ggplot(mg) +
              size = 2.4, stroke = 0.6) +
   scale_colour_manual(values = c("grey20", "grey55", "grey80"), drop = FALSE) +
   scale_shape_manual(values = 21) +
+  guides(colour = guide_legend(order = 1), shape = guide_legend(order = 2)) +
+  scale_x_continuous(breaks = c(1, 250, 500, 750, 1000),
+                     labels = c("1 CE", "250 CE", "500 CE", "750 CE", "1000 CE")) +
   labs(x = "calendar year", y = ROW_LAB) +
   base_theme
 
-save_fig(strip4, rows4, "Case 4: merged phases",
-         "Each find is dated to 1, 2 or 3 adjacent phases",
-         "case4_dating.png", c(0, 1000))
+save_fig(strip4, rows4, "Case 4: Abutting phases",
+         file = "case4_dating.png", xlim = c(0, 1000))
+
+# Mixed dating methods (presentation only): four samples from each case over the
+# same period, each drawn as the probability over years the model receives
+
+set.seed(4)
+pick <- function(d, method) {
+  d <- d[sample(nrow(d), 4), ]
+  data.frame(method = method, True_date = d$True_date,
+             Start_date = d$Start_date, End_date = d$End_date, CRA = NA, Error = NA)
+}
+mix_c14 <- simulate_c14(4, 8, 0.02, 2, c(100, 900), lab_error = 30, seed = 3)
+mix <- rbind(data.frame(method = "radiocarbon", True_date = mix_c14$True_date,
+                        Start_date = NA, End_date = NA,
+                        CRA = mix_c14$CRA, Error = mix_c14$Error),
+             pick(typo, "independent date range"),
+             pick(ov, "overlapping phases"),
+             pick(mg, "abutting phases"))
+mix <- sort_rows(mix)
+mix$method <- factor(mix$method, levels = c("radiocarbon", "independent date range",
+                                            "overlapping phases", "abutting phases"))
+
+years <- 0:1000
+dens_mix <- do.call(rbind, lapply(seq_len(nrow(mix)), function(i) {
+  if (mix$method[i] == "radiocarbon") {
+    cal <- calmatrix_to_calendar(calibrate(mix$CRA[i], errors = mix$Error[i],
+                                           calCurves = "intcal20", calMatrix = TRUE,
+                                           verbose = FALSE))
+    p <- cal$prob[match(years, cal$years), 1]
+    p[is.na(p)] <- 0
+  } else {
+    p <- as.numeric(years >= mix$Start_date[i] & years <= mix$End_date[i])
+  }
+  data.frame(row = i, method = mix$method[i], year = years,
+             ymin = i, ymax = i + 0.85 * p / max(p))
+}))
+
+rows_mix <- ggplot(dens_mix) +
+  geom_ribbon(aes(year, ymin = ymin, ymax = ymax, group = row, fill = method),
+              colour = "grey40", linewidth = 0.2) +
+  geom_point(data = mix, aes(True_date, row, colour = TRUE_LAB), size = 2) +
+  scale_fill_manual(values = c("#E69F00", "#56B4E9", "#009E73", "#7570B3")) +
+  scale_colour_manual(values = ACCENT) +
+  guides(fill = guide_legend(order = 1), colour = guide_legend(order = 2)) +
+  scale_x_continuous(breaks = c(1, 250, 500, 750, 1000),
+                     labels = c("1 CE", "250 CE", "500 CE", "750 CE", "1000 CE")) +
+  labs(x = "calendar year", y = ROW_LAB) +
+  base_theme
+
+save_fig(NULL, rows_mix, "Different dating methods in a single dataset",
+         file = "mixed_dating.png", xlim = c(0, 1000))

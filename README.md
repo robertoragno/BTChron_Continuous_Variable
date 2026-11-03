@@ -39,7 +39,9 @@ three adjacent phases.
 ## Repository structure
 
 The paper looks at time in two roles, and each role is tested on the same four
-dating cases:
+dating cases. Each role has its own simulated datasets (the data are generated in
+opposite orders), so results are compared within a role, not dataset by dataset
+across roles:
 
 - **time as predictor**: a measured value changes with the date
   (value = intercept + slope × date)

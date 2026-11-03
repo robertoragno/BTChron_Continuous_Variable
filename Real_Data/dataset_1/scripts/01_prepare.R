@@ -1,79 +1,70 @@
-# Real-data linear case study: prepare the GINI subset and the exploratory panel.
+# Build the analysis subset of the GINI house database and the exploratory
+# panel. Time as predictor: the roofed area of a house is the response, its
+# date the predictor, known only as a window.
 #
-# Subset: Great Britain, nuclear-family houses, positive roofed area, with a
-# dated window (EndHouse > BeginHouse) and midpoint in [-100, 1000].
-# Response is log(RoofedArea); dating window is [BeginHouse, EndHouse].
+# Subset: Great Britain, nuclear-family houses, positive roofed area, a dated
+# window (EndHouse > BeginHouse) and a midpoint in [-100, 1000].
 #
 # Produces: gini_gb_filtered.csv, dataset_1_exploratory_panel.png
-
 library(here)
-library(tidyverse)
+library(ggplot2)
 library(patchwork)
 
-data_dir   <- here("Real_Data", "dataset_1", "data")
-raw_path   <- file.path(data_dir, "gini_database_all_records_20240721.csv")
-clean_path <- file.path(data_dir, "gini_gb_filtered.csv")
-figure_path <- function(name) here("Real_Data", "dataset_1", "figures", name)
+data.dir <- here("Real_Data", "dataset_1", "data")
+figure.file <- here("Real_Data", "dataset_1", "figures", "dataset_1_exploratory_panel.png")
 
-panel_theme <- theme_classic(base_size = 11) +
-  theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
-        plot.margin = margin(5, 10, 2, 10))
+panel.theme <- theme_classic(base_size = 11) +
+	theme(plot.title = element_text(size = 11, face = "bold", hjust = 0),
+	      plot.margin = margin(5, 10, 2, 10))
 
-# 1. Filter ---------------------------------------------------------------------
+raw <- read.csv(file.path(data.dir, "gini_database_all_records_20240721.csv"))
 
-raw <- read_csv(raw_path, show_col_types = FALSE)
+# 1. Subset ---------------------------------------------------------------
 
-gb_data <- raw %>%
-  filter(Region == "Great Britain", RoofedArea > 0,
-         Housetypedesc == "Nuclear family", EndHouse > BeginHouse) %>%
-  mutate(Midpoint = (BeginHouse + EndHouse) / 2) %>%
-  filter(Midpoint >= -100, Midpoint <= 1000) %>%
-  transmute(ID = row_number(),
-            Site,
-            Start_date = BeginHouse,
-            End_date   = EndHouse,
-            Midpoint,
-            RoofedArea,
-            Value = log(RoofedArea))
+# which() rather than a plain logical index: a record missing a date or an area
+# gives NA in the condition, which would otherwise be kept as a row of NAs
+houses <- raw[which(raw$Region == "Great Britain" & raw$RoofedArea > 0 &
+                    raw$Housetypedesc == "Nuclear family" & raw$EndHouse > raw$BeginHouse), ]
+houses$Midpoint <- (houses$BeginHouse + houses$EndHouse) / 2
+houses <- houses[which(houses$Midpoint >= -100 & houses$Midpoint <= 1000), ]
 
-write_csv(gb_data, clean_path)
-cat("Filtered subset:", nrow(gb_data), "houses\n")
+houses <- data.frame(ID = seq_len(nrow(houses)), Site = houses$Site,
+                     Start_date = houses$BeginHouse, End_date = houses$EndHouse,
+                     Midpoint = houses$Midpoint, RoofedArea = houses$RoofedArea,
+                     Value = log(houses$RoofedArea))
+houses$width <- houses$End_date - houses$Start_date
 
-# 2. Exploratory panel ----------------------------------------------------------
-# Same three-panel layout as the simulation, without a ground-truth line:
-# real data has no known trend.
+write.csv(houses, file.path(data.dir, "gini_gb_filtered.csv"), row.names = FALSE)
+cat("subset:", nrow(houses), "houses from", length(unique(houses$Site)), "sites\n")
+cat("span:", min(houses$Start_date), "-", max(houses$End_date), "CE\n")
+cat("windows:", min(houses$width), "-", max(houses$width),
+    "years, median", median(houses$width), "\n")
 
-year_breaks <- seq(-200, 1000, 200)
+# 2. Exploratory panel ----------------------------------------------------
+# The first panel is the data as the model sees it: one segment per house,
+# spanning the years its date could take, at the roofed area measured for it.
+# Too many houses to draw them all, so a sample is shown.
 
-exploratory <- gb_data %>%
-  arrange(Midpoint) %>%
-  mutate(row_position = row_number())
+set.seed(1)
+shown <- houses[sample(nrow(houses), 300), ]
 
-values_histogram <- ggplot(exploratory, aes(Value)) +
-  geom_histogram(binwidth = 0.3, fill = "grey70", colour = "black", linewidth = 0.3) +
-  labs(title = expression(bold("A.") ~ "Distribution of values"),
-       x = "log(Roofed area)", y = "Count") + panel_theme
+p.data <- ggplot(shown, aes(y = Value)) +
+	geom_errorbar(aes(xmin = Start_date, xmax = End_date), orientation = "y",
+	              width = 0, linewidth = 0.3, colour = "grey30", alpha = 0.6) +
+	labs(title = "Dates and roofed areas (300 houses sampled)",
+	     x = "date window (CE)", y = "log roofed area") +
+	panel.theme
 
-date_ranges_plot <- ggplot(exploratory, aes(y = row_position)) +
-  geom_segment(aes(x = Start_date, xend = End_date, yend = row_position),
-               linewidth = 0.1, colour = "grey40", alpha = 0.5) +
-  geom_point(aes(x = Midpoint), shape = 15, size = 0.2, colour = "black") +
-  scale_x_continuous(breaks = year_breaks, expand = c(0.01, 0)) +
-  labs(title = expression(bold("B.") ~ "Recorded dating ranges"), x = "Year",
-       y = "House (ordered)") +
-  panel_theme + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+p.width <- ggplot(houses, aes(x = width)) +
+	geom_histogram(binwidth = 25, fill = "grey30", colour = "white") +
+	labs(title = "Width of the date window", x = "years", y = "houses") +
+	panel.theme
 
-values_over_time <- ggplot(exploratory, aes(Midpoint, Value)) +
-  geom_linerange(aes(xmin = Start_date, xmax = End_date), linewidth = 0.1,
-                 colour = "grey60", alpha = 0.3) +
-  geom_point(shape = 15, size = 0.4, colour = "black", alpha = 0.4) +
-  scale_x_continuous(breaks = year_breaks, expand = c(0.01, 0)) +
-  labs(title = expression(bold("C.") ~ "Values across time"), x = "Year",
-       y = "log(Roofed area)") + panel_theme
+p.value <- ggplot(houses, aes(x = Value)) +
+	geom_histogram(bins = 30, fill = "grey30", colour = "white") +
+	labs(title = "Roofed area", x = "log roofed area", y = "houses") +
+	panel.theme
 
-ggsave(figure_path("dataset_1_exploratory_panel.png"),
-       (values_histogram | date_ranges_plot | values_over_time) +
-         plot_layout(widths = c(0.8, 1.8, 0.8)),
-       width = 14, height = 4.5, dpi = 300, bg = "white")
-
-cat("Wrote dataset_1_exploratory_panel.png\n")
+panel <- p.data / (p.width | p.value) + plot_layout(heights = c(1.6, 1))
+ggsave(figure.file, panel, width = 9, height = 8, dpi = 300, bg = "white")
+cat("wrote", basename(figure.file), "\n")
