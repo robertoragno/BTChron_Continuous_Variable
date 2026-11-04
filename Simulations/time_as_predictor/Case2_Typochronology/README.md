@@ -69,6 +69,8 @@ setting, 3200 in total:
 
 0% and 100% coarsely dated are reference points, not "realistic" datasets.
 
+The run has 200 datasets per setting (3200 in total), while the other cases have 100. Results and figures use replicates 1 to 100 of each setting, to match them. On all 200 the headline numbers are nearly the same (slope ratio 0.965 midpoint, 0.971 full distribution; coverage 0.77 and 0.81).
+
 ## Feeding the models
 
 Both fits use the same model (`shared/models/linear_dates.stan`) and see each find's range and measured value, not the true date.

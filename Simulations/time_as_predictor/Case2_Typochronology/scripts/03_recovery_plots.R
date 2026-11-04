@@ -16,6 +16,9 @@ source(here("Simulations", "shared", "dating", "case2_typochronology.R"))
 results <- read.csv(here("Simulations", "time_as_predictor", "Case2_Typochronology", "output", "recovery_results.csv"))
 design <- read.csv(here("Simulations", "time_as_predictor", "Case2_Typochronology", "data", "design.csv"))
 r <- merge(results, design)
+# The run has 200 datasets per setting; the other cases have 100.
+# Only replicates 1 to 100 are used here, to match them.
+r <- r[r$rep <= 100, ]
 r$model <- ifelse(r$model == "midpoint", "Midpoint / Median", "Full distribution")
 fig.dir <- here("Simulations", "time_as_predictor", "Case2_Typochronology", "figures")
 

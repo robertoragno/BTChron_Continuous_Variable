@@ -72,7 +72,7 @@ Value = intercept + slope × date. σ in units of the measured value (true σ 0.
 |---|---|---|
 | 1, steep section | midpoint 0.80 / 0.44 / +0.14; median 0.82 / 0.47 / +0.14 | 0.83 / 0.49 / +0.01 |
 | 1, Hallstatt plateau | midpoint 1.11 / 0.79 / +0.45; median 0.82 / 0.64 / +0.41 | 0.96 / 0.83 / −0.02 |
-| 2, typochronology | 0.965 / 0.77 / +0.13 | 0.97 / 0.81 / −0.01 |
+| 2, typochronology | 0.97 / 0.78 / +0.13 | 0.97 / 0.83 / −0.01 |
 | 3, overlapping phases | 1.00 / 0.87 / +0.41 | 0.97 / 0.76 / −0.16 |
 | 4, merged phases | 1.03 / 0.85 / +0.60 | 1.01 / 0.85 / −0.07 |
 
