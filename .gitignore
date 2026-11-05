@@ -25,9 +25,8 @@ Notes/
 skew_correction_plan.md
 Simulations/LEARN.md
 
-# Planning notes, not part of the paper
-docs/IMPLEMENTATION_PLAN.md
-docs/*.docx
+# Planning notes and manuscript drafts, not part of the repository
+docs/
 
 # Self-contained copy of RESULTS.md for sharing, rebuilt from it
 RESULTS.html
